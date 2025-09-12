@@ -1,3 +1,5 @@
+import React from 'react';
+
 // K-line data types
 export interface KLineData {
   id: number;
@@ -6,6 +8,7 @@ export interface KLineData {
   low: number;
   close: number;
   volume: number;
+  vol?: number; // Alternative volume field
   dateString: string;
   selectedItemList?: Array<{
     title: string;
@@ -87,6 +90,43 @@ export interface KLineChartProps {
   onDrawItemDidTouch?: (event: any) => void;
   onDrawItemComplete?: (event: any) => void;
   onDrawPointComplete?: (event: any) => void;
+  // Custom styling props
+  containerStyle?: any;
+  chartStyle?: any;
+  // Custom behavior props
+  enableGestures?: boolean;
+  enableZoom?: boolean;
+  enableScroll?: boolean;
+  enableDrawing?: boolean;
+  // Custom overlay props
+  showOverlay?: boolean;
+  overlayContent?: React.ReactNode;
+  // Custom loading props
+  isLoading?: boolean;
+  loadingComponent?: React.ReactNode;
+  // Custom error props
+  hasError?: boolean;
+  errorComponent?: React.ReactNode;
+  // Custom header props
+  showHeader?: boolean;
+  headerComponent?: React.ReactNode;
+  // Custom footer props
+  showFooter?: boolean;
+  footerComponent?: React.ReactNode;
+  // Custom side panels
+  showLeftPanel?: boolean;
+  leftPanelComponent?: React.ReactNode;
+  showRightPanel?: boolean;
+  rightPanelComponent?: React.ReactNode;
+  // Custom background
+  backgroundComponent?: React.ReactNode;
+  // Custom events
+  onChartPress?: (event: any) => void;
+  onChartLongPress?: (event: any) => void;
+  onChartPan?: (event: any) => void;
+  onChartZoom?: (event: any) => void;
+  // Custom ref
+  chartRef?: React.RefObject<any>;
 }
 
 export interface ToolbarProps {

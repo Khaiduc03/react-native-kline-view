@@ -1,9 +1,18 @@
-import React, { Component } from 'react';
-import { View, StyleSheet, StatusBar, Dimensions } from 'react-native';
+import React, { Component, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  StatusBar,
+  Dimensions,
+  TouchableOpacity,
+  Text,
+} from 'react-native';
 import { ThemeManager } from './src/constants';
 import { useKLineChart } from './src/hooks/useKLineChart';
 import {
   KLineChart,
+  CustomKLineChart,
+  CustomKLineExample,
   Toolbar,
   ControlBar,
   TimeSelector,
@@ -15,6 +24,8 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isHorizontalScreen = screenWidth > screenHeight;
 
 const App: React.FC = () => {
+  const [useCustomView, setUseCustomView] = useState(false);
+
   const {
     state,
     toggleTheme,
@@ -35,30 +46,81 @@ const App: React.FC = () => {
   const theme = ThemeManager.getCurrentTheme(state.isDarkTheme);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundColor }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
+    >
       {/* Top toolbar */}
       <Toolbar isDarkTheme={state.isDarkTheme} onToggleTheme={toggleTheme} />
 
-      {/* K-line chart */}
-      <KLineChart
-        optionList={state.optionList}
-        onDrawItemDidTouch={onDrawItemDidTouch}
-        onDrawItemComplete={onDrawItemComplete}
-        onDrawPointComplete={onDrawPointComplete}
-      />
+      {/* Toggle between normal and custom view */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            !useCustomView && styles.activeToggleButton,
+            { backgroundColor: !useCustomView ? theme.buttonColor : '#F5F5F5' },
+          ]}
+          onPress={() => setUseCustomView(false)}
+        >
+          <Text
+            style={[
+              styles.toggleButtonText,
+              { color: !useCustomView ? '#FFFFFF' : theme.textColor },
+            ]}
+          >
+            Normal View
+          </Text>
+        </TouchableOpacity>
 
-      {/* Bottom control bar */}
-      <ControlBar
-        selectedTimeType={state.selectedTimeType}
-        selectedMainIndicator={state.selectedMainIndicator}
-        selectedSubIndicator={state.selectedSubIndicator}
-        selectedDrawTool={state.selectedDrawTool}
-        onTimeTypePress={showTimeSelector}
-        onIndicatorPress={showIndicatorSelector}
-        onDrawToolPress={showDrawToolSelector}
-        onClearDrawings={clearDrawings}
-        theme={theme}
-      />
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            useCustomView && styles.activeToggleButton,
+            { backgroundColor: useCustomView ? theme.buttonColor : '#F5F5F5' },
+          ]}
+          onPress={() => setUseCustomView(true)}
+        >
+          <Text
+            style={[
+              styles.toggleButtonText,
+              { color: useCustomView ? '#FFFFFF' : theme.textColor },
+            ]}
+          >
+            Custom View
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Conditional rendering based on view type */}
+      {useCustomView ? (
+        <CustomKLineExample
+          optionList={state.optionList}
+          isDarkTheme={state.isDarkTheme}
+        />
+      ) : (
+        <>
+          {/* K-line chart */}
+          <KLineChart
+            optionList={state.optionList}
+            onDrawItemDidTouch={onDrawItemDidTouch}
+            onDrawItemComplete={onDrawItemComplete}
+            onDrawPointComplete={onDrawPointComplete}
+          />
+
+          {/* Bottom control bar */}
+          <ControlBar
+            selectedTimeType={state.selectedTimeType}
+            selectedMainIndicator={state.selectedMainIndicator}
+            selectedSubIndicator={state.selectedSubIndicator}
+            selectedDrawTool={state.selectedDrawTool}
+            onTimeTypePress={showTimeSelector}
+            onIndicatorPress={showIndicatorSelector}
+            onDrawToolPress={showDrawToolSelector}
+            onClearDrawings={clearDrawings}
+            theme={theme}
+          />
+        </>
+      )}
 
       {/* Selector popups */}
       <TimeSelector
@@ -96,6 +158,26 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: isHorizontalScreen ? 10 : 50,
     paddingBottom: isHorizontalScreen ? 20 : 100,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeToggleButton: {
+    // Active state styling handled by backgroundColor
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

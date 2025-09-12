@@ -20,7 +20,10 @@ const KLineChart: React.FC<KLineChartProps> = ({
   );
 
   // Check if using new architecture on iOS
-  if (global?.nativeFabricUIManager && require('react-native').Platform.OS === 'ios') {
+  if (
+    (global as any)?.nativeFabricUIManager &&
+    require('react-native').Platform.OS === 'ios'
+  ) {
     return directRender;
   }
 

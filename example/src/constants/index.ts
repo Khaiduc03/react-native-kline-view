@@ -2,7 +2,8 @@ import { processColor } from 'react-native';
 import { TimeType, IndicatorType, DrawToolType, Theme } from '../types';
 
 // Screen dimensions
-export const { width: screenWidth, height: screenHeight } = require('react-native').Dimensions.get('window');
+export const { width: screenWidth, height: screenHeight } =
+  require('react-native').Dimensions.get('window');
 export const isHorizontalScreen = screenWidth > screenHeight;
 
 // Time period constants
@@ -75,14 +76,35 @@ export const DrawStateConstants = {
 
 // Drawing tool types - using numeric constants
 export const DrawToolTypes: Record<number, DrawToolType> = {
-  [DrawTypeConstants.none]: { label: 'Close Drawing', value: DrawTypeConstants.none },
+  [DrawTypeConstants.none]: {
+    label: 'Close Drawing',
+    value: DrawTypeConstants.none,
+  },
   [DrawTypeConstants.line]: { label: 'Line', value: DrawTypeConstants.line },
-  [DrawTypeConstants.horizontalLine]: { label: 'Horizontal Line', value: DrawTypeConstants.horizontalLine },
-  [DrawTypeConstants.verticalLine]: { label: 'Vertical Line', value: DrawTypeConstants.verticalLine },
-  [DrawTypeConstants.halfLine]: { label: 'Ray', value: DrawTypeConstants.halfLine },
-  [DrawTypeConstants.parallelLine]: { label: 'Parallel Channel', value: DrawTypeConstants.parallelLine },
-  [DrawTypeConstants.rectangle]: { label: 'Rectangle', value: DrawTypeConstants.rectangle },
-  [DrawTypeConstants.parallelogram]: { label: 'Parallelogram', value: DrawTypeConstants.parallelogram },
+  [DrawTypeConstants.horizontalLine]: {
+    label: 'Horizontal Line',
+    value: DrawTypeConstants.horizontalLine,
+  },
+  [DrawTypeConstants.verticalLine]: {
+    label: 'Vertical Line',
+    value: DrawTypeConstants.verticalLine,
+  },
+  [DrawTypeConstants.halfLine]: {
+    label: 'Ray',
+    value: DrawTypeConstants.halfLine,
+  },
+  [DrawTypeConstants.parallelLine]: {
+    label: 'Parallel Channel',
+    value: DrawTypeConstants.parallelLine,
+  },
+  [DrawTypeConstants.rectangle]: {
+    label: 'Rectangle',
+    value: DrawTypeConstants.rectangle,
+  },
+  [DrawTypeConstants.parallelogram]: {
+    label: 'Parallelogram',
+    value: DrawTypeConstants.parallelogram,
+  },
 };
 
 // Theme configuration
@@ -94,7 +116,7 @@ export class ThemeManager {
       titleColor: '#14171A',
       detailColor: '#8B95A1',
       textColor7724: '#C4C9D0',
-      
+
       // Special background colors
       headerColor: '#F7F9FA',
       tabBarBackgroundColor: 'white',
@@ -107,22 +129,22 @@ export class ThemeManager {
       backgroundColor9607: '#F5F7FA',
       backgroundColor9609: 'white',
       backgroundColor9509: '#F2F4F7',
-      
+
       // Functional colors
       backgroundColorBlue: '#0066CC',
       buttonColor: '#0066CC',
       borderColor: '#E8EBED',
       backgroundOpacity: 'rgba(0, 0, 0, 0.5)',
-      
+
       // K-line related colors
       increaseColor: '#00C853', // Rising color: green
       decreaseColor: '#FF1744', // Falling color: red
       minuteLineColor: '#0066CC',
-      
+
       // Grid and borders
       gridColor: '#E8EBED',
       separatorColor: '#E8EBED',
-      
+
       // Text colors
       textColor: '#14171A',
     },
@@ -132,7 +154,7 @@ export class ThemeManager {
       titleColor: '#CFD3D6',
       detailColor: '#6D7B8A',
       textColor7724: '#3D4852',
-      
+
       // Special background colors
       headerColor: '#1A1D21',
       tabBarBackgroundColor: '#1A1D21',
@@ -145,22 +167,22 @@ export class ThemeManager {
       backgroundColor9607: '#132028',
       backgroundColor9609: '#1A1F28',
       backgroundColor9509: '#1A1D21',
-      
+
       // Functional colors
       backgroundColorBlue: '#2196F3',
       buttonColor: '#2196F3',
       borderColor: '#212832',
       backgroundOpacity: 'rgba(0, 0, 0, 0.8)',
-      
+
       // K-line related colors
       increaseColor: '#00FF87', // Rising color: bright green
       decreaseColor: '#FF6B6B', // Falling color: bright red
       minuteLineColor: '#2196F3',
-      
+
       // Grid and borders
       gridColor: '#212832',
       separatorColor: '#212832',
-      
+
       // Text colors
       textColor: '#CFD3D6',
     },
@@ -170,3 +192,36 @@ export class ThemeManager {
     return this.themes[isDark ? 'dark' : 'light'];
   }
 }
+
+// Drawing tool helper methods
+export const DrawToolHelper = {
+  name: (type: number): string => {
+    switch (type) {
+      case 1:
+        return 'Line';
+      case 2:
+        return 'Horizontal Line';
+      case 3:
+        return 'Vertical Line';
+      case 4:
+        return 'Ray';
+      case 5:
+        return 'Parallel Channel';
+      case 101:
+        return 'Rectangle';
+      case 102:
+        return 'Parallelogram';
+    }
+    return '';
+  },
+
+  count: (type: number): number => {
+    if (type === 1 || type === 2 || type === 3 || type === 4 || type === 101) {
+      return 2;
+    }
+    if (type === 5 || type === 102) {
+      return 3;
+    }
+    return 0;
+  },
+};
