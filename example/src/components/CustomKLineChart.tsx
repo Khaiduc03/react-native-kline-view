@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import RNKLineView from 'react-native-kline-view';
 import { KLineChartProps } from '../types';
+import CustomPanView from './CustomPanView';
+import { usePanData } from '../hooks/usePanData';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -48,6 +50,9 @@ const CustomKLineChart = forwardRef<CustomKLineChartRef, KLineChartProps>(
       isLoading = false,
       loadingComponent,
       // Custom error
+      // Pan view customization
+      enablePanView = true,
+      panViewTheme = 'light',
       hasError = false,
       errorComponent,
       // Custom header
@@ -72,6 +77,14 @@ const CustomKLineChart = forwardRef<CustomKLineChartRef, KLineChartProps>(
     ref,
   ) => {
     const chartRef = useRef<any>(null);
+    const {
+      panData,
+      panPosition,
+      isPanVisible,
+      showPan,
+      hidePan,
+      processKLineData,
+    } = usePanData();
     const panRef = useRef(new Animated.ValueXY()).current;
     const scaleRef = useRef(new Animated.Value(1)).current;
     const lastScaleRef = useRef(1);
@@ -150,10 +163,37 @@ const CustomKLineChart = forwardRef<CustomKLineChartRef, KLineChartProps>(
             y: lastPanRef.current.y + gestureState.dy,
           });
           onChartPan?.(gestureState);
+
+          // Handle pan view
+          if (enablePanView && optionList) {
+            try {
+              const data = JSON.parse(optionList);
+              if (data.modelArray && data.modelArray.length > 0) {
+                // Calculate which data point is closest to the touch position
+                const touchX = evt.nativeEvent.locationX;
+                const itemWidth = data.configList?.itemWidth || 9;
+                const dataIndex = Math.floor(touchX / itemWidth);
+
+                if (dataIndex >= 0 && dataIndex < data.modelArray.length) {
+                  const klineData = data.modelArray[dataIndex];
+                  const processedData = processKLineData(klineData);
+                  showPan(processedData, {
+                    x: touchX,
+                    y: evt.nativeEvent.locationY,
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('Error parsing optionList for pan view:', error);
+            }
+          }
         }
       },
       onPanResponderRelease: () => {
         // Handle pan release
+        if (enablePanView) {
+          hidePan();
+        }
       },
     });
 
@@ -316,6 +356,16 @@ const CustomKLineChart = forwardRef<CustomKLineChartRef, KLineChartProps>(
         </View>
 
         {renderOverlay()}
+
+        {/* Custom Pan View */}
+        {enablePanView && (
+          <CustomPanView
+            data={panData}
+            visible={isPanVisible}
+            position={panPosition}
+            theme={panViewTheme}
+          />
+        )}
       </View>
     );
   },

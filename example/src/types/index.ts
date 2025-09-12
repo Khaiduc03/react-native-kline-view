@@ -98,6 +98,9 @@ export interface KLineChartProps {
   enableZoom?: boolean;
   enableScroll?: boolean;
   enableDrawing?: boolean;
+  // Pan view customization
+  enablePanView?: boolean;
+  panViewTheme?: 'light' | 'dark';
   // Custom overlay props
   showOverlay?: boolean;
   overlayContent?: React.ReactNode;

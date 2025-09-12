@@ -19,12 +19,14 @@ import {
   IndicatorSelector,
   DrawToolSelector,
 } from './src/components';
+import PanViewExample from './src/components/PanViewExample';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isHorizontalScreen = screenWidth > screenHeight;
 
 const App: React.FC = () => {
   const [useCustomView, setUseCustomView] = useState(false);
+  const [showPanViewExample, setShowPanViewExample] = useState(false);
 
   const {
     state,
@@ -60,7 +62,10 @@ const App: React.FC = () => {
             !useCustomView && styles.activeToggleButton,
             { backgroundColor: !useCustomView ? theme.buttonColor : '#F5F5F5' },
           ]}
-          onPress={() => setUseCustomView(false)}
+          onPress={() => {
+            setUseCustomView(false);
+            setShowPanViewExample(false);
+          }}
         >
           <Text
             style={[
@@ -78,7 +83,10 @@ const App: React.FC = () => {
             useCustomView && styles.activeToggleButton,
             { backgroundColor: useCustomView ? theme.buttonColor : '#F5F5F5' },
           ]}
-          onPress={() => setUseCustomView(true)}
+          onPress={() => {
+            setUseCustomView(true);
+            setShowPanViewExample(false);
+          }}
         >
           <Text
             style={[
@@ -89,10 +97,37 @@ const App: React.FC = () => {
             Custom View
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            showPanViewExample && styles.activeToggleButton,
+            {
+              backgroundColor: showPanViewExample
+                ? theme.buttonColor
+                : '#F5F5F5',
+            },
+          ]}
+          onPress={() => {
+            setShowPanViewExample(true);
+            setUseCustomView(false);
+          }}
+        >
+          <Text
+            style={[
+              styles.toggleButtonText,
+              { color: showPanViewExample ? '#FFFFFF' : theme.textColor },
+            ]}
+          >
+            Pan View Demo
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Conditional rendering based on view type */}
-      {useCustomView ? (
+      {showPanViewExample ? (
+        <PanViewExample />
+      ) : useCustomView ? (
         <CustomKLineExample
           optionList={state.optionList}
           isDarkTheme={state.isDarkTheme}
