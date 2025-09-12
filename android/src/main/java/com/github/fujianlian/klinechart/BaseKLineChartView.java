@@ -26,7 +26,7 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * k线图
+ * K-line chart
  * Created by tian on 2016/5/3.
  */
 public abstract class BaseKLineChartView extends ScrollAndScaleView implements Drawable.Callback {
@@ -128,7 +128,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     private Boolean isWR = false;
     private Boolean isShowChild = false;
 
-    //当前点的个数
+    // Current number of points
     private int mItemCount;
     private IChartDraw mChildDraw;
     private List<IChartDraw> mChildDraws = new ArrayList<>();
@@ -352,7 +352,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 解决text居中的问题
+     * Fix text centering issue
      */
     public float fixTextY(float y) {
         Paint.FontMetrics fontMetrics = mTextPaint.getFontMetrics();
@@ -360,7 +360,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 解决text居中的问题
+     * Fix text centering issue
      */
     public float fixTextY1(float y) {
         Paint.FontMetrics fontMetrics = mTextPaint.getFontMetrics();
@@ -368,7 +368,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 画表格
+     * Draw grid
      *
      * @param canvas
      */
@@ -470,7 +470,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 画k线图
+     * Draw K-line chart
      *
      * @param canvas
      */
@@ -504,7 +504,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 计算文本长度
+     * Calculate text width
      *
      * @return
      */
@@ -515,7 +515,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 计算文本长度
+     * Calculate text width
      *
      * @return
      */
@@ -526,7 +526,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 画文字
+     * Draw text
      *
      * @param canvas
      */
@@ -753,10 +753,10 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 画值
+     * Draw values
      *
      * @param canvas
-     * @param position 显示某个点的值
+     * @param position Display value for a specific point
      */
     private void drawValue(Canvas canvas, int position) {
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
@@ -790,7 +790,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 格式化值
+     * Format value
      */
     public String formatValue(float value) {
         if (getValueFormatter() == null) {
@@ -800,7 +800,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     /**
-     * 重新计算并刷新线条
+     * Recalculate and refresh lines
      */
     public void notifyChanged() {
         mItemCount = configManager.modelArray.size();

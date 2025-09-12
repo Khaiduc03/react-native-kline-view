@@ -258,7 +258,7 @@ class HTKLineConfigManager: NSObject {
     
     var onDrawPointComplete: HTKLineDrawItemBlock?
     
-    // -3 表示没有弹起任何弹窗, -2 表示弹起了画笔弹窗没有弹起 context 弹窗, -1 表示弹起了弹窗, 弹窗表示的是全局配置, 其他表示正常的 index
+    // -3 means no popup is shown, -2 means pencil popup is shown but not context popup, -1 means popup is shown, popup represents global configuration, others represent normal index
     var shouldReloadDrawItemIndex = -3
     
     var drawShouldTrash = false
