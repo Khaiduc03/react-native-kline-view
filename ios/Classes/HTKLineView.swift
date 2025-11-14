@@ -10,41 +10,29 @@ import UIKit
 import Lottie
 
 class HTKLineView: UIScrollView {
-        
+
     var configManager: HTKLineConfigManager
-    
+
     lazy var drawContext: HTDrawContext = {
         let drawContext = HTDrawContext.init(self, configManager)
         return drawContext
     }()
 
     var visibleRange = 0...0
-
     var selectedIndex = -1
-
     var scale: CGFloat = 1
 
     let mainDraw = HTMainDraw.init()
-
     let volumeDraw = HTVolumeDraw.init()
-
     let macdDraw = HTMacdDraw.init()
-
     let kdjDraw = HTKdjDraw.init()
-
     let rsiDraw = HTRsiDraw.init()
-
     let wrDraw = HTWrDraw.init()
 
     var childDraw: HTKLineDrawProtocol?
 
     var animationView = LottieAnimationView()
-
     var lastLoadAnimationSource = ""
-
-
-
-
 
     // 计算属性
     var visibleModelArray = [HTKLineModel]()
@@ -62,8 +50,39 @@ class HTKLineView: UIScrollView {
     var childBaseY: CGFloat  = 0
     var childHeight: CGFloat  = 0
 
+    // === Grid spacing target (ô to, thưa) ===
+    private let GRID_MIN_V_SPACING_PX: CGFloat = 96   // dọc: 96–128 để ô to hơn
+    private let GRID_MIN_H_SPACING_PX: CGFloat = 64   // ngang: 56–72 là vừa mắt
 
+    // MARK: - Helpers cho lưới
+    @inline(__always)
+    private func hairlineWidth() -> CGFloat {
+        // 1px "thật" theo mật độ màn hình (giữ line mảnh & sắc)
+        return 1.0 / UIScreen.main.scale
+    }
 
+    @inline(__always)
+    private func alignToPixel(_ v: CGFloat) -> CGFloat {
+        // Canh vào ranh giới pixel để không mờ/béo do anti-alias
+        let s = UIScreen.main.scale
+        return (floor(v * s) + 0.5) / s
+    }
+
+    /// Chọn bước nến "đẹp": 1,2,3,5 × 10^k sao cho step*itemWidth >= minSpacing
+    private func niceCandleStep(itemWidth: CGFloat, minSpacing: CGFloat) -> Int {
+        guard itemWidth > 0 else { return 1 }
+        let raw = max(1, Int(ceil(minSpacing / itemWidth))) // số nến tối thiểu để đạt spacing yêu cầu
+        var mag = 1
+        var r = raw
+        while r > 5 {
+            r = (r + 9) / 10
+            mag *= 10
+        }
+        for b in [1, 2, 3, 5] where b >= r { return b * mag }
+        return 5 * mag
+    }
+
+    // MARK: - Init
 
     init(_ frame: CGRect, _ configManager: HTKLineConfigManager) {
         self.configManager = configManager
@@ -117,7 +136,9 @@ class HTKLineView: UIScrollView {
         lastLoadAnimationSource = configManager.closePriceRightLightLottieSource
 
         DispatchQueue.global().async { [weak self] in
-            guard let this = self, let data = this.configManager.closePriceRightLightLottieSource.data(using: String.Encoding.utf8), let animation = try? JSONDecoder().decode(LottieAnimation.self, from: data) else {
+            guard let this = self,
+                  let data = this.configManager.closePriceRightLightLottieSource.data(using: String.Encoding.utf8),
+                  let animation = try? JSONDecoder().decode(LottieAnimation.self, from: data) else {
                 return
             }
             DispatchQueue.main.async {
@@ -146,7 +167,6 @@ class HTKLineView: UIScrollView {
         let offsetX = max(0, min(contentOffsetX, contentSize.width - bounds.size.width))
         setContentOffset(CGPoint.init(x: offsetX, y: 0), animated: animated)
     }
-    
 
     func contextTranslate(_ context: CGContext, _ x: CGFloat, _ block: (CGContext) -> Void) {
         context.saveGState()
@@ -166,13 +186,12 @@ class HTKLineView: UIScrollView {
         })
 
         contextTranslate(context, contentOffset.x, { context in
-//            context.setFillColor(UIColor.red.withAlphaComponent(0.1).cgColor)
-//            context.fill(CGRect.init(x: 0, y: mainBaseY, width: allWidth, height: mainHeight))
+            // context.setFillColor(UIColor.red.withAlphaComponent(0.1).cgColor)
+            // context.fill(CGRect.init(x: 0, y: mainBaseY, width: allWidth, height: mainHeight))
 
+            drawGrid(context)
             drawText(context)
             drawValue(context)
-
-
 
             drawHighLow(context)
             drawTime(context)
@@ -180,11 +199,9 @@ class HTKLineView: UIScrollView {
             drawSelectedLine(context)
             drawSelectedBoard(context)
             drawSelectedTime(context)
-            
+
             drawContext.draw(contentOffset.x)
         })
-
-        
     }
 
     func calculateBaseHeight() {
@@ -206,7 +223,6 @@ class HTKLineView: UIScrollView {
         self.childMinMaxRange = childDraw?.minMaxRange(visibleModelArray, configManager) ?? Range<CGFloat>.init(uncheckedBounds: (lower: 0, upper: 0))
         self.childBaseY = allHeight * volumeRange.upperBound + configManager.headerHeight + textHeight
         self.childHeight = allHeight * (1 - volumeRange.upperBound) - configManager.headerHeight - textHeight
-
     }
 
     func yFromValue(_ value: CGFloat) -> CGFloat {
@@ -217,7 +233,7 @@ class HTKLineView: UIScrollView {
         }
         return y
     }
-    
+
     func valueFromY(_ y: CGFloat) -> CGFloat {
         let scale = (mainMinMaxRange.upperBound - mainMinMaxRange.lowerBound) / mainHeight
         var value = scale * mainHeight * 0.5
@@ -226,7 +242,7 @@ class HTKLineView: UIScrollView {
         }
         return value
     }
-    
+
     func xFromValue(_ value: CGFloat) -> CGFloat {
         guard let firstItem = configManager.modelArray.first, let lastItem = configManager.modelArray.last else {
             return 0
@@ -235,7 +251,7 @@ class HTKLineView: UIScrollView {
         let x = (value - firstItem.id) / scale + configManager.itemWidth / 2.0 - contentOffset.x
         return x
     }
-    
+
     func valueFromX(_ x: CGFloat) -> CGFloat {
         guard let firstItem = configManager.modelArray.first, let lastItem = configManager.modelArray.last else {
             return 0
@@ -243,6 +259,53 @@ class HTKLineView: UIScrollView {
         let scale = (lastItem.id - firstItem.id) / (configManager.itemWidth * CGFloat(configManager.modelArray.count - 1))
         let value = scale * (x + contentOffset.x - configManager.itemWidth / 2.0) + firstItem.id
         return value
+    }
+
+    // MARK: - Lưới (đã chỉnh: ô to, thưa, ổn định)
+    func drawGrid(_ context: CGContext) {
+        guard configManager.gridEnabled else { return }
+
+        let baseColor = configManager.gridColor
+        let itemW = configManager.itemWidth
+
+        // --- Lưới ngang: chia theo pixel tối thiểu để thưa & đều ---
+        let hCount = max(2, Int(floor(mainHeight / GRID_MIN_H_SPACING_PX)))
+        if hCount > 0 {
+            context.setLineWidth(hairlineWidth())
+            for i in 1..<hCount {
+                let y = alignToPixel(mainBaseY + (mainHeight * CGFloat(i) / CGFloat(hCount)))
+                context.setStrokeColor(baseColor.withAlphaComponent(0.45).cgColor)
+                context.move(to: CGPoint(x: 0, y: y))
+                context.addLine(to: CGPoint(x: allWidth, y: y))
+                context.strokePath()
+            }
+        }
+
+        // --- Lưới dọc: bước theo số nến để spacing >= ngưỡng (ô to) ---
+        let step = niceCandleStep(itemWidth: itemW, minSpacing: GRID_MIN_V_SPACING_PX)
+        let spacing = CGFloat(step) * itemW
+
+        // spacing nhỏ -> vạch mảnh & trong hơn cho đỡ nặng mắt
+        let thinMode = spacing < (GRID_MIN_V_SPACING_PX * 1.25)
+        let lineW = thinMode ? hairlineWidth() : max(configManager.gridLineWidth, hairlineWidth())
+        let alpha = max(0.35, min(1.0, spacing / (GRID_MIN_V_SPACING_PX * 1.25)))
+
+        context.setLineWidth(lineW)
+        context.setStrokeColor(baseColor.withAlphaComponent(0.35 + 0.65 * alpha).cgColor)
+
+        // Căn theo index nến để vạch đi qua tâm nến
+        let firstIndex = (visibleRange.lowerBound / step) * step
+        var i = firstIndex
+        while i <= visibleRange.upperBound {
+            let xRaw = (CGFloat(i) + 0.5) * itemW - contentOffset.x
+            if xRaw >= -spacing && xRaw <= allWidth + spacing {
+                let x = alignToPixel(xRaw)
+                context.move(to: CGPoint(x: x, y: mainBaseY))
+                context.addLine(to: CGPoint(x: x, y: allHeight))
+                context.strokePath()
+            }
+            i += step
+        }
     }
 
     func drawCandle(_ context: CGContext) {
@@ -281,29 +344,42 @@ class HTKLineView: UIScrollView {
         mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
         volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
         childDraw?.drawValue(childMinMaxRange.upperBound, childMinMaxRange.lowerBound, baseX, childBaseY, childHeight, context, configManager)
-
     }
 
+    // MARK: - Time labels (đã chỉnh để khớp vạch dọc & thưa)
     func drawTime(_ context: CGContext) {
-        let count = 6
-        let valueDistance = self.allWidth / CGFloat(count - 1)
-        for i in 0..<count {
-            let font = configManager.createFont(configManager.candleTextFontSize)
-            let x = valueDistance * CGFloat(i)
-            let itemNumber = (x - 1 + contentOffset.x) / configManager.itemWidth
-            var itemIndex = Int(ceil(itemNumber))
-            itemIndex -= 1
-            itemIndex -= visibleRange.lowerBound
-            itemIndex = max(0, itemIndex)
-            if (itemIndex >= visibleModelArray.count) {
-                continue
+        // Tự tính step theo itemWidth để nhãn bám đúng vạch dọc
+        let step = niceCandleStep(itemWidth: configManager.itemWidth,
+                                  minSpacing: GRID_MIN_V_SPACING_PX)
+        guard !visibleModelArray.isEmpty else { return }
+
+        let font = configManager.createFont(configManager.candleTextFontSize)
+
+        // Vạch dọc đầu tiên khớp theo "step"
+        let firstIndex = (visibleRange.lowerBound / step) * step
+        var i = firstIndex
+
+        while i <= visibleRange.upperBound {
+            let local = i - visibleRange.lowerBound
+            if local >= 0 && local < visibleModelArray.count {
+                let item = visibleModelArray[local]
+                let title = item.dateString
+                let w = mainDraw.textWidth(title: title, font: font)
+                let h = mainDraw.textHeight(font: font)
+
+                // canh giữa nhãn dưới vạch dọc
+                let xCenter = (CGFloat(i) + 0.5) * configManager.itemWidth - contentOffset.x
+                let x = alignToPixel(xCenter - w / 2.0)
+                let y = childBaseY + childHeight + (configManager.paddingBottom - h) / 2.0
+
+                mainDraw.drawText(title: title,
+                                  point: CGPoint(x: x, y: y),
+                                  color: configManager.textColor,
+                                  font: font,
+                                  context: context,
+                                  configManager: configManager)
             }
-            let item = visibleModelArray[itemIndex]
-            let title = item.dateString
-            let width = mainDraw.textWidth(title: title, font: font)
-            let height = mainDraw.textHeight(font: font)
-            let y = childBaseY + childHeight + (configManager.paddingBottom - height) / 2
-            mainDraw.drawText(title: title, point: CGPoint.init(x: x - width / 2.0, y: y), color: configManager.textColor, font: font, context: context, configManager: configManager)
+            i += step
         }
     }
 
@@ -323,9 +399,7 @@ class HTKLineView: UIScrollView {
         }
 
         let drawValue: (Int, CGFloat) -> Void = { [weak self] (index, value) in
-            guard let this = self else {
-                return
-            }
+            guard let this = self else { return }
 
             var title = this.configManager.precision(value, this.configManager.price)
             let font = this.configManager.createFont(this.configManager.candleTextFontSize)
@@ -347,7 +421,6 @@ class HTKLineView: UIScrollView {
         }
         drawValue(highIndex, visibleModelArray[highIndex].high)
         drawValue(lowIndex, visibleModelArray[lowIndex].low)
-
     }
 
     func drawClosePrice(_ context: CGContext) {
@@ -430,7 +503,6 @@ class HTKLineView: UIScrollView {
         context.fill(rect)
         mainDraw.drawText(title: title, point: rect.origin, color: color, font: font, context: context, configManager: configManager)
 
-
         if (configManager.isMinute) {
             animationView.isHidden = false
             UIView.animate(withDuration: 0.15) {
@@ -509,16 +581,11 @@ class HTKLineView: UIScrollView {
         context.addPath(bezierPath.cgPath)
         context.strokePath()
         mainDraw.drawText(title: title, point: CGPoint.init(x: startX + paddingHorizontal, y: y - height / 2), color: configManager.candleTextColor, font: font, context: context, configManager: configManager)
-
     }
 
     func drawSelectedBoard(_ context: CGContext) {
-        guard visibleRange.contains(selectedIndex) else {
-            return
-        }
-        guard !configManager.isMinute else {
-            return
-        }
+        guard visibleRange.contains(selectedIndex) else { return }
+        guard !configManager.isMinute else { return }
         let itemList = visibleModelArray[selectedIndex - visibleRange.lowerBound].selectedItemList
 
         let font = configManager.createFont(configManager.panelTextFontSize)
@@ -567,9 +634,7 @@ class HTKLineView: UIScrollView {
     }
 
     func drawSelectedTime(_ context: CGContext) {
-        guard visibleRange.contains(selectedIndex) else {
-            return
-        }
+        guard visibleRange.contains(selectedIndex) else { return }
         let value = visibleModelArray[selectedIndex - visibleRange.lowerBound].dateString
         let color = configManager.candleTextColor
         let x = (CGFloat(selectedIndex) + 0.5) * configManager.itemWidth - contentOffset.x
@@ -587,7 +652,7 @@ class HTKLineView: UIScrollView {
         context.stroke(rect)
         mainDraw.drawText(title: title, point: CGPoint.init(x: x - width / 2.0, y: y + (configManager.paddingBottom - height) / 2), color: color, font: font, context: context, configManager: configManager)
     }
-    
+
     func valuePointFromViewPoint(_ point: CGPoint) -> CGPoint {
         return CGPoint.init(x: valueFromX(point.x), y: valueFromY(point.y))
     }
@@ -595,8 +660,6 @@ class HTKLineView: UIScrollView {
     func viewPointFromValuePoint(_ point: CGPoint) -> CGPoint {
         return CGPoint.init(x: xFromValue(point.x), y: yFromValue(point.y))
     }
-    
-
 }
 
 extension HTKLineView: UIScrollViewDelegate {
@@ -651,7 +714,4 @@ extension HTKLineView: UIScrollViewDelegate {
         reloadContentOffset(contentOffsetX)
         scrollViewDidScroll(self)
     }
-
-
-
 }

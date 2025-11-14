@@ -6,7 +6,7 @@ import com.github.fujianlian.klinechart.utils.DateUtil;
 import java.util.Date;
 
 /**
- * Date formatter
+ * 时间格式化器
  * Created by tifezh on 2016/6/21.
  */
 

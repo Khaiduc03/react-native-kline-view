@@ -53,13 +53,13 @@ enum HTKLineDrawType: Int {
 }
 
 enum HTDrawState: Int {
-    
+
     case none = -3
-    
+
     case showPencil = -2
-    
+
     case showContext = -1
-    
+
 }
 
 typealias HTKLineDrawItemBlock = (HTDrawItem?, Int) -> Void
@@ -229,45 +229,56 @@ class HTKLineConfigManager: NSObject {
     var closePriceRightLightLottieScale: CGFloat = 0.4
 
     var closePriceRightLightLottieSource = ""
-    
-    
+
+    // grid draw
+    var gridColor = UIColor.lightGray
+
+    var gridLineWidth: CGFloat = 0.5
+
+    var gridHorizontalLineCount: Int = 4
+
+    var gridVerticalLineCount: Int = 4
+
+    var gridEnabled: Bool = true
+
+
     // shot draw
     var shotBackgroundColor = UIColor.orange
-    
+
     var drawShouldContinue = false
-    
+
     var drawType = HTDrawType.none
-    
+
     var shouldFixDraw = false
 
     var shouldClearDraw = false
-    
-    var drawColor = UIColor.orange
-    
-    var drawLineHeight: CGFloat = 0.5
-    
-    var drawDashWidth: CGFloat = 1
-    
-    var drawDashSpace: CGFloat = 1
-    
-    var drawIsLock = false
-    
-    var onDrawItemDidTouch: HTKLineDrawItemBlock?
-    
-    var onDrawItemComplete: HTKLineDrawItemBlock?
-    
-    var onDrawPointComplete: HTKLineDrawItemBlock?
-    
-    // -3 means no popup is shown, -2 means pencil popup is shown but not context popup, -1 means popup is shown, popup represents global configuration, others represent normal index
-    var shouldReloadDrawItemIndex = -3
-    
-    var drawShouldTrash = false
-    
-    
-    
 
-    
-    
+    var drawColor = UIColor.orange
+
+    var drawLineHeight: CGFloat = 0.5
+
+    var drawDashWidth: CGFloat = 1
+
+    var drawDashSpace: CGFloat = 1
+
+    var drawIsLock = false
+
+    var onDrawItemDidTouch: HTKLineDrawItemBlock?
+
+    var onDrawItemComplete: HTKLineDrawItemBlock?
+
+    var onDrawPointComplete: HTKLineDrawItemBlock?
+
+    // -3 表示没有弹起任何弹窗, -2 表示弹起了画笔弹窗没有弹起 context 弹窗, -1 表示弹起了弹窗, 弹窗表示的是全局配置, 其他表示正常的 index
+    var shouldReloadDrawItemIndex = -3
+
+    var drawShouldTrash = false
+
+
+
+
+
+
 
 
     func createFont(_ size: CGFloat) -> UIFont {
@@ -322,7 +333,7 @@ class HTKLineConfigManager: NSObject {
         if let modelList = optionList["modelArray"] as? [[String: Any]] {
             modelArray = HTKLineModel.packModelArray(modelList)
         }
-        
+
 
         if let targetList = optionList["targetList"] as? [String: Any] {
             maList = HTKLineItemModel.packModelArray(targetList["maList"] as? [[String: Any]] ?? [])
@@ -377,7 +388,7 @@ class HTKLineConfigManager: NSObject {
             if let drawShouldTrash = drawList["drawShouldTrash"] as? Bool {
                 self.drawShouldTrash = drawShouldTrash
             }
-            
+
         }
 
         if let shouldScrollToEnd = optionList["shouldScrollToEnd"] as? Bool {
@@ -433,6 +444,15 @@ class HTKLineConfigManager: NSObject {
         panelTextFontSize = configList["panelTextFontSize"] as? CGFloat ?? 0
         closePriceCenterSeparatorColor = RCTConvert.uiColor(configList["closePriceCenterSeparatorColor"])
         closePriceCenterBackgroundColor = RCTConvert.uiColor(configList["closePriceCenterBackgroundColor"])
+
+        // Grid configuration
+        if let gridColorValue = configList["gridColor"] as? Int {
+            gridColor = RCTConvert.uiColor(gridColorValue)
+        }
+        gridLineWidth = configList["gridLineWidth"] as? CGFloat ?? 0.5
+        gridHorizontalLineCount = configList["gridHorizontalLineCount"] as? Int ?? 4
+        gridVerticalLineCount = configList["gridVerticalLineCount"] as? Int ?? 4
+        gridEnabled = configList["gridEnabled"] as? Bool ?? true
         closePriceCenterBorderColor = RCTConvert.uiColor(configList["closePriceCenterBorderColor"])
         closePriceCenterTriangleColor = RCTConvert.uiColor(configList["closePriceCenterTriangleColor"])
         closePriceRightSeparatorColor = RCTConvert.uiColor(configList["closePriceRightSeparatorColor"])

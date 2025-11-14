@@ -3,13 +3,13 @@ package com.github.fujianlian.klinechart;
 import java.util.List;
 
 /**
- * Data helper class for calculating MACD, RSI, etc.
+ * 数据辅助类 计算macd rsi等
  * Created by tifezh on 2016/11/26.
  */
 public class DataHelper {
 
     /**
-     * Calculate RSI
+     * 计算RSI
      *
      * @param dataList
      */
@@ -42,7 +42,7 @@ public class DataHelper {
     }
 
     /**
-     * Calculate KDJ
+     * 计算kdj
      *
      * @param dataList
      */
@@ -91,7 +91,7 @@ public class DataHelper {
     }
 
     /**
-     * Calculate WR
+     * 计算wr
      *
      * @param dataList
      */
@@ -124,7 +124,7 @@ public class DataHelper {
     }
 
     /**
-     * Calculate MACD
+     * 计算macd
      *
      * @param dataList
      */
@@ -142,14 +142,14 @@ public class DataHelper {
                 ema12 = closePrice;
                 ema26 = closePrice;
             } else {
-                // EMA(12) = Previous day EMA(12) X 11/13 + Today close price X 2/13
+                // EMA（12） = 前一日EMA（12） X 11/13 + 今日收盘价 X 2/13
                 ema12 = ema12 * 11f / 13f + closePrice * 2f / 13f;
-                // EMA(26) = Previous day EMA(26) X 25/27 + Today close price X 2/27
+                // EMA（26） = 前一日EMA（26） X 25/27 + 今日收盘价 X 2/27
                 ema26 = ema26 * 25f / 27f + closePrice * 2f / 27f;
             }
-            // DIF = EMA(12) - EMA(26)
-            // Today DEA = (Previous day DEA X 8/10 + Today DIF X 2/10)
-            // (DIF-DEA)*2 is the MACD histogram.
+            // DIF = EMA（12） - EMA（26） 。
+            // 今日DEA = （前一日DEA X 8/10 + 今日DIF X 2/10）
+            // 用（DIF-DEA）*2即为MACD柱状图。
             dif = ema12 - ema26;
             dea = dea * 8f / 10f + dif * 2f / 10f;
             macd = (dif - dea) * 2f;
@@ -161,7 +161,7 @@ public class DataHelper {
     }
 
     /**
-     * Calculate BOLL - needs to be done after calculating MA
+     * 计算 BOLL 需要在计算ma之后进行
      *
      * @param dataList
      */
@@ -192,7 +192,7 @@ public class DataHelper {
     }
 
     /**
-     * Calculate MA
+     * 计算ma
      *
      * @param dataList
      */
@@ -257,7 +257,7 @@ public class DataHelper {
     }
 
     /**
-     * Calculate MA, BOLL, RSI, KDJ, MACD
+     * 计算MA BOLL RSI KDJ MACD
      *
      * @param dataList
      */

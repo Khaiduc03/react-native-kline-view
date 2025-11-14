@@ -9,7 +9,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
 /**
- * Value formatter class
+ * Value格式化类
  * Created by tifezh on 2016/6/21.
  */
 
