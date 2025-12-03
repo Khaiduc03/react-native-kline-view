@@ -9,6 +9,7 @@ import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.annotations.ReactProp;
+import androidx.annotation.Nullable;
 import com.github.fujianlian.klinechart.container.HTKLineContainerView;
 import com.github.fujianlian.klinechart.draw.PrimaryStatus;
 import com.github.fujianlian.klinechart.draw.SecondStatus;
@@ -25,9 +26,13 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
 
 	public static String onDrawItemDidTouchKey = "onDrawItemDidTouch";
 
+	public static String onScrollLeftKey = "onScrollLeft";
+
 	public static String onDrawItemCompleteKey = "onDrawItemComplete";
 
 	public static String onDrawPointCompleteKey = "onDrawPointComplete";
+
+	public static String onChartTouchKey = "onChartTouch";
 
     @Nonnull
     @Override
@@ -46,8 +51,10 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
 	public Map getExportedCustomDirectEventTypeConstants() {
 		return MapBuilder.of(
 				onDrawItemDidTouchKey, MapBuilder.of("registrationName", onDrawItemDidTouchKey),
+				onScrollLeftKey, MapBuilder.of("registrationName", onScrollLeftKey),
 				onDrawItemCompleteKey, MapBuilder.of("registrationName", onDrawItemCompleteKey),
-				onDrawPointCompleteKey, MapBuilder.of("registrationName", onDrawPointCompleteKey)
+				onDrawPointCompleteKey, MapBuilder.of("registrationName", onDrawPointCompleteKey),
+				onChartTouchKey, MapBuilder.of("registrationName", onChartTouchKey)
 		);
 	}
 
@@ -60,7 +67,7 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
         if (optionList == null) {
             return;
         }
-        
+
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -77,6 +84,69 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
         }).start();
     }
 
+    @Override
+    public Map<String, Integer> getCommandsMap() {
+        return MapBuilder.of(
+            "updateLastCandlestick", 1,
+            "addCandlesticksAtTheEnd", 2,
+            "addCandlesticksAtTheStart", 3
+        );
+    }
 
+    @Override
+    public void receiveCommand(@Nonnull HTKLineContainerView containerView, String commandId, @Nullable ReadableArray args) {
+        android.util.Log.d("RNKLineView", "receiveCommand called with commandId: " + commandId);
+        switch (commandId) {
+            case "updateLastCandlestick":
+                android.util.Log.d("RNKLineView", "Processing updateLastCandlestick command");
+                if (args != null && args.size() > 0) {
+                    try {
+                        ReadableMap candlestickData = args.getMap(0);
+                        Map<String, Object> dataMap = candlestickData.toHashMap();
+                        android.util.Log.d("RNKLineView", "Calling containerView.updateLastCandlestick with data: " + dataMap);
+                        containerView.updateLastCandlestick(dataMap);
+                    } catch (Exception e) {
+                        android.util.Log.e("RNKLineView", "Error in receiveCommand", e);
+                        e.printStackTrace();
+                    }
+                } else {
+                    android.util.Log.w("RNKLineView", "updateLastCandlestick: args is null or empty");
+                }
+                break;
+            case "addCandlesticksAtTheEnd":
+                android.util.Log.d("RNKLineView", "Processing addCandlesticksAtTheEnd command");
+                if (args != null && args.size() > 0) {
+                    try {
+                        ReadableArray candlesticksArray = args.getArray(0);
+                        android.util.Log.d("RNKLineView", "Calling containerView.addCandlesticksAtTheEnd with " + candlesticksArray.size() + " candlesticks");
+                        containerView.addCandlesticksAtTheEnd(candlesticksArray);
+                    } catch (Exception e) {
+                        android.util.Log.e("RNKLineView", "Error in addCandlesticksAtTheEnd command", e);
+                        e.printStackTrace();
+                    }
+                } else {
+                    android.util.Log.w("RNKLineView", "addCandlesticksAtTheEnd: args is null or empty");
+                }
+                break;
+            case "addCandlesticksAtTheStart":
+                android.util.Log.d("RNKLineView", "Processing addCandlesticksAtTheStart command");
+                if (args != null && args.size() > 0) {
+                    try {
+                        ReadableArray candlesticksArray = args.getArray(0);
+                        android.util.Log.d("RNKLineView", "Calling containerView.addCandlesticksAtTheStart with " + candlesticksArray.size() + " candlesticks");
+                        containerView.addCandlesticksAtTheStart(candlesticksArray);
+                    } catch (Exception e) {
+                        android.util.Log.e("RNKLineView", "Error in addCandlesticksAtTheStart command", e);
+                        e.printStackTrace();
+                    }
+                } else {
+                    android.util.Log.w("RNKLineView", "addCandlesticksAtTheStart: args is null or empty");
+                }
+                break;
+            default:
+                android.util.Log.w("RNKLineView", "Unknown command: " + commandId);
+                break;
+        }
+    }
 
 }

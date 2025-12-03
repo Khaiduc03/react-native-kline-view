@@ -29,6 +29,8 @@ public class MainDraw implements IChartDraw<ICandle> {
     private Paint mLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint mRedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint mGreenPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mRedWickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mGreenWickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint ma5Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint ma10Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint ma30Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -65,6 +67,8 @@ public class MainDraw implements IChartDraw<ICandle> {
     public void reloadColor(BaseKLineChartView view) {
         mRedPaint.setColor(view.configManager.increaseColor);
         mGreenPaint.setColor(view.configManager.decreaseColor);
+        mRedWickPaint.setColor(view.configManager.increaseWickColor);
+        mGreenWickPaint.setColor(view.configManager.decreaseWickColor);
         mLinePaint.setColor(view.configManager.minuteLineColor);
     }
 
@@ -129,10 +133,14 @@ public class MainDraw implements IChartDraw<ICandle> {
         if (primaryStatus == PrimaryStatus.MA) {
             KLineEntity lastItem = (KLineEntity) lastPoint;
             KLineEntity currentItem = (KLineEntity) curPoint;
-            for (int i = 0; i < view.configManager.maList.size(); i ++) {
+            // Use the embedded indicator data from candlestick rather than config manager's empty list
+            int maCount = Math.min(currentItem.maList.size(), lastItem.maList.size());
+            for (int i = 0; i < maCount; i ++) {
                 HTKLineTargetItem currentTargetItem = (HTKLineTargetItem) currentItem.maList.get(i);
                 HTKLineTargetItem lastTargetItem = (HTKLineTargetItem) lastItem.maList.get(i);
-                primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maList.get(i).index]);
+                // Use the target item's index for color selection
+                int colorIndex = Math.min(currentTargetItem.index, view.configManager.targetColorList.length - 1);
+                primaryPaint.setColor(view.configManager.targetColorList[colorIndex]);
                 view.drawMainLine(canvas, this.primaryPaint, lastX, lastTargetItem.value, curX, currentTargetItem.value);
             }
         } else if (primaryStatus == PrimaryStatus.BOLL) {
@@ -162,9 +170,12 @@ public class MainDraw implements IChartDraw<ICandle> {
 
         } else {
             if (primaryStatus == PrimaryStatus.MA) {
-                for (int i = 0; i < view.configManager.maList.size(); i ++) {
+                // Use the embedded indicator data from candlestick rather than config manager's empty list
+                for (int i = 0; i < point.maList.size(); i ++) {
                     HTKLineTargetItem targetItem = (HTKLineTargetItem) point.maList.get(i);
-                    this.primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maList.get(i).index]);
+                    // Use the target item's index for color selection
+                    int colorIndex = Math.min(targetItem.index, view.configManager.targetColorList.length - 1);
+                    this.primaryPaint.setColor(view.configManager.targetColorList[colorIndex]);
                     StringBuilder stringBuilder = new StringBuilder();
                     stringBuilder.append("MA");
                     stringBuilder.append(targetItem.title);
@@ -254,15 +265,25 @@ public class MainDraw implements IChartDraw<ICandle> {
         close = view.yFromValue(close);
         float r = mCandleWidth / 2;
         float lineR = mCandleLineWidth / 2;
+        float cornerRadius = view.configManager.candleCornerRadius;
+
         if (open > close) {
             //实心
             if (mCandleSolid) {
-                canvas.drawRect(x - r, close, x + r, open, mRedPaint);
-                canvas.drawRect(x - lineR, high, x + lineR, low, mRedPaint);
+                // Draw wick first (behind body)
+                canvas.drawRect(x - lineR, high, x + lineR, low, mRedWickPaint);
+                if (cornerRadius > 0) {
+                    // Draw rounded rectangle for candle body
+                    RectF rectF = new RectF(x - r, close, x + r, open);
+                    canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, mRedPaint);
+                } else {
+                    // Draw regular rectangle (original behavior)
+                    canvas.drawRect(x - r, close, x + r, open, mRedPaint);
+                }
             } else {
-                mRedPaint.setStrokeWidth(mCandleLineWidth);
-                canvas.drawLine(x, high, x, close, mRedPaint);
-                canvas.drawLine(x, open, x, low, mRedPaint);
+                mRedWickPaint.setStrokeWidth(mCandleLineWidth);
+                canvas.drawLine(x, high, x, close, mRedWickPaint);
+                canvas.drawLine(x, open, x, low, mRedWickPaint);
                 canvas.drawLine(x - r + lineR, open, x - r + lineR, close, mRedPaint);
                 canvas.drawLine(x + r - lineR, open, x + r - lineR, close, mRedPaint);
                 mRedPaint.setStrokeWidth(mCandleLineWidth * view.getScaleX());
@@ -271,11 +292,27 @@ public class MainDraw implements IChartDraw<ICandle> {
             }
 
         } else if (open < close) {
-            canvas.drawRect(x - r, open, x + r, close, mGreenPaint);
-            canvas.drawRect(x - lineR, high, x + lineR, low, mGreenPaint);
+            // Draw wick first (behind body)
+            canvas.drawRect(x - lineR, high, x + lineR, low, mGreenWickPaint);
+            if (cornerRadius > 0) {
+                // Draw rounded rectangle for candle body
+                RectF rectF = new RectF(x - r, open, x + r, close);
+                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, mGreenPaint);
+            } else {
+                // Draw regular rectangle (original behavior)
+                canvas.drawRect(x - r, open, x + r, close, mGreenPaint);
+            }
         } else {
-            canvas.drawRect(x - r, open, x + r, close + 1, mRedPaint);
-            canvas.drawRect(x - lineR, high, x + lineR, low, mRedPaint);
+            // Draw wick first (behind body)
+            canvas.drawRect(x - lineR, high, x + lineR, low, mRedWickPaint);
+            if (cornerRadius > 0) {
+                // Draw rounded rectangle for candle body
+                RectF rectF = new RectF(x - r, open, x + r, close + 1);
+                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, mRedPaint);
+            } else {
+                // Draw regular rectangle (original behavior)
+                canvas.drawRect(x - r, open, x + r, close + 1, mRedPaint);
+            }
         }
     }
 
@@ -453,6 +490,8 @@ public class MainDraw implements IChartDraw<ICandle> {
         mLinePaint.setTypeface(typeface);
         mRedPaint.setTypeface(typeface);
         mGreenPaint.setTypeface(typeface);
+        mRedWickPaint.setTypeface(typeface);
+        mGreenWickPaint.setTypeface(typeface);
         ma5Paint.setTypeface(typeface);
         ma10Paint.setTypeface(typeface);
         ma30Paint.setTypeface(typeface);

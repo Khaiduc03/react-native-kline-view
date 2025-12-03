@@ -1,0 +1,32 @@
+// Cursor project rules for react-native-kline-view
+
+// General
+
+- preferTypescript: true
+- inferTypesFromUsage: true
+
+// File conventions
+
+- treat `example/App.tsx` and all files in `example/components/*.tsx` as the primary React Native UI entry points.
+- new React components should be written in `.tsx` with typed props instead of `.js`.
+- when touching a `.js` file in `example/utils/`, prefer incremental migration to `.ts` (keep runtime behavior identical).
+
+// React / hooks
+
+- follow React hook rules strictly; keep `useState`/`useEffect`/`useCallback` dependencies correct rather than disabling lint rules.
+- avoid creating new inline functions in JSX where a memoized `useCallback` handler is reasonable.
+
+// Styling & layout
+
+- reuse existing style factories like `createToolbarStyles`, `createControlBarStyles`, `createSelectorsStyles` when adding new UI.
+- keep chart container layout compatible with the current Binance-like design (header + stats + chart card + controls).
+
+// Native bridge
+
+- do not change public API of `react-native-kline-view` (props, optionList shape, imperative methods) without confirming the change is backward compatible.
+- any changes to iOS native files under `ios/Classes` must keep method signatures used by `RNKLineView.m` and JS wrapper.
+
+// Lint / formatting
+
+- respect `.eslintrc.js` and Prettier settings; do not disable rules globally to "fix" lint errors.
+- fix new TypeScript errors introduced by edits, but avoid large refactors unless explicitly requested.

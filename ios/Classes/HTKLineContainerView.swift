@@ -12,7 +12,11 @@ class HTKLineContainerView: UIView {
     var configManager = HTKLineConfigManager()
     
     @objc var onDrawItemDidTouch: RCTBubblingEventBlock?
-    
+
+    @objc var onScrollLeft: RCTBubblingEventBlock?
+
+    @objc var onChartTouch: RCTBubblingEventBlock?
+
     @objc var onDrawItemComplete: RCTBubblingEventBlock?
     
     @objc var onDrawPointComplete: RCTBubblingEventBlock?
@@ -97,6 +101,31 @@ class HTKLineContainerView: UIView {
                 "drawDashWidth": drawItem.drawDashWidth,
                 "drawDashSpace": drawItem.drawDashSpace,
                 "drawIsLock": drawItem.drawIsLock
+            ])
+        }
+        configManager.onScrollLeft = { [weak self] (timestamp) in
+            self?.onScrollLeft?([
+                "timestamp": timestamp,
+            ])
+        }
+        configManager.onChartTouch = { [weak self] (location, isOnClosePriceLabel) in
+            guard let self = self else { return }
+
+            // If touched on close price label, trigger smooth scroll to end
+            if isOnClosePriceLabel {
+                self.klineView.smoothScrollToEnd()
+            }
+
+            self.onChartTouch?([
+                "x": location.x,
+                "y": location.y,
+                "isOnClosePriceLabel": isOnClosePriceLabel,
+                "closePriceFrame": [
+                    "x": self.klineView.closePriceLabelFrame.origin.x,
+                    "y": self.klineView.closePriceLabelFrame.origin.y,
+                    "width": self.klineView.closePriceLabelFrame.size.width,
+                    "height": self.klineView.closePriceLabelFrame.size.height,
+                ],
             ])
         }
         configManager.onDrawItemComplete = { [weak self] (drawItem, drawItemIndex) in
@@ -202,12 +231,195 @@ class HTKLineContainerView: UIView {
         var previousLocation = touched.first?.previousLocation(in: self) ?? location
         location = convertLocation(location)
         previousLocation = convertLocation(previousLocation)
-        
+
         let translation = CGPoint.init(x: location.x - previousLocation.x, y: location.y - previousLocation.y)
-        
+
         klineView.drawContext.touchesGesture(location, translation, state)
         shotView.shotPoint = state != .ended ? touched.first?.location(in: self) : nil
     }
-    
+
+    @objc func updateLastCandlestick(_ candlestick: NSDictionary) {
+        print("HTKLineContainerView: updateLastCandlestick called with data: \(candlestick)")
+
+        guard let candlestickDict = candlestick as? [String: Any],
+              configManager.modelArray.count > 0 else {
+            print("HTKLineContainerView: updateLastCandlestick - Null check failed or empty model array")
+            return
+        }
+
+        do {
+            // Get the existing last candlestick to preserve indicator data
+            let lastIndex = configManager.modelArray.count - 1
+            let existingModel = configManager.modelArray[lastIndex]
+
+            // Create updated model with new indicator data from React Native
+            let updatedModel = HTKLineModel.packModel(candlestickDict)
+
+            print("HTKLineContainerView: Input vol field: \(candlestickDict["vol"] ?? "nil")")
+            print("HTKLineContainerView: Created model with volume: \(updatedModel.volume)")
+
+            // Only preserve indicator lists if the new data doesn't contain them
+            print("HTKLineContainerView: Using new indicator data from React Native")
+            if updatedModel.maList.isEmpty {
+                updatedModel.maList = existingModel.maList
+            }
+            if updatedModel.maVolumeList.isEmpty {
+                updatedModel.maVolumeList = existingModel.maVolumeList
+            }
+            if updatedModel.rsiList.isEmpty {
+                updatedModel.rsiList = existingModel.rsiList
+            }
+            if updatedModel.wrList.isEmpty {
+                updatedModel.wrList = existingModel.wrList
+            }
+            if updatedModel.selectedItemList.isEmpty {
+                updatedModel.selectedItemList = existingModel.selectedItemList
+            }
+
+            print("HTKLineContainerView: New maVolumeList count: \(updatedModel.maVolumeList.count)")
+            if !updatedModel.maVolumeList.isEmpty {
+                print("HTKLineContainerView: Volume MA5: \(updatedModel.maVolumeList[0].value), MA10: \(updatedModel.maVolumeList[1].value)")
+            }
+
+            // Update the model array
+            configManager.modelArray[lastIndex] = updatedModel
+
+            print("HTKLineContainerView: Updated last candlestick at index \(lastIndex) with close: \(updatedModel.close)")
+            print("HTKLineContainerView: Preserved maVolumeList count: \(updatedModel.maVolumeList.count)")
+
+            // Force redraw without reloading the entire configuration
+            DispatchQueue.main.async { [weak self] in
+                print("HTKLineContainerView: Triggering redraw")
+                self?.klineView.setNeedsDisplay()
+            }
+        } catch {
+            print("HTKLineContainerView: Error updating last candlestick: \(error)")
+        }
+    }
+
+    @objc func addCandlesticksAtTheEnd(_ candlesticks: NSArray) {
+        print("HTKLineContainerView: addCandlesticksAtTheEnd called with \(candlesticks.count) candlesticks")
+
+        guard let candlesticksArray = candlesticks as? [[String: Any]],
+              !candlesticksArray.isEmpty else {
+            print("HTKLineContainerView: addCandlesticksAtTheEnd - Invalid or empty candlesticks array")
+            return
+        }
+
+        do {
+            // Get template model for preserving indicator lists structure
+            var templateModel: HTKLineModel? = nil
+            if !configManager.modelArray.isEmpty {
+                templateModel = configManager.modelArray.last
+            }
+
+            // Convert array of dictionaries to HTKLineModel array
+            let newModels = HTKLineModel.packModelArray(candlesticksArray)
+
+            if newModels.isEmpty {
+                print("HTKLineContainerView: No valid models created from input data")
+                return
+            }
+
+            // The indicator lists are now properly populated by packModelArray() from React Native data
+            // No need for manual calculation since the data already includes calculated indicators
+            for newModel in newModels {
+                print("HTKLineContainerView: Using indicator data from React Native - maList.count=\(newModel.maList.count), maVolumeList.count=\(newModel.maVolumeList.count)")
+            }
+
+            // Get the scroll position before adding data
+            let wasAtEnd = klineView.contentOffset.x >= (klineView.contentSize.width - klineView.frame.width - 10)
+
+            // Add new models to the end of the array
+            configManager.modelArray.append(contentsOf: newModels)
+
+            print("HTKLineContainerView: Added \(newModels.count) new candlesticks to the end")
+            print("HTKLineContainerView: Total candlesticks now: \(configManager.modelArray.count)")
+            print("HTKLineContainerView: Was at end before adding: \(wasAtEnd)")
+
+            // Force redraw and optionally scroll to end
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+
+                print("HTKLineContainerView: Reloading content size after adding candlesticks")
+                self.klineView.reloadContentSize()
+
+                print("HTKLineContainerView: Triggering redraw after adding candlesticks")
+                self.klineView.setNeedsDisplay()
+
+                // If user was at the end, keep them at the end
+                if wasAtEnd {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        print("HTKLineContainerView: Scrolling to end after adding new data")
+                        let maxContentOffsetX = max(0, self.klineView.contentSize.width - self.klineView.bounds.size.width)
+                        self.klineView.reloadContentOffset(maxContentOffsetX, true)
+                    }
+                }
+            }
+        } catch {
+            print("HTKLineContainerView: Error adding candlesticks: \(error)")
+        }
+    }
+
+    @objc func addCandlesticksAtTheStart(_ candlesticks: NSArray) {
+        print("HTKLineContainerView: addCandlesticksAtTheStart called with \(candlesticks.count) candlesticks")
+
+        guard let candlesticksArray = candlesticks as? [[String: Any]],
+              !candlesticksArray.isEmpty else {
+            print("HTKLineContainerView: addCandlesticksAtTheStart - Invalid or empty candlesticks array")
+            return
+        }
+
+        do {
+            // Convert array of dictionaries to HTKLineModel array
+            let newModels = HTKLineModel.packModelArray(candlesticksArray)
+
+            if newModels.isEmpty {
+                print("HTKLineContainerView: No valid models created from input data")
+                return
+            }
+
+            // The indicator lists are now properly populated by packModelArray() from React Native data
+            for newModel in newModels {
+                print("HTKLineContainerView: Using indicator data from React Native - maList.count=\(newModel.maList.count), maVolumeList.count=\(newModel.maVolumeList.count)")
+            }
+
+            // Get the current scroll position to maintain it after adding data at start
+            let currentContentOffsetX = klineView.contentOffset.x
+
+            // Add new models to the beginning of the array (prepend)
+            configManager.modelArray.insert(contentsOf: newModels, at: 0)
+
+            print("HTKLineContainerView: Added \(newModels.count) new candlesticks to the start")
+            print("HTKLineContainerView: Total candlesticks now: \(configManager.modelArray.count)")
+
+            // Reset the scroll left trigger flag to allow new triggers
+            self.klineView.resetScrollLeftTrigger()
+
+            // Force redraw and adjust scroll position in a single operation to prevent flickering
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+
+                // Calculate the new scroll position before reloading content
+                let addedWidth = CGFloat(newModels.count) * self.configManager.itemWidth
+                let newContentOffsetX = currentContentOffsetX + addedWidth
+
+                print("HTKLineContainerView: Reloading content size and adjusting scroll position by \(addedWidth) pixels")
+
+                // Reload content size first
+                self.klineView.reloadContentSize()
+
+                // Set the new scroll position immediately to prevent the view from snapping to the wrong position
+                self.klineView.reloadContentOffset(newContentOffsetX, false)
+
+                // Trigger redraw only after scroll position is set
+                print("HTKLineContainerView: Triggering redraw after scroll position adjustment")
+                self.klineView.setNeedsDisplay()
+            }
+        } catch {
+            print("HTKLineContainerView: Error adding candlesticks at start: \(error)")
+        }
+    }
+
 }
 

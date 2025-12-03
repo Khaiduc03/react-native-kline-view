@@ -53,22 +53,29 @@ enum HTKLineDrawType: Int {
 }
 
 enum HTDrawState: Int {
-
+    
     case none = -3
-
+    
     case showPencil = -2
-
+    
     case showContext = -1
-
+    
 }
 
 typealias HTKLineDrawItemBlock = (HTDrawItem?, Int) -> Void
+typealias HTKLineScrollBlock = (Int64) -> Void
 
 class HTKLineConfigManager: NSObject {
 
     var modelArray = [HTKLineModel]()
 
+    var useImperativeApi = false
+
     var shouldScrollToEnd = true
+
+    var scrollPositionAdjustment: CGFloat = 0
+
+    var shouldAdjustScrollPosition = false
 
     var maList = [HTKLineItemModel]()
 
@@ -125,6 +132,8 @@ class HTKLineConfigManager: NSObject {
 
     var _candleWidth: CGFloat = 7
 
+    var candleCornerRadius: CGFloat = 0
+
     var minuteVolumeCandleWidth: CGFloat = 0
 
     var _minuteVolumeCandleWidth: CGFloat = 0
@@ -153,6 +162,20 @@ class HTKLineConfigManager: NSObject {
         return formatter.string(from: number) ?? ""
     }
 
+    func formatVolume(_ value: CGFloat, _ precision: Int = 1) -> String {
+        let num = Double(value)
+
+        if num >= 1000000000 {
+            return String(format: "%.1fB", num / 1000000000)
+        } else if num >= 1000000 {
+            return String(format: "%.1fM", num / 1000000)
+        } else if num >= 1000 {
+            return String(format: "%.1fK", num / 1000)
+        } else {
+            return String(format: "%.0f", num)
+        }
+    }
+
 
     var candleLineWidth: CGFloat = 1
 
@@ -173,6 +196,10 @@ class HTKLineConfigManager: NSObject {
     var increaseColor = UIColor.red
 
     var decreaseColor = UIColor.green
+
+    var increaseWickColor = UIColor.red
+
+    var decreaseWickColor = UIColor.green
 
     var minuteLineColor = UIColor.blue
 
@@ -204,6 +231,11 @@ class HTKLineConfigManager: NSObject {
 
     var panelBorderColor = UIColor.orange
 
+    // Background & grid
+    var backgroundColor = UIColor.clear
+    var gridColor = UIColor.clear
+    var gridLineWidth: CGFloat = 0
+
     var selectedPointContainerColor = UIColor.orange
 
     var selectedPointContentColor = UIColor.orange
@@ -229,56 +261,49 @@ class HTKLineConfigManager: NSObject {
     var closePriceRightLightLottieScale: CGFloat = 0.4
 
     var closePriceRightLightLottieSource = ""
-
-    // grid draw
-    var gridColor = UIColor.lightGray
-
-    var gridLineWidth: CGFloat = 0.5
-
-    var gridHorizontalLineCount: Int = 4
-
-    var gridVerticalLineCount: Int = 4
-
-    var gridEnabled: Bool = true
-
-
+    
+    
     // shot draw
     var shotBackgroundColor = UIColor.orange
-
+    
     var drawShouldContinue = false
-
+    
     var drawType = HTDrawType.none
-
+    
     var shouldFixDraw = false
 
     var shouldClearDraw = false
-
+    
     var drawColor = UIColor.orange
-
+    
     var drawLineHeight: CGFloat = 0.5
-
+    
     var drawDashWidth: CGFloat = 1
-
+    
     var drawDashSpace: CGFloat = 1
-
+    
     var drawIsLock = false
-
+    
     var onDrawItemDidTouch: HTKLineDrawItemBlock?
 
+    var onScrollLeft: HTKLineScrollBlock?
+
+    var onChartTouch: ((CGPoint, Bool) -> Void)?
+
     var onDrawItemComplete: HTKLineDrawItemBlock?
-
+    
     var onDrawPointComplete: HTKLineDrawItemBlock?
-
+    
     // -3 表示没有弹起任何弹窗, -2 表示弹起了画笔弹窗没有弹起 context 弹窗, -1 表示弹起了弹窗, 弹窗表示的是全局配置, 其他表示正常的 index
     var shouldReloadDrawItemIndex = -3
-
+    
     var drawShouldTrash = false
+    
+    
+    
 
-
-
-
-
-
+    
+    
 
 
     func createFont(_ size: CGFloat) -> UIFont {
@@ -330,10 +355,14 @@ class HTKLineConfigManager: NSObject {
     }
 
     func reloadOptionList(_ optionList: [String: Any]) {
-        if let modelList = optionList["modelArray"] as? [[String: Any]] {
-            modelArray = HTKLineModel.packModelArray(modelList)
+        if let useImperativeApiValue = optionList["useImperativeApi"] as? Bool {
+            useImperativeApi = useImperativeApiValue
         }
 
+        if !useImperativeApi, let modelList = optionList["modelArray"] as? [[String: Any]] {
+            modelArray = HTKLineModel.packModelArray(modelList)
+        }
+        
 
         if let targetList = optionList["targetList"] as? [String: Any] {
             maList = HTKLineItemModel.packModelArray(targetList["maList"] as? [[String: Any]] ?? [])
@@ -388,12 +417,22 @@ class HTKLineConfigManager: NSObject {
             if let drawShouldTrash = drawList["drawShouldTrash"] as? Bool {
                 self.drawShouldTrash = drawShouldTrash
             }
-
+            
         }
 
         if let shouldScrollToEnd = optionList["shouldScrollToEnd"] as? Bool {
             self.shouldScrollToEnd = shouldScrollToEnd
         }
+
+        // 处理滚动位置调整
+        if let scrollPositionAdjustment = optionList["scrollPositionAdjustment"] as? NSNumber {
+            self.scrollPositionAdjustment = CGFloat(scrollPositionAdjustment.floatValue)
+            self.shouldAdjustScrollPosition = true
+        } else {
+            self.shouldAdjustScrollPosition = false
+            self.scrollPositionAdjustment = 0
+        }
+
         if shouldReloadDrawItemIndex >= HTDrawState.showPencil.rawValue {
             self.shouldScrollToEnd = false
         }
@@ -413,6 +452,7 @@ class HTKLineConfigManager: NSObject {
         _candleWidth = configList["candleWidth"] as? CGFloat ?? 0
         _minuteVolumeCandleWidth = configList["minuteVolumeCandleWidth"] as? CGFloat ?? 0
         _macdCandleWidth = configList["macdCandleWidth"] as? CGFloat ?? 0
+        candleCornerRadius = configList["candleCornerRadius"] as? CGFloat ?? 0
         reloadScrollViewScale(1)
         paddingTop = configList["paddingTop"] as? CGFloat ?? 0
         paddingRight = configList["paddingRight"] as? CGFloat ?? 0
@@ -423,6 +463,10 @@ class HTKLineConfigManager: NSObject {
         let colorList = configList["colorList"] as? [String: Any] ?? [String: Any]()
         increaseColor = RCTConvert.uiColor(colorList["increaseColor"])
         decreaseColor = RCTConvert.uiColor(colorList["decreaseColor"])
+
+        // Set wick colors, defaulting to body colors if not specified
+        increaseWickColor = RCTConvert.uiColor(colorList["increaseWickColor"]) ?? increaseColor
+        decreaseWickColor = RCTConvert.uiColor(colorList["decreaseWickColor"]) ?? decreaseColor
         minuteLineColor = RCTConvert.uiColor(configList["minuteLineColor"])
         targetColorList = type(of: self).packColorList(configList["targetColorList"])
         minuteGradientColorList = type(of: self).packColorList(configList["minuteGradientColorList"])
@@ -444,15 +488,6 @@ class HTKLineConfigManager: NSObject {
         panelTextFontSize = configList["panelTextFontSize"] as? CGFloat ?? 0
         closePriceCenterSeparatorColor = RCTConvert.uiColor(configList["closePriceCenterSeparatorColor"])
         closePriceCenterBackgroundColor = RCTConvert.uiColor(configList["closePriceCenterBackgroundColor"])
-
-        // Grid configuration
-        if let gridColorValue = configList["gridColor"] as? Int {
-            gridColor = RCTConvert.uiColor(gridColorValue)
-        }
-        gridLineWidth = configList["gridLineWidth"] as? CGFloat ?? 0.5
-        gridHorizontalLineCount = configList["gridHorizontalLineCount"] as? Int ?? 4
-        gridVerticalLineCount = configList["gridVerticalLineCount"] as? Int ?? 4
-        gridEnabled = configList["gridEnabled"] as? Bool ?? true
         closePriceCenterBorderColor = RCTConvert.uiColor(configList["closePriceCenterBorderColor"])
         closePriceCenterTriangleColor = RCTConvert.uiColor(configList["closePriceCenterTriangleColor"])
         closePriceRightSeparatorColor = RCTConvert.uiColor(configList["closePriceRightSeparatorColor"])
@@ -460,6 +495,19 @@ class HTKLineConfigManager: NSObject {
         closePriceRightLightLottieFloder = configList["closePriceRightLightLottieFloder"] as? String ?? ""
         closePriceRightLightLottieScale = configList["closePriceRightLightLottieScale"] as? CGFloat ?? 0
         closePriceRightLightLottieSource = configList["closePriceRightLightLottieSource"] as? String ?? ""
+
+        // Optional background & grid configuration
+        if let backgroundColorValue = configList["backgroundColor"] {
+            backgroundColor = RCTConvert.uiColor(backgroundColorValue)
+        } else {
+            backgroundColor = .clear
+        }
+        if let gridColorValue = configList["gridColor"] {
+            gridColor = RCTConvert.uiColor(gridColorValue)
+        } else {
+            gridColor = .clear
+        }
+        gridLineWidth = configList["gridLineWidth"] as? CGFloat ?? 0
     }
 
 }

@@ -21,7 +21,13 @@ public class HTKLineConfigManager {
 
 	public List<KLineEntity> modelArray = new ArrayList<>();
 
+	public Boolean useImperativeApi = false;
+
 	public Boolean shouldScrollToEnd = true;
+
+	public int scrollPositionAdjustment = 0;
+
+	public Boolean shouldAdjustScrollPosition = false;
 
 
 	public int shotBackgroundColor = Color.RED;
@@ -55,6 +61,10 @@ public class HTKLineConfigManager {
 
     public Callback onDrawItemDidTouch;
 
+    public Callback onScrollLeft;
+
+    public Callback onChartTouch;
+
     public Callback onDrawPointComplete;
 
 
@@ -71,6 +81,10 @@ public class HTKLineConfigManager {
 
     public int decreaseColor = Color.GREEN;
 
+    public int increaseWickColor = Color.RED;
+
+    public int decreaseWickColor = Color.GREEN;
+
     public int minuteLineColor = Color.BLUE;
 
     public int[] minuteGradientColorList = { Color.BLUE, Color.BLUE };
@@ -86,6 +100,8 @@ public class HTKLineConfigManager {
     public float itemWidth = 9;
 
     public float candleWidth = 7;
+
+    public float candleCornerRadius = 0;
 
     public int minuteVolumeCandleColor = Color.RED;
 
@@ -200,13 +216,34 @@ public class HTKLineConfigManager {
 
     public KLineEntity packModel(Map<String, Object> keyValue) {
     	KLineEntity entity = new KLineEntity();
-    	entity.id = ((Number)keyValue.get("id")).intValue();
-        entity.Date = keyValue.get("dateString").toString();
-        entity.Open = ((Number)keyValue.get("open")).floatValue();
-        entity.High = ((Number)keyValue.get("high")).floatValue();
-        entity.Low = ((Number)keyValue.get("low")).floatValue();
-        entity.Close = ((Number)keyValue.get("close")).floatValue();
-        entity.Volume = ((Number)keyValue.get("vol")).floatValue();
+
+    	// Handle id with fallback to time if id is missing
+    	Object idValue = keyValue.get("id");
+    	if (idValue == null) {
+    	    idValue = keyValue.get("time");
+    	}
+    	entity.id = idValue != null ? ((Number)idValue).intValue() : 0;
+
+    	// Handle dateString with fallback
+    	Object dateValue = keyValue.get("dateString");
+    	entity.Date = dateValue != null ? dateValue.toString() : "";
+
+    	// Handle numeric values with null checks
+        entity.Open = ((Number)this.getOrDefault(keyValue, "open", 0.0)).floatValue();
+        entity.High = ((Number)this.getOrDefault(keyValue, "high", 0.0)).floatValue();
+        entity.Low = ((Number)this.getOrDefault(keyValue, "low", 0.0)).floatValue();
+        entity.Close = ((Number)this.getOrDefault(keyValue, "close", 0.0)).floatValue();
+
+        // Handle volume with special case for NaN
+        Object volValue = keyValue.get("vol");
+        // android.util.Log.d("HTKLineConfigManager", "packModel - volValue from input: " + volValue);
+        if (volValue instanceof Number && !((Number)volValue).toString().equals("NaN")) {
+            entity.Volume = ((Number)volValue).floatValue();
+            // android.util.Log.d("HTKLineConfigManager", "packModel - Setting Volume to: " + entity.Volume);
+        } else {
+            entity.Volume = 0.0f;
+            // android.util.Log.w("HTKLineConfigManager", "packModel - Volume was null or NaN, setting to 0");
+        }
         entity.selectedItemList = (List<Map<String, Object>>) keyValue.get("selectedItemList");
 
 
@@ -241,8 +278,13 @@ public class HTKLineConfigManager {
 
     public void reloadOptionList(Map optionList) {
 
+        Boolean useImperativeApiValue = (Boolean)optionList.get("useImperativeApi");
+        if (useImperativeApiValue != null) {
+            this.useImperativeApi = useImperativeApiValue;
+        }
+
     	List modelArray = (List)optionList.get("modelArray");
-    	if (modelArray != null) {
+    	if (!this.useImperativeApi && modelArray != null) {
     		this.modelArray = this.packModelList(modelArray);
     	}
 
@@ -319,6 +361,16 @@ public class HTKLineConfigManager {
             this.shouldScrollToEnd = shouldScrollToEnd;
         }
 
+        // 处理滚动位置调整
+        Number scrollPositionAdjustment = (Number)optionList.get("scrollPositionAdjustment");
+        if (scrollPositionAdjustment != null) {
+            this.scrollPositionAdjustment = scrollPositionAdjustment.intValue();
+            this.shouldAdjustScrollPosition = true;
+        } else {
+            this.shouldAdjustScrollPosition = false;
+            this.scrollPositionAdjustment = 0;
+        }
+
         if (shouldReloadDrawItemIndex >= HTDrawState.showPencil) {
             this.shouldScrollToEnd = false;
         }
@@ -378,6 +430,13 @@ public class HTKLineConfigManager {
         this.increaseColor = ((Number) colorList.get("increaseColor")).intValue();
         this.decreaseColor = ((Number) colorList.get("decreaseColor")).intValue();
 
+        // Set wick colors, defaulting to body colors if not specified
+        Number increaseWickColorValue = (Number) colorList.get("increaseWickColor");
+        this.increaseWickColor = increaseWickColorValue != null ? increaseWickColorValue.intValue() : this.increaseColor;
+
+        Number decreaseWickColorValue = (Number) colorList.get("decreaseWickColor");
+        this.decreaseWickColor = decreaseWickColorValue != null ? decreaseWickColorValue.intValue() : this.decreaseColor;
+
         this.mainFlex = ((Number)configList.get("mainFlex")).floatValue();
         this.volumeFlex = ((Number)configList.get("volumeFlex")).floatValue();
 
@@ -388,6 +447,11 @@ public class HTKLineConfigManager {
         this.paddingBottom = ((Number)configList.get("paddingBottom")).floatValue();
         this.itemWidth = ((Number)configList.get("itemWidth")).floatValue();
         this.candleWidth = ((Number)configList.get("candleWidth")).floatValue();
+
+        Number candleCornerRadiusValue = (Number)configList.get("candleCornerRadius");
+        if (candleCornerRadiusValue != null) {
+            this.candleCornerRadius = candleCornerRadiusValue.floatValue();
+        }
 
         this.fontFamily = (configList.get("fontFamily")).toString();
         this.textColor = ((Number) configList.get("textColor")).intValue();

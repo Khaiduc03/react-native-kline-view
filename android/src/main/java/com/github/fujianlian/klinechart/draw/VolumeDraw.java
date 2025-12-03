@@ -51,10 +51,14 @@ public class VolumeDraw implements IChartDraw<IVolume> {
         drawHistogram(canvas, curPoint, lastPoint, curX, view, position);
         KLineEntity lastItem = (KLineEntity) lastPoint;
         KLineEntity currentItem = (KLineEntity) curPoint;
-        for (int i = 0; i < view.configManager.maVolumeList.size(); i++) {
+        // Use the embedded indicator data from candlestick rather than config manager's empty list
+        int maVolumeCount = Math.min(currentItem.maVolumeList.size(), lastItem.maVolumeList.size());
+        for (int i = 0; i < maVolumeCount; i++) {
             HTKLineTargetItem currentTargetItem = (HTKLineTargetItem) currentItem.maVolumeList.get(i);
             HTKLineTargetItem lastTargetItem = (HTKLineTargetItem) lastItem.maVolumeList.get(i);
-            primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maVolumeList.get(i).index]);
+            // Use the target item's index for color selection
+            int colorIndex = Math.min(currentTargetItem.index, view.configManager.targetColorList.length - 1);
+            primaryPaint.setColor(view.configManager.targetColorList[colorIndex]);
             view.drawVolLine(canvas, primaryPaint, lastX, lastTargetItem.value, curX, currentTargetItem.value);
         }
     }
@@ -86,18 +90,32 @@ public class VolumeDraw implements IChartDraw<IVolume> {
         if (formatter instanceof ValueFormatter) {
             ValueFormatter valueFormatter = (ValueFormatter)formatter;
             String space = "  ";
-            String text = "VOL:" + valueFormatter.formatVolume(point.getVolume()) + "  ";
+            // Handle NaN volume value to prevent formatting crashes
+            float volume = point.getVolume();
+            String volumeText = Float.isNaN(volume) ? "--" : valueFormatter.formatVolume(volume);
+            String text = "VOL:" + volumeText + "  ";
             primaryPaint.setColor(view.configManager.targetColorList[5]);
             canvas.drawText(text, x, y, primaryPaint);
             x += view.getTextPaint().measureText(text);
-            for (int i = 0; i < view.configManager.maVolumeList.size(); i++) {
+            // Use the embedded indicator data from candlestick rather than config manager's list
+            for (int i = 0; i < point.maVolumeList.size(); i++) {
                 HTKLineTargetItem targetItem = (HTKLineTargetItem) point.maVolumeList.get(i);
-                primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maVolumeList.get(i).index]);
+                // Use the target item's index for color selection
+                int colorIndex = Math.min(targetItem.index, view.configManager.targetColorList.length - 1);
+                primaryPaint.setColor(view.configManager.targetColorList[colorIndex]);
                 StringBuilder stringBuilder = new StringBuilder();
                 stringBuilder.append("MA");
                 stringBuilder.append(targetItem.title);
                 stringBuilder.append(":");
-                stringBuilder.append(valueFormatter.formatVolume(targetItem.value));
+
+                // Handle NaN values to prevent formatting crashes
+                float value = targetItem.value;
+                if (Float.isNaN(value)) {
+                    stringBuilder.append("--");
+                } else {
+                    stringBuilder.append(valueFormatter.formatVolume(value));
+                }
+
                 stringBuilder.append(space);
                 text = stringBuilder.toString();
                 canvas.drawText(text, x, y, this.primaryPaint);
@@ -109,13 +127,27 @@ public class VolumeDraw implements IChartDraw<IVolume> {
     @Override
     public float getMaxValue(IVolume point) {
         KLineEntity item = (KLineEntity) point;
-        return Math.max(point.getVolume(), item.targetListISMax(item.maVolumeList, true));
+        float volume = point.getVolume();
+        float maMax = item.targetListISMax(item.maVolumeList, true);
+
+        // Handle NaN values to prevent crashes
+        if (Float.isNaN(volume)) volume = 0f;
+        if (Float.isNaN(maMax)) maMax = 0f;
+
+        return Math.max(volume, maMax);
     }
 
     @Override
     public float getMinValue(IVolume point) {
         KLineEntity item = (KLineEntity) point;
-        return Math.min(point.getVolume(), item.targetListISMax(item.maVolumeList, false));
+        float volume = point.getVolume();
+        float maMin = item.targetListISMax(item.maVolumeList, false);
+
+        // Handle NaN values to prevent crashes
+        if (Float.isNaN(volume)) volume = 0f;
+        if (Float.isNaN(maMin)) maMin = 0f;
+
+        return Math.min(volume, maMin);
     }
 
     @Override
