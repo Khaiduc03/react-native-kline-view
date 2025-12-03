@@ -16,12 +16,56 @@ import {
 import { ThemeManager, COLOR } from './themes';
 import { TimeTypes, DrawStateConstants, FORMAT } from './constants';
 import { fixRound, formatTime, isHorizontalScreen } from './helpers';
+import type {
+  KLineModel,
+  TargetListConfig,
+  OptionListObject,
+  DrawListConfig,
+  ConfigListConfig,
+} from 'react-native-kline-view';
 
-export const getTargetList = (selectedIndicators: {
+type SelectedIndicators = {
   selectedMainIndicator: number;
   selectedSubIndicator: number;
   showVolumeChart: boolean;
-}) => {
+};
+
+type TargetListWithHelpers = TargetListConfig & {
+  isMASelected: () => boolean;
+  isBOLLSelected: () => boolean;
+  isMACDSelected: () => boolean;
+  isKDJSelected: () => boolean;
+  isRSISelected: () => boolean;
+  isWRSelected: () => boolean;
+};
+
+type InputKLinePoint = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  vol?: number;
+  volume?: number;
+};
+
+type PackOptionListParams = {
+  isDarkTheme: boolean;
+  selectedTimeType: number;
+  selectedMainIndicator: number;
+  selectedSubIndicator: number;
+  selectedDrawTool: number;
+  showVolumeChart: boolean;
+  candleCornerRadius: number;
+  drawShouldContinue: boolean;
+};
+
+const pc = (value: Parameters<typeof processColor>[0]): number =>
+  (processColor(value) ?? 0) as number;
+
+export const getTargetList = (
+  selectedIndicators: SelectedIndicators,
+): TargetListWithHelpers => {
   const { selectedMainIndicator, selectedSubIndicator, showVolumeChart } =
     selectedIndicators;
 
@@ -33,7 +77,7 @@ export const getTargetList = (selectedIndicators: {
   const isRSISelected = () => selectedSubIndicator === 5;
   const isWRSelected = () => selectedSubIndicator === 6;
 
-  return {
+  const targetList: TargetListWithHelpers = {
     maList: [
       { title: '5', selected: isMASelected(), index: 0 },
       { title: '10', selected: isMASelected(), index: 1 },
@@ -65,22 +109,24 @@ export const getTargetList = (selectedIndicators: {
     isRSISelected,
     isWRSelected,
   };
+
+  return targetList;
 };
 
 /**
  * Calculate technical indicators based on target configuration
  */
 export const calculateIndicatorsFromTargetList = (
-  data: any[],
-  targetList: any,
+  data: KLineModel[],
+  targetList: TargetListWithHelpers,
   showVolumeChart: boolean,
-) => {
+): KLineModel[] => {
   let processedData = [...data];
 
   // Calculate MA indicator
   const selectedMAPeriods = targetList.maList
-    .filter((item: any) => item.selected)
-    .map((item: any) => ({
+    .filter(item => item.selected)
+    .map(item => ({
       period: parseInt(item.title, 10),
       index: item.index,
     }));
@@ -91,8 +137,8 @@ export const calculateIndicatorsFromTargetList = (
 
   // Calculate volume MA indicator
   const selectedVolumeMAPeriods = targetList.maVolumeList
-    .filter((item: any) => item.selected)
-    .map((item: any) => ({
+    .filter(item => item.selected)
+    .map(item => ({
       period: parseInt(item.title, 10),
       index: item.index,
     }));
@@ -135,8 +181,8 @@ export const calculateIndicatorsFromTargetList = (
 
   // Calculate RSI indicator
   const selectedRSIPeriods = targetList.rsiList
-    .filter((item: any) => item.selected)
-    .map((item: any) => ({
+    .filter(item => item.selected)
+    .map(item => ({
       period: parseInt(item.title, 10),
       index: item.index,
     }));
@@ -147,8 +193,8 @@ export const calculateIndicatorsFromTargetList = (
 
   // Calculate WR indicator
   const selectedWRPeriods = targetList.wrList
-    .filter((item: any) => item.selected)
-    .map((item: any) => ({
+    .filter(item => item.selected)
+    .map(item => ({
       period: parseInt(item.title, 10),
       index: item.index,
     }));
@@ -164,15 +210,20 @@ export const calculateIndicatorsFromTargetList = (
  * Add technical indicators to selected item list
  */
 export const addIndicatorToSelectedList = (
-  item: any,
-  targetList: any,
+  item: KLineModel,
+  targetList: TargetListWithHelpers,
   priceCount: number,
 ) => {
+  if (!item.selectedItemList) {
+    item.selectedItemList = [];
+  }
+  const selectedList = item.selectedItemList;
+
   // Add MA indicator display
   if (targetList.isMASelected() && item.maList) {
-    item.maList.forEach((ma: any) => {
+    item.maList.forEach(ma => {
       if (ma && ma.value != null) {
-        item.selectedItemList.push({
+        selectedList.push({
           title: `MA${ma.title}`,
           detail: fixRound(ma.value, priceCount, true, false),
         });
@@ -182,7 +233,7 @@ export const addIndicatorToSelectedList = (
 
   // Add BOLL indicator display
   if (targetList.isBOLLSelected() && item.bollMb != null) {
-    item.selectedItemList.push(
+    selectedList.push(
       {
         title: 'BOLL-MB',
         detail: fixRound(item.bollMb, priceCount, true, false),
@@ -200,7 +251,7 @@ export const addIndicatorToSelectedList = (
 
   // Add MACD indicator display
   if (targetList.isMACDSelected() && item.macdValue != null) {
-    item.selectedItemList.push(
+    selectedList.push(
       { title: 'MACD', detail: fixRound(item.macdValue, 4, true, false) },
       { title: 'DEA', detail: fixRound(item.macdDea, 4, true, false) },
       { title: 'DIF', detail: fixRound(item.macdDif, 4, true, false) },
@@ -209,7 +260,7 @@ export const addIndicatorToSelectedList = (
 
   // Add KDJ indicator display
   if (targetList.isKDJSelected() && item.kdjK != null) {
-    item.selectedItemList.push(
+    selectedList.push(
       { title: 'K', detail: fixRound(item.kdjK, 2, true, false) },
       { title: 'D', detail: fixRound(item.kdjD, 2, true, false) },
       { title: 'J', detail: fixRound(item.kdjJ, 2, true, false) },
@@ -218,9 +269,9 @@ export const addIndicatorToSelectedList = (
 
   // Add RSI indicator display
   if (targetList.isRSISelected() && item.rsiList) {
-    item.rsiList.forEach((rsi: any) => {
+    item.rsiList.forEach(rsi => {
       if (rsi && rsi.value != null) {
-        item.selectedItemList.push({
+        selectedList.push({
           title: `RSI${rsi.title}`,
           detail: fixRound(rsi.value, 2, true, false),
         });
@@ -230,9 +281,9 @@ export const addIndicatorToSelectedList = (
 
   // Add WR indicator display
   if (targetList.isWRSelected() && item.wrList) {
-    item.wrList.forEach((wr: any) => {
+    item.wrList.forEach(wr => {
       if (wr && wr.value != null) {
-        item.selectedItemList.push({
+        selectedList.push({
           title: `WR${wr.title}`,
           detail: fixRound(wr.value, 2, true, false),
         });
@@ -245,14 +296,10 @@ export const addIndicatorToSelectedList = (
  * Process K-line data, add technical indicator calculations
  */
 export const processKLineData = (
-  rawData: any[],
-  selectedIndicators: {
-    selectedMainIndicator: number;
-    selectedSubIndicator: number;
-    showVolumeChart: boolean;
-  },
+  rawData: InputKLinePoint[],
+  selectedIndicators: SelectedIndicators,
   isDarkTheme: boolean,
-) => {
+): KLineModel[] => {
   // Simulate symbol configuration
   const symbol = {
     price: 2, // Price precision
@@ -265,14 +312,14 @@ export const processKLineData = (
   const targetList = getTargetList(selectedIndicators);
 
   // Calculate all technical indicators
-  let processedData = rawData.map(item => ({
+  let processedData: KLineModel[] = rawData.map(item => ({
     ...item,
     id: item.time,
     open: item.open,
     high: item.high,
     low: item.low,
     close: item.close,
-    vol: item.vol || item.volume || 0, // Use vol field, fallback to volume for compatibility
+    vol: item.vol ?? item.volume ?? 0, // Use vol field, fallback to volume for compatibility
   }));
 
   // Calculate technical indicators based on targetList configuration
@@ -298,9 +345,7 @@ export const processKLineData = (
 
     // Color configuration
     const theme = ThemeManager.getCurrentTheme(isDarkTheme);
-    const color = isAppend
-      ? processColor(theme.increaseColor)
-      : processColor(theme.decreaseColor);
+    const color = isAppend ? pc(theme.increaseColor) : pc(theme.decreaseColor);
 
     // Add formatted fields
     item.dateString = `${time}`;
@@ -341,11 +386,11 @@ export const processKLineData = (
  * Pack option list for chart configuration
  */
 export const packOptionList = (
-  modelArray: any[],
-  appState: any,
+  modelArray: KLineModel[],
+  appState: PackOptionListParams,
   shouldScrollToEnd = true,
   useImperativeApi = false,
-) => {
+): OptionListObject => {
   const {
     isDarkTheme,
     selectedTimeType,
@@ -365,62 +410,60 @@ export const packOptionList = (
     ios: 1,
   }) as number;
 
-  const configList = {
+  const configList: ConfigListConfig = {
     colorList: {
-      increaseColor: processColor(theme.increaseColor),
-      decreaseColor: processColor(theme.decreaseColor),
+      increaseColor: pc(theme.increaseColor),
+      decreaseColor: pc(theme.decreaseColor),
     },
     targetColorList: [
-      processColor(COLOR(0.96, 0.86, 0.58)),
-      processColor(COLOR(0.38, 0.82, 0.75)),
-      processColor(COLOR(0.8, 0.57, 1)),
-      processColor(COLOR(1, 0.23, 0.24)),
-      processColor(COLOR(0.44, 0.82, 0.03)),
-      processColor(COLOR(0.44, 0.13, 1)),
+      pc(COLOR(0.96, 0.86, 0.58)),
+      pc(COLOR(0.38, 0.82, 0.75)),
+      pc(COLOR(0.8, 0.57, 1)),
+      pc(COLOR(1, 0.23, 0.24)),
+      pc(COLOR(0.44, 0.82, 0.03)),
+      pc(COLOR(0.44, 0.13, 1)),
     ],
-    minuteLineColor: processColor(theme.minuteLineColor),
+    minuteLineColor: pc(theme.minuteLineColor),
     minuteGradientColorList: [
-      processColor(COLOR(0.094117647, 0.341176471, 0.831372549, 0.149019608)), // 15% transparent blue
-      processColor(COLOR(0.266666667, 0.501960784, 0.97254902, 0.149019608)), // 26% transparent blue
-      processColor(COLOR(0.074509804, 0.121568627, 0.188235294, 0)), // Fully transparent
-      processColor(COLOR(0.074509804, 0.121568627, 0.188235294, 0)), // Fully transparent
+      pc(COLOR(0.094117647, 0.341176471, 0.831372549, 0.149019608)), // 15% transparent blue
+      pc(COLOR(0.266666667, 0.501960784, 0.97254902, 0.149019608)), // 26% transparent blue
+      pc(COLOR(0.074509804, 0.121568627, 0.188235294, 0)), // Fully transparent
+      pc(COLOR(0.074509804, 0.121568627, 0.188235294, 0)), // Fully transparent
     ],
     minuteGradientLocationList: [0, 0.3, 0.6, 1],
-    backgroundColor: processColor(theme.backgroundColor),
-    textColor: processColor(theme.detailColor),
-    gridColor: processColor(theme.gridColor),
-    candleTextColor: processColor(theme.titleColor),
-    panelBackgroundColor: processColor(
+    backgroundColor: pc(theme.backgroundColor),
+    textColor: pc(theme.detailColor),
+    gridColor: pc(theme.gridColor),
+    candleTextColor: pc(theme.titleColor),
+    panelBackgroundColor: pc(
       isDarkTheme ? COLOR(0.03, 0.09, 0.14, 0.9) : COLOR(1, 1, 1, 0.95),
     ), // 95% transparency
-    panelBorderColor: processColor(theme.detailColor),
-    panelTextColor: processColor(theme.titleColor),
-    selectedPointContainerColor: processColor('transparent'),
-    selectedPointContentColor: processColor(
-      isDarkTheme ? theme.titleColor : 'white',
-    ),
-    closePriceCenterBackgroundColor: processColor(theme.backgroundColor9703),
-    closePriceCenterBorderColor: processColor(theme.textColor7724),
-    closePriceCenterTriangleColor: processColor(theme.textColor7724),
-    closePriceCenterSeparatorColor: processColor(theme.detailColor),
-    closePriceRightBackgroundColor: processColor(theme.backgroundColor),
-    closePriceRightSeparatorColor: processColor(theme.backgroundColorBlue),
+    panelBorderColor: pc(theme.detailColor),
+    panelTextColor: pc(theme.titleColor),
+    selectedPointContainerColor: pc('transparent'),
+    selectedPointContentColor: pc(isDarkTheme ? theme.titleColor : 'white'),
+    closePriceCenterBackgroundColor: pc(theme.backgroundColor9703),
+    closePriceCenterBorderColor: pc(theme.textColor7724),
+    closePriceCenterTriangleColor: pc(theme.textColor7724),
+    closePriceCenterSeparatorColor: pc(theme.detailColor),
+    closePriceRightBackgroundColor: pc(theme.backgroundColor),
+    closePriceRightSeparatorColor: pc(theme.backgroundColorBlue),
     closePriceRightLightLottieFloder: 'images',
     closePriceRightLightLottieScale: 0.4,
     panelGradientColorList: isDarkTheme
       ? [
-          processColor(COLOR(0.0588235, 0.101961, 0.160784, 0.2)),
-          processColor(COLOR(0.811765, 0.827451, 0.913725, 0.101961)),
-          processColor(COLOR(0.811765, 0.827451, 0.913725, 0.2)),
-          processColor(COLOR(0.811765, 0.827451, 0.913725, 0.101961)),
-          processColor(COLOR(0.0784314, 0.141176, 0.223529, 0.2)),
+          pc(COLOR(0.0588235, 0.101961, 0.160784, 0.2)),
+          pc(COLOR(0.811765, 0.827451, 0.913725, 0.101961)),
+          pc(COLOR(0.811765, 0.827451, 0.913725, 0.2)),
+          pc(COLOR(0.811765, 0.827451, 0.913725, 0.101961)),
+          pc(COLOR(0.0784314, 0.141176, 0.223529, 0.2)),
         ]
       : [
-          processColor(COLOR(1, 1, 1, 0)),
-          processColor(COLOR(0.54902, 0.623529, 0.678431, 0.101961)),
-          processColor(COLOR(0.54902, 0.623529, 0.678431, 0.25098)),
-          processColor(COLOR(0.54902, 0.623529, 0.678431, 0.101961)),
-          processColor(COLOR(1, 1, 1, 0)),
+          pc(COLOR(1, 1, 1, 0)),
+          pc(COLOR(0.54902, 0.623529, 0.678431, 0.101961)),
+          pc(COLOR(0.54902, 0.623529, 0.678431, 0.25098)),
+          pc(COLOR(0.54902, 0.623529, 0.678431, 0.101961)),
+          pc(COLOR(1, 1, 1, 0)),
         ],
     panelGradientLocationList: [0, 0.25, 0.5, 0.75, 1],
     mainFlex: showVolumeChart
@@ -439,7 +482,7 @@ export const packOptionList = (
     itemWidth: 8 * (pixelRatio ?? 1),
     candleWidth: 6 * (pixelRatio ?? 1),
     candleCornerRadius: candleCornerRadius * (pixelRatio ?? 1),
-    minuteVolumeCandleColor: processColor(
+    minuteVolumeCandleColor: pc(
       showVolumeChart
         ? COLOR(0.0941176, 0.509804, 0.831373, 0.501961)
         : 'transparent',
@@ -451,10 +494,11 @@ export const packOptionList = (
     candleTextFontSize: 10 * (pixelRatio ?? 1),
     panelTextFontSize: 10 * (pixelRatio ?? 1),
     panelMinWidth: 130 * (pixelRatio ?? 1),
-    fontFamily: Platform.select({
-      ios: 'DINPro-Medium',
-      android: '',
-    }),
+    fontFamily:
+      Platform.select({
+        ios: 'DINPro-Medium',
+        android: '',
+      }) ?? '',
     closePriceRightLightLottieSource: '',
   };
 
@@ -465,13 +509,13 @@ export const packOptionList = (
     showVolumeChart,
   });
 
-  const drawList = {
-    shotBackgroundColor: processColor(theme.backgroundColor),
+  const drawList: DrawListConfig = {
+    shotBackgroundColor: pc(theme.backgroundColor),
     // Basic drawing configuration
     drawType: selectedDrawTool,
     shouldReloadDrawItemIndex: DrawStateConstants.none,
     drawShouldContinue: drawShouldContinue,
-    drawColor: processColor(COLOR(1, 0.46, 0.05)),
+    drawColor: pc(COLOR(1, 0.46, 0.05)),
     drawLineHeight: 2,
     drawDashWidth: 4,
     drawDashSpace: 4,

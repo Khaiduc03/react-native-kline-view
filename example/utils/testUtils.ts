@@ -1,9 +1,37 @@
+import type { KLineModel } from 'react-native-kline-view';
 import { formatTime } from './helpers';
 
+type CandlestickInput = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  vol: number;
+  id?: number;
+  dateString?: string;
+  maList?: KLineModel['maList'];
+  maVolumeList?: KLineModel['maVolumeList'];
+  rsiList?: KLineModel['rsiList'];
+  wrList?: KLineModel['wrList'];
+  selectedItemList?: KLineModel['selectedItemList'];
+  [key: string]: unknown;
+};
+
+type VolumeAwareKLine = CandlestickInput & { volume?: number };
+
+const getSafeVolume = (item: VolumeAwareKLine): number => {
+  const volumeValue = item.vol ?? item.volume ?? 0;
+  return Number.isFinite(volumeValue) ? volumeValue : 100000;
+};
+
+const safeValue = (val: number, fallback = 0): number =>
+  Number.isFinite(val) ? val : fallback;
+
 export const testUpdateLastCandlestick = (
-  klineData: any[],
+  klineData: VolumeAwareKLine[],
   _showVolumeChart: boolean,
-  updateLastCandlestickCallback: (candle: any) => void,
+  updateLastCandlestickCallback: (candle: KLineModel) => void,
 ) => {
   if (!updateLastCandlestickCallback || klineData.length === 0) {
     console.warn('No callback or data available');
@@ -17,13 +45,15 @@ export const testUpdateLastCandlestick = (
   const priceVariation = (Math.random() - 0.5) * basePrice * 0.01; // ±1% variation
 
   const newClose = Math.max(0.01, basePrice + priceVariation);
-  const newHigh =
-    Math.max(lastCandle.high, newClose + Math.random() * basePrice * 0.002);
-  const newLow =
-    Math.min(lastCandle.low, newClose - Math.random() * basePrice * 0.002);
-  const newVolume = Math.round(
-    lastCandle.vol * (0.8 + Math.random() * 0.4),
-  ); // ±20% volume variation
+  const newHigh = Math.max(
+    lastCandle.high,
+    newClose + Math.random() * basePrice * 0.002,
+  );
+  const newLow = Math.min(
+    lastCandle.low,
+    newClose - Math.random() * basePrice * 0.002,
+  );
+  const newVolume = Math.round(lastCandle.vol * (0.8 + Math.random() * 0.4)); // ±20% volume variation
 
   // Create updated candlestick with preserved indicators
   const updatedCandle = {
@@ -62,9 +92,9 @@ export const testUpdateLastCandlestick = (
 };
 
 export const testAddCandlesticksAtTheEnd = (
-  klineData: any[],
+  klineData: VolumeAwareKLine[],
   showVolumeChart: boolean,
-  addCandlesticksAtTheEndCallback: (candles: any[]) => void,
+  addCandlesticksAtTheEndCallback: (candles: KLineModel[]) => void,
 ) => {
   if (!addCandlesticksAtTheEndCallback || klineData.length === 0) {
     console.warn('No callback or data available');
@@ -74,7 +104,7 @@ export const testAddCandlesticksAtTheEnd = (
   const lastCandle = klineData[klineData.length - 1];
   const numberOfNewCandles = 1;
 
-  const newCandlesticks: any[] = [];
+  const newCandlesticks: KLineModel[] = [];
   for (let i = 1; i <= numberOfNewCandles; i++) {
     const timeIncrement = 60000 * i;
     const basePrice = lastCandle.close;
@@ -85,13 +115,9 @@ export const testAddCandlesticksAtTheEnd = (
       basePrice + (Math.random() - 0.5) * basePrice * 0.01,
     );
     const close = Math.max(0.01, basePrice + priceVariation);
-    const high =
-      Math.max(open, close) + Math.random() * basePrice * 0.005;
-    const low =
-      Math.min(open, close) - Math.random() * basePrice * 0.005;
-    const volume = Math.round(
-      lastCandle.vol * (0.5 + Math.random()),
-    );
+    const high = Math.max(open, close) + Math.random() * basePrice * 0.005;
+    const low = Math.min(open, close) - Math.random() * basePrice * 0.005;
+    const volume = Math.round(lastCandle.vol * (0.5 + Math.random()));
 
     const tempAllData = [...klineData];
     const currentIndex = tempAllData.length + i - 1;
@@ -135,11 +161,6 @@ export const testAddCandlesticksAtTheEnd = (
       ma20 = sum / 20;
     }
 
-    const getSafeVolume = (item: any) => {
-      const vol = item.vol || item.volume;
-      return isNaN(vol) || !isFinite(vol) ? 100000 : vol;
-    };
-
     let volumeMa5 = volume;
     if (currentIndex >= 4) {
       let sum = volume;
@@ -166,9 +187,6 @@ export const testAddCandlesticksAtTheEnd = (
       volumeMa10 = sum / 10;
     }
 
-    const safeValue = (val: any, fallback = 0) =>
-      isNaN(val) || !isFinite(val) ? fallback : val;
-
     const newCandle = {
       time: lastCandle.time + timeIncrement,
       open: parseFloat(open.toFixed(2)),
@@ -177,27 +195,21 @@ export const testAddCandlesticksAtTheEnd = (
       close: parseFloat(close.toFixed(2)),
       vol: safeValue(volume, 100000),
       id: lastCandle.time + timeIncrement,
-      dateString: formatTime(
-        lastCandle.time + timeIncrement,
-        'MM-DD HH:mm',
-      ),
+      dateString: formatTime(lastCandle.time + timeIncrement, 'MM-DD HH:mm'),
       maList: [
         {
           title: '5',
           value: safeValue(ma5, close),
-          selected: true,
           index: 0,
         },
         {
           title: '10',
           value: safeValue(ma10, close),
-          selected: true,
           index: 1,
         },
         {
           title: '20',
           value: safeValue(ma20, close),
-          selected: true,
           index: 2,
         },
       ],
@@ -205,13 +217,11 @@ export const testAddCandlesticksAtTheEnd = (
         {
           title: '5',
           value: safeValue(volumeMa5, 100000),
-          selected: showVolumeChart,
           index: 0,
         },
         {
           title: '10',
           value: safeValue(volumeMa10, 100000),
-          selected: showVolumeChart,
           index: 1,
         },
       ],
@@ -237,10 +247,10 @@ export const testAddCandlesticksAtTheEnd = (
 };
 
 export const testAddCandlesticksAtTheStart = (
-  klineData: any[],
+  klineData: VolumeAwareKLine[],
   showVolumeChart: boolean,
   firstCandleTime: number,
-  addCandlesticksAtTheStartCallback: (candles: any[]) => void,
+  addCandlesticksAtTheStartCallback: (candles: KLineModel[]) => void,
 ) => {
   if (!addCandlesticksAtTheStartCallback || klineData.length === 0) {
     console.warn('No callback or data available');
@@ -250,7 +260,7 @@ export const testAddCandlesticksAtTheStart = (
   const firstCandle = klineData[0];
   const numberOfNewCandles = 200;
 
-  const newCandlesticks: any[] = [];
+  const newCandlesticks: KLineModel[] = [];
   const tempAllData = [...klineData];
 
   for (let i = 0; i < numberOfNewCandles; i++) {
@@ -258,35 +268,21 @@ export const testAddCandlesticksAtTheStart = (
     const timestamp = firstCandleTime - minutesBack * 60 * 1000;
 
     const basePrice = firstCandle.open;
-    const priceVariation1 =
-      (Math.random() - 0.5) * basePrice * 0.02;
-    const priceVariation2 =
-      (Math.random() - 0.5) * basePrice * 0.02;
+    const priceVariation1 = (Math.random() - 0.5) * basePrice * 0.02;
+    const priceVariation2 = (Math.random() - 0.5) * basePrice * 0.02;
     const open = Math.max(0.01, basePrice + priceVariation1);
     const close = Math.max(0.01, basePrice + priceVariation2);
-    const high =
-      Math.max(open, close) + Math.random() * basePrice * 0.005;
-    const low =
-      Math.min(open, close) - Math.random() * basePrice * 0.005;
-    const volume = Math.round(
-      firstCandle.vol * (0.5 + Math.random()),
-    );
+    const high = Math.max(open, close) + Math.random() * basePrice * 0.005;
+    const low = Math.min(open, close) - Math.random() * basePrice * 0.005;
+    const volume = Math.round(firstCandle.vol * (0.5 + Math.random()));
 
     const currentIndex = numberOfNewCandles - 1 - i;
-
-    const getSafeVolume = (item: any) => {
-      const vol = item.vol || item.volume;
-      return isNaN(vol) || !isFinite(vol) ? 100000 : vol;
-    };
 
     let volumeMa5 = volume;
     let volumeMa10 = volume;
     let ma5 = close;
     let ma10 = close;
     let ma20 = close;
-
-    const safeValue = (val: any, fallback = 0) =>
-      isNaN(val) || !isFinite(val) ? fallback : val;
 
     const newCandle = {
       time: timestamp,
@@ -301,19 +297,16 @@ export const testAddCandlesticksAtTheStart = (
         {
           title: '5',
           value: safeValue(ma5, close),
-          selected: true,
           index: 0,
         },
         {
           title: '10',
           value: safeValue(ma10, close),
-          selected: true,
           index: 1,
         },
         {
           title: '20',
           value: safeValue(ma20, close),
-          selected: true,
           index: 2,
         },
       ],
@@ -321,13 +314,11 @@ export const testAddCandlesticksAtTheStart = (
         {
           title: '5',
           value: safeValue(volumeMa5, 100000),
-          selected: showVolumeChart,
           index: 0,
         },
         {
           title: '10',
           value: safeValue(volumeMa10, 100000),
-          selected: showVolumeChart,
           index: 1,
         },
       ],
@@ -362,16 +353,9 @@ export const testAddCandlesticksAtTheStart = (
   );
   console.log(
     '  Historical newest:',
-    new Date(
-      newCandlesticks[newCandlesticks.length - 1].time,
-    ).toLocaleString(),
+    new Date(newCandlesticks[newCandlesticks.length - 1].time).toLocaleString(),
   );
-  console.log(
-    '  Previous first:',
-    new Date(firstCandle.time).toLocaleString(),
-  );
+  console.log('  Previous first:', new Date(firstCandle.time).toLocaleString());
 
   addCandlesticksAtTheStartCallback(newCandlesticks);
 };
-
-

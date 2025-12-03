@@ -1,10 +1,14 @@
 import * as React from 'react';
 import { ViewProps, NativeSyntheticEvent } from 'react-native';
 
-export type RNKLineViewNativeEvent = NativeSyntheticEvent<any>;
+type ExtraFields = Record<string, unknown>;
+
+export type RNKLineViewNativeEvent = NativeSyntheticEvent<
+  Record<string, unknown>
+>;
 
 // K-line model item (single candlestick with indicators)
-export interface KLineModel {
+export interface KLineModel extends ExtraFields {
   id: number;
   open: number;
   high: number;
@@ -15,18 +19,25 @@ export interface KLineModel {
   selectedItemList?: Array<{
     title: string;
     detail: string | number;
-    color?: any;
+    color?: number;
   }>;
+  bollMb?: number;
+  bollUp?: number;
+  bollDn?: number;
+  macdValue?: number;
+  macdDea?: number;
+  macdDif?: number;
+  kdjK?: number;
+  kdjD?: number;
+  kdjJ?: number;
   // Optional indicator fields (MACD, KDJ, RSI, WR, MA, etc.)
   maList?: Array<{ title: string; value: number; index: number }>;
   maVolumeList?: Array<{ title: string; value: number; index: number }>;
   rsiList?: Array<{ title: string; value: number; index: number }>;
   wrList?: Array<{ title: string; value: number; index: number }>;
-  // Additional indicator-specific fields are allowed but not strictly typed here
-  [key: string]: any;
 }
 
-export interface TargetListConfig {
+export interface TargetListConfig extends ExtraFields {
   maList: Array<{ title: string; selected: boolean; index: number }>;
   maVolumeList: Array<{ title: string; selected: boolean; index: number }>;
   rsiList: Array<{ title: string; selected: boolean; index: number }>;
@@ -39,21 +50,20 @@ export interface TargetListConfig {
   kdjN: string;
   kdjM1: string;
   kdjM2: string;
-  [key: string]: any;
 }
 
-export interface ConfigListConfig {
+export interface ConfigListConfig extends ExtraFields {
   colorList: {
-    increaseColor: any;
-    decreaseColor: any;
+    increaseColor: number;
+    decreaseColor: number;
   };
-  targetColorList: any[];
-  backgroundColor: any;
-  textColor: any;
-  gridColor: any;
-  candleTextColor: any;
-  minuteLineColor: any;
-  minuteGradientColorList: any[];
+  targetColorList: number[];
+  backgroundColor: number;
+  textColor: number;
+  gridColor: number;
+  candleTextColor: number;
+  minuteLineColor: number;
+  minuteGradientColorList: number[];
   minuteGradientLocationList: number[];
   mainFlex: number;
   volumeFlex: number;
@@ -63,7 +73,7 @@ export interface ConfigListConfig {
   itemWidth: number;
   candleWidth: number;
   candleCornerRadius: number;
-  minuteVolumeCandleColor: any;
+  minuteVolumeCandleColor: number;
   minuteVolumeCandleWidth: number;
   macdCandleWidth: number;
   headerTextFontSize: number;
@@ -72,38 +82,36 @@ export interface ConfigListConfig {
   panelTextFontSize: number;
   panelMinWidth: number;
   fontFamily: string;
-  panelBackgroundColor: any;
-  panelBorderColor: any;
-  panelGradientColorList?: any[];
+  panelBackgroundColor: number;
+  panelBorderColor: number;
+  panelGradientColorList?: number[];
   panelGradientLocationList?: number[];
-  closePriceCenterBackgroundColor?: any;
-  closePriceCenterBorderColor?: any;
-  closePriceCenterTriangleColor?: any;
-  closePriceCenterSeparatorColor?: any;
-  closePriceRightBackgroundColor?: any;
-  closePriceRightSeparatorColor?: any;
+  closePriceCenterBackgroundColor?: number;
+  closePriceCenterBorderColor?: number;
+  closePriceCenterTriangleColor?: number;
+  closePriceCenterSeparatorColor?: number;
+  closePriceRightBackgroundColor?: number;
+  closePriceRightSeparatorColor?: number;
   closePriceRightLightLottieFloder?: string;
   closePriceRightLightLottieScale?: number;
   closePriceRightLightLottieSource?: string;
-  [key: string]: any;
 }
 
-export interface DrawListConfig {
+export interface DrawListConfig extends ExtraFields {
   drawType: number;
   shouldReloadDrawItemIndex: number;
   drawShouldContinue: boolean;
   shouldClearDraw?: boolean;
   shouldFixDraw?: boolean;
-  shotBackgroundColor?: any;
-  drawColor?: any;
+  shotBackgroundColor?: number;
+  drawColor?: number;
   drawLineHeight?: number;
   drawDashWidth?: number;
   drawDashSpace?: number;
   drawIsLock?: boolean;
-  [key: string]: any;
 }
 
-export interface OptionListObject {
+export interface OptionListObject extends ExtraFields {
   modelArray: KLineModel[];
   shouldScrollToEnd?: boolean;
   targetList: TargetListConfig;
@@ -116,7 +124,6 @@ export interface OptionListObject {
   time?: number;
   useImperativeApi?: boolean;
   scrollPositionAdjustment?: number;
-  [key: string]: any;
 }
 
 export interface RNKLineViewProps extends ViewProps {
@@ -158,17 +165,17 @@ export interface RNKLineViewRef {
    * Imperatively update the last candlestick in the series.
    * candlestick must match the model structure used in optionList.modelArray.
    */
-  updateLastCandlestick(candlestick: any): void;
+  updateLastCandlestick(candlestick: KLineModel): void;
 
   /**
    * Append new candlesticks to the end of the series.
    */
-  addCandlesticksAtTheEnd(candlesticks: any[]): void;
+  addCandlesticksAtTheEnd(candlesticks: KLineModel[]): void;
 
   /**
    * Prepend new candlesticks to the start of the series.
    */
-  addCandlesticksAtTheStart(candlesticks: any[]): void;
+  addCandlesticksAtTheStart(candlesticks: KLineModel[]): void;
 }
 
 declare const RNKLineView: React.ForwardRefExoticComponent<

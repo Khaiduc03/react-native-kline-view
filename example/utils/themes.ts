@@ -16,9 +16,7 @@ const COLOR = (r: number, g: number, b: number, a = 1): string => {
   }
 };
 
-type Theme = {
-  [key: string]: any;
-};
+export type Theme = Record<string, string>;
 
 // Theme configuration
 export class ThemeManager {

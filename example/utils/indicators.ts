@@ -1,3 +1,8 @@
+import type { KLineModel } from 'react-native-kline-view';
+
+type PeriodConfig = { period: number; index: number };
+type CandleData = KLineModel & { volume?: number };
+
 /**
  * Technical Indicator Calculation Functions
  * Common technical analysis indicators for K-line charts
@@ -6,7 +11,11 @@
 /**
  * Calculate Bollinger Bands (BOLL)
  */
-export const calculateBOLL = (data: any[], n = 20, p = 2) => {
+export const calculateBOLL = (
+  data: CandleData[],
+  n = 20,
+  p = 2,
+): CandleData[] => {
   return data.map((item, index) => {
     if (index < n - 1) {
       return {
@@ -43,7 +52,12 @@ export const calculateBOLL = (data: any[], n = 20, p = 2) => {
 /**
  * Calculate MACD
  */
-export const calculateMACD = (data: any[], s = 12, l = 26, m = 9) => {
+export const calculateMACD = (
+  data: CandleData[],
+  s = 12,
+  l = 26,
+  m = 9,
+): CandleData[] => {
   let ema12 = data[0].close;
   let ema26 = data[0].close;
   let dea = 0;
@@ -78,7 +92,12 @@ export const calculateMACD = (data: any[], s = 12, l = 26, m = 9) => {
 /**
  * Calculate KDJ
  */
-export const calculateKDJ = (data: any[], n = 9, m1 = 3, m2 = 3) => {
+export const calculateKDJ = (
+  data: CandleData[],
+  n = 9,
+  m1 = 3,
+  m2 = 3,
+): CandleData[] => {
   let k = 50;
   let d = 50;
 
@@ -123,17 +142,19 @@ export const calculateKDJ = (data: any[], n = 9, m1 = 3, m2 = 3) => {
  * Calculate Moving Average (MA) for given periods
  */
 export const calculateMAWithConfig = (
-  data: any[],
-  periodConfigs: Array<{ period: number; index: number }>,
-) => {
+  data: CandleData[],
+  periodConfigs: PeriodConfig[],
+): CandleData[] => {
   return data.map((item, index) => {
-    const maList: any[] = new Array(3); // Fixed 3 positions
+    const maList: Array<{ value: number; title: string; index: number }> =
+      new Array(3);
 
     periodConfigs.forEach(config => {
       if (index < config.period - 1) {
         maList[config.index] = {
           value: item.close,
           title: `${config.period}`,
+          index: config.index,
         };
       } else {
         let sum = 0;
@@ -143,6 +164,7 @@ export const calculateMAWithConfig = (
         maList[config.index] = {
           value: sum / config.period,
           title: `${config.period}`,
+          index: config.index,
         };
       }
     });
@@ -155,17 +177,22 @@ export const calculateMAWithConfig = (
  * Calculate Volume Moving Average (MA) for given periods
  */
 export const calculateVolumeMAWithConfig = (
-  data: any[],
-  periodConfigs: Array<{ period: number; index: number }>,
-) => {
+  data: CandleData[],
+  periodConfigs: PeriodConfig[],
+): CandleData[] => {
   return data.map((item, index) => {
-    const maVolumeList: any[] = new Array(2); // Fixed 2 positions
+    const maVolumeList: Array<{
+      value: number;
+      title: string;
+      index: number;
+    }> = new Array(2);
 
     periodConfigs.forEach(config => {
       if (index < config.period - 1) {
         maVolumeList[config.index] = {
-          value: item.vol || item.volume || 0,
+          value: item.vol ?? item.volume ?? 0,
           title: `${config.period}`,
+          index: config.index,
         };
       } else {
         let sum = 0;
@@ -175,6 +202,7 @@ export const calculateVolumeMAWithConfig = (
         maVolumeList[config.index] = {
           value: sum / config.period,
           title: `${config.period}`,
+          index: config.index,
         };
       }
     });
@@ -187,12 +215,16 @@ export const calculateVolumeMAWithConfig = (
  * Calculate RSI for given periods
  */
 export const calculateRSIWithConfig = (
-  data: any[],
-  periodConfigs: Array<{ period: number; index: number }>,
-) => {
+  data: CandleData[],
+  periodConfigs: PeriodConfig[],
+): CandleData[] => {
   return data.map((item, index) => {
     if (index === 0) {
-      const rsiList: any[] = new Array(3); // Fixed 3 positions
+      const rsiList: Array<{
+        value: number;
+        index: number;
+        title: string;
+      }> = new Array(3);
       periodConfigs.forEach(config => {
         rsiList[config.index] = {
           value: 50,
@@ -203,7 +235,11 @@ export const calculateRSIWithConfig = (
       return { ...item, rsiList };
     }
 
-    const rsiList: any[] = new Array(3); // Fixed 3 positions
+    const rsiList: Array<{
+      value: number;
+      index: number;
+      title: string;
+    }> = new Array(3);
     periodConfigs.forEach(config => {
       if (index < config.period) {
         rsiList[config.index] = {
@@ -243,11 +279,15 @@ export const calculateRSIWithConfig = (
  * Calculate Williams %R for given periods
  */
 export const calculateWRWithConfig = (
-  data: any[],
-  periodConfigs: Array<{ period: number; index: number }>,
-) => {
+  data: CandleData[],
+  periodConfigs: PeriodConfig[],
+): CandleData[] => {
   return data.map((item, index) => {
-    const wrList: any[] = new Array(1); // Fixed 1 position
+    const wrList: Array<{
+      value: number;
+      index: number;
+      title: string;
+    }> = new Array(1);
 
     periodConfigs.forEach(config => {
       if (index < config.period - 1) {

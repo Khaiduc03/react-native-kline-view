@@ -6,10 +6,7 @@ import {
   DrawTypeConstants,
   DrawToolHelper,
 } from '../utils/constants';
-
-type Theme = {
-  [key: string]: any;
-};
+import type { Theme } from '../utils/themes';
 
 type ControlBarProps = {
   theme: Theme;
@@ -168,4 +165,3 @@ const createControlBarStyles = (theme: Theme) => {
     },
   });
 };
-

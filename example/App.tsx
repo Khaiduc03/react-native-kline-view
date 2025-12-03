@@ -4,8 +4,15 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, StatusBar, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  StatusBar,
+  Platform,
+  NativeSyntheticEvent,
+} from 'react-native';
 import RNKLineView, { RNKLineViewRef } from 'react-native-kline-view';
+import type { OptionListObject, KLineModel } from 'react-native-kline-view';
 import { ThemeManager } from './utils/themes';
 import {
   TimeTypes,
@@ -32,24 +39,63 @@ type KlinePoint = {
   low: number;
   close: number;
   vol: number;
+  id?: number;
+  dateString?: string;
+  [key: string]: unknown;
 };
 
-type DrawEvent = {
-  nativeEvent: any;
+type DrawNativeEvent = {
+  x?: number;
+  y?: number;
+  isOnClosePriceLabel?: boolean;
+  pointCount?: number;
+  closePriceFrame?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  [key: string]: unknown;
+};
+
+type DrawEvent = NativeSyntheticEvent<DrawNativeEvent>;
+
+type BinanceKlineTuple = [
+  number,
+  string,
+  string,
+  string,
+  string,
+  string,
+  ...unknown[],
+];
+
+type OptionListPatch = Partial<OptionListObject> & {
+  drawList?: Partial<OptionListObject['drawList']>;
+};
+
+const isFullOptionList = (
+  value: OptionListObject | OptionListPatch,
+): value is OptionListObject => {
+  return (
+    Array.isArray((value as OptionListObject).modelArray) &&
+    typeof (value as OptionListObject).configList === 'object'
+  );
 };
 
 const mapBinanceKlinesToKlineData = (rawData: unknown): KlinePoint[] => {
   if (!Array.isArray(rawData)) return [];
 
-  return rawData.map((k: any) => {
-    const openTime = Number(k[0]);
+  return rawData.map(kline => {
+    const [openTime, open, high, low, close, volume] =
+      kline as BinanceKlineTuple;
     return {
-      time: openTime,
-      open: Number(k[1]),
-      high: Number(k[2]),
-      low: Number(k[3]),
-      close: Number(k[4]),
-      vol: Number(k[5]),
+      time: Number(openTime),
+      open: Number(open),
+      high: Number(high),
+      low: Number(low),
+      close: Number(close),
+      vol: Number(volume),
     };
   });
 };
@@ -59,7 +105,7 @@ const App: React.FC = () => {
   const [selectedTimeType, setSelectedTimeType] = useState(2); // Corresponds to 1 minute
   const [selectedMainIndicator, setSelectedMainIndicator] = useState(1); // Corresponds to MA (1=MA, 2=BOLL)
   const [selectedSubIndicator, setSelectedSubIndicator] = useState(4); // Corresponds to KDJ (3=MACD, 4=KDJ, 5=RSI, 6=WR)
-  const [selectedDrawTool, setSelectedDrawTool] = useState(
+  const [selectedDrawTool, setSelectedDrawTool] = useState<number>(
     DrawTypeConstants.none,
   );
   const [showIndicatorSelector, setShowIndicatorSelector] = useState(false);
@@ -67,15 +113,14 @@ const App: React.FC = () => {
   const [showDrawToolSelector, setShowDrawToolSelector] = useState(false);
   const [klineData, setKlineData] = useState<KlinePoint[]>([]);
   const [drawShouldContinue, setDrawShouldContinue] = useState(true);
-  const [optionList, setOptionList] = useState<string | null>(null);
-  const [lastDataLength, setLastDataLength] = useState(0);
-  const [currentScrollPosition, _setCurrentScrollPosition] = useState(0);
+  const [optionList, setOptionList] = useState<string | undefined>(undefined);
   const [showVolumeChart, setShowVolumeChart] = useState(true);
   const [candleCornerRadius, setCandleCornerRadius] = useState(0);
   const firstCandleTimeRef = useRef<number | null>(null);
-  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const initialLoadRef = useRef(false);
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
+  const optionListRef = useRef<OptionListObject | null>(null);
 
   const updateStatusBar = useCallback(() => {
     StatusBar.setBarStyle(isDarkTheme ? 'light-content' : 'dark-content', true);
@@ -118,7 +163,7 @@ const App: React.FC = () => {
         if (mapped.length > 0) {
           setKlineData(mapped);
           firstCandleTimeRef.current = mapped[0].time;
-          setInitialDataLoaded(false);
+          initialLoadRef.current = false;
         }
       } catch (e) {
         console.warn('Failed to load BTC klines', e);
@@ -130,9 +175,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     updateStatusBar();
-    if (klineData.length > 0) {
+    if (klineData.length > 0 && initialLoadRef.current) {
       // Initialize loading K-line data
-      setLastDataLength(klineData.length);
       setTimeout(() => reloadKLineData(), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,10 +207,10 @@ const App: React.FC = () => {
     setSelectedTimeType(timeType);
     setShowTimeSelector(false);
     // Reset initial data loaded flag and regenerate data
-    setInitialDataLoaded(false);
+    initialLoadRef.current = false;
     // Clear current data; it will be reloaded from Binance in effect
     setKlineData([]);
-    console.log('Switch time period:', (TimeTypes as any)[timeType].label);
+    console.log('Switch time period:', TimeTypes[timeType]?.label ?? 'Unknown');
   }, []);
 
   // Select indicator
@@ -185,9 +229,27 @@ const App: React.FC = () => {
   );
 
   // Set optionList property
-  const setOptionListValue = useCallback((nextOptionList: any) => {
-    setOptionList(JSON.stringify(nextOptionList));
-  }, []);
+  const setOptionListValue = useCallback(
+    (nextOptionList: OptionListObject | OptionListPatch) => {
+      if (isFullOptionList(nextOptionList)) {
+        optionListRef.current = nextOptionList;
+      } else if (optionListRef.current) {
+        optionListRef.current = {
+          ...optionListRef.current,
+          ...nextOptionList,
+          drawList: nextOptionList.drawList
+            ? { ...optionListRef.current.drawList, ...nextOptionList.drawList }
+            : optionListRef.current.drawList,
+        };
+      } else {
+        // Without a base option list we cannot apply a patch safely.
+        return;
+      }
+
+      setOptionList(JSON.stringify(optionListRef.current));
+    },
+    [],
+  );
 
   // Select drawing tool
   const selectDrawTool = useCallback(
@@ -215,10 +277,12 @@ const App: React.FC = () => {
     setOptionListValue({
       drawList: {
         shouldReloadDrawItemIndex: DrawStateConstants.none,
+        drawType: DrawTypeConstants.none,
+        drawShouldContinue,
         shouldClearDraw: true,
       },
     });
-  }, [setOptionListValue]);
+  }, [drawShouldContinue, setOptionListValue]);
 
   // Reload K-line data
   function reloadKLineData(shouldScrollToEnd = true) {
@@ -244,53 +308,23 @@ const App: React.FC = () => {
         selectedMainIndicator,
         selectedSubIndicator,
         selectedDrawTool,
-        showIndicatorSelector,
-        showTimeSelector,
-        showDrawToolSelector,
-        klineData,
-        drawShouldContinue,
-        optionList,
-        lastDataLength,
-        currentScrollPosition,
         showVolumeChart,
         candleCornerRadius,
+        drawShouldContinue,
       },
       shouldScrollToEnd,
-      kLineViewRef.current ? true : false,
+      false,
     );
     setOptionListValue(newOptionList);
   }
 
-  // Load initial data when component mounts and ref is available
+  // Load data exactly once after fetch completes
   useEffect(() => {
-    if (kLineViewRef.current && klineData.length > 0 && !initialDataLoaded) {
-      console.log(
-        'Loading initial candlesticks via imperative API:',
-        klineData.length,
-      );
-      const processedData = processKLineData(
-        klineData,
-        {
-          selectedMainIndicator,
-          selectedSubIndicator,
-          showVolumeChart,
-        },
-        isDarkTheme,
-      );
-
-      setTimeout(() => {
-        kLineViewRef.current?.addCandlesticksAtTheEnd(processedData);
-        setInitialDataLoaded(true);
-      }, 200); // Give chart time to initialize
+    if (klineData.length > 0 && !initialLoadRef.current) {
+      initialLoadRef.current = true;
+      reloadKLineData(true);
     }
-  }, [
-    klineData,
-    selectedMainIndicator,
-    selectedSubIndicator,
-    showVolumeChart,
-    isDarkTheme,
-    initialDataLoaded,
-  ]);
+  }, [klineData]);
 
   // Reload K-line data and adjust scroll position to maintain current view
   // Helper kept for future use: adjust scroll position when prepending data
@@ -360,10 +394,11 @@ const App: React.FC = () => {
     testAddCandlesticksAtTheStart(
       klineData,
       showVolumeChart,
-      firstCandleTimeRef.current,
-      candlesticks => {
+      firstCandleTimeRef.current ?? klineData[0]?.time ?? Date.now(),
+      (candlesticks: KLineModel[]) => {
         kLineViewRef.current?.addCandlesticksAtTheStart(candlesticks);
-        firstCandleTimeRef.current = candlesticks[0].time;
+        firstCandleTimeRef.current =
+          (candlesticks[0]?.time as number | undefined) ?? null;
       },
     );
   }, [klineData, showVolumeChart]);
@@ -385,13 +420,17 @@ const App: React.FC = () => {
   }, [klineData, showVolumeChart]);
 
   const handleTestAddCandlesticksAtTheEnd = useCallback(() => {
-    testAddCandlesticksAtTheEnd(klineData, showVolumeChart, candlesticks => {
-      kLineViewRef.current?.addCandlesticksAtTheEnd(candlesticks);
-    });
+    testAddCandlesticksAtTheEnd(
+      klineData,
+      showVolumeChart,
+      (candlesticks: KLineModel[]) => {
+        kLineViewRef.current?.addCandlesticksAtTheEnd(candlesticks);
+      },
+    );
   }, [klineData, showVolumeChart]);
 
   const renderKLineChart = useCallback(
-    (styles: any) => {
+    (styles: ReturnType<typeof getStyles>) => {
       const directRender = (
         <RNKLineView
           ref={kLineViewRef}
@@ -404,15 +443,11 @@ const App: React.FC = () => {
           onDrawPointComplete={onDrawPointComplete}
         />
       );
-      if ((globalThis as any)?.nativeFabricUIManager && Platform.OS === 'ios') {
-        return directRender;
-      }
+
       return (
-        <View style={{ flex: 1 }} collapsable={false}>
-          <View style={{ flex: 1 }} collapsable={false}>
-            <View style={styles.chartContainer} collapsable={false}>
-              {directRender}
-            </View>
+        <View style={styles.container}>
+          <View style={styles.chartContainer} collapsable={false}>
+            {directRender}
           </View>
         </View>
       );

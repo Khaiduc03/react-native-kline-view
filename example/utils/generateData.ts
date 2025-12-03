@@ -1,5 +1,14 @@
-export const generateMockData = () => {
-  const data: any[] = [];
+type GeneratedKline = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  vol: number;
+};
+
+export const generateMockData = (): GeneratedKline[] => {
+  const data: GeneratedKline[] = [];
   let lastClose = 50000;
   const now = Date.now();
 
@@ -38,10 +47,10 @@ export const generateMockData = () => {
 };
 
 export const generateMoreHistoricalData = (
-  existingData: any[],
+  existingData: GeneratedKline[],
   count = 200,
-) => {
-  const newData: any[] = [];
+): GeneratedKline[] => {
+  const newData: GeneratedKline[] = [];
   const firstItem = existingData[0];
   let lastClose = firstItem.open;
 

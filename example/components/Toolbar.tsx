@@ -1,9 +1,6 @@
 import React from 'react';
 import { View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
-
-type Theme = {
-  [key: string]: any;
-};
+import type { Theme } from '../utils/themes';
 
 type ToolbarProps = {
   theme: Theme;

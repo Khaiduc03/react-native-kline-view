@@ -2,7 +2,7 @@
   "name": "react-native-kline-view",
   "version": "1.0.1",
   "description": "",
-  "main": "index.js",
+  "main": "index.tsx",
   "types": "index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -15,5 +15,9 @@
   "peerDependencies": {
     "react-native": ">=0.66.0"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-native": "^0.73.0"
+  }
 }

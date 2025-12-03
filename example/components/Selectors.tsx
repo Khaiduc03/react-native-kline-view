@@ -9,10 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { TimeTypes, IndicatorTypes, DrawToolTypes } from '../utils/constants';
-
-type Theme = {
-  [key: string]: any;
-};
+import type { Theme } from '../utils/themes';
 
 type SelectorsProps = {
   theme: Theme;
@@ -258,4 +255,3 @@ const createSelectorsStyles = (theme: Theme) => {
     },
   });
 };
-
