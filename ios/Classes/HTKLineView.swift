@@ -51,7 +51,7 @@ class HTKLineView: UIScrollView {
     var childHeight: CGFloat  = 0
 
     // === Grid spacing target (ô to, thưa) ===
-    private let GRID_MIN_V_SPACING_PX: CGFloat = 64   // dọc: 96–128 để ô to hơn
+    private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
     private let GRID_MIN_H_SPACING_PX: CGFloat = 64   // ngang: 56–72 là vừa mắt
 
     // MARK: - Helpers cho lưới
