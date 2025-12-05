@@ -51,7 +51,7 @@ class HTKLineView: UIScrollView {
     var childHeight: CGFloat  = 0
 
     // === Grid spacing target (ô to, thưa) ===
-    private let GRID_MIN_V_SPACING_PX: CGFloat = 96   // dọc: 96–128 để ô to hơn
+    private let GRID_MIN_V_SPACING_PX: CGFloat = 64   // dọc: 96–128 để ô to hơn
     private let GRID_MIN_H_SPACING_PX: CGFloat = 64   // ngang: 56–72 là vừa mắt
 
     // MARK: - Helpers cho lưới
@@ -268,13 +268,17 @@ class HTKLineView: UIScrollView {
         let baseColor = configManager.gridColor
         let itemW = configManager.itemWidth
 
+        // --- Dùng cùng line width và alpha cho cả ngang và dọc để đồng nhất ---
+        let gridLineWidth = max(hairlineWidth(), configManager.gridLineWidth)
+        let gridAlpha: CGFloat = 0.4
+
         // --- Lưới ngang: chia theo pixel tối thiểu để thưa & đều ---
         let hCount = max(2, Int(floor(mainHeight / GRID_MIN_H_SPACING_PX)))
         if hCount > 0 {
-            context.setLineWidth(hairlineWidth())
+            context.setLineWidth(gridLineWidth)
+            context.setStrokeColor(baseColor.withAlphaComponent(gridAlpha).cgColor)
             for i in 1..<hCount {
                 let y = alignToPixel(mainBaseY + (mainHeight * CGFloat(i) / CGFloat(hCount)))
-                context.setStrokeColor(baseColor.withAlphaComponent(0.45).cgColor)
                 context.move(to: CGPoint(x: 0, y: y))
                 context.addLine(to: CGPoint(x: allWidth, y: y))
                 context.strokePath()
@@ -285,13 +289,8 @@ class HTKLineView: UIScrollView {
         let step = niceCandleStep(itemWidth: itemW, minSpacing: GRID_MIN_V_SPACING_PX)
         let spacing = CGFloat(step) * itemW
 
-        // spacing nhỏ -> vạch mảnh & trong hơn cho đỡ nặng mắt
-        let thinMode = spacing < (GRID_MIN_V_SPACING_PX * 1.25)
-        let lineW = thinMode ? hairlineWidth() : max(configManager.gridLineWidth, hairlineWidth())
-        let alpha = max(0.35, min(1.0, spacing / (GRID_MIN_V_SPACING_PX * 1.25)))
-
-        context.setLineWidth(lineW)
-        context.setStrokeColor(baseColor.withAlphaComponent(0.35 + 0.65 * alpha).cgColor)
+        context.setLineWidth(gridLineWidth)
+        context.setStrokeColor(baseColor.withAlphaComponent(gridAlpha).cgColor)
 
         // Căn theo index nến để vạch đi qua tâm nến
         let firstIndex = (visibleRange.lowerBound / step) * step
