@@ -17,7 +17,7 @@
     <color name="chart_background">#202326</color>
     <color name="chart_bac">#00FFFFFF</color>
     <color name="chart_point_bac">#202326</color>
-    <color name="chart_grid_line">#1AFFFFFF</color>
+    <color name="chart_grid_line">#333333</color>
     <color name="chart_text">#818596</color>
     <color name="chart_selector">#202326</color>
     <color name="chart_tab_background">#30343C</color>
