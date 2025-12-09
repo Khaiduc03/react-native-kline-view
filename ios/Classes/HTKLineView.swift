@@ -285,26 +285,7 @@ class HTKLineView: UIScrollView {
             }
         }
 
-        // --- Lưới dọc: bước theo số nến để spacing >= ngưỡng (ô to) ---
-        let step = niceCandleStep(itemWidth: itemW, minSpacing: GRID_MIN_V_SPACING_PX)
-        let spacing = CGFloat(step) * itemW
-
-        context.setLineWidth(gridLineWidth)
-        context.setStrokeColor(baseColor.withAlphaComponent(gridAlpha).cgColor)
-
-        // Căn theo index nến để vạch đi qua tâm nến
-        let firstIndex = (visibleRange.lowerBound / step) * step
-        var i = firstIndex
-        while i <= visibleRange.upperBound {
-            let xRaw = (CGFloat(i) + 0.5) * itemW - contentOffset.x
-            if xRaw >= -spacing && xRaw <= allWidth + spacing {
-                let x = alignToPixel(xRaw)
-                context.move(to: CGPoint(x: x, y: mainBaseY))
-                context.addLine(to: CGPoint(x: x, y: allHeight))
-                context.strokePath()
-            }
-            i += step
-        }
+        // --- Lưới dọc: tắt (chỉ giữ line ngang) ---
     }
 
     func drawCandle(_ context: CGContext) {
