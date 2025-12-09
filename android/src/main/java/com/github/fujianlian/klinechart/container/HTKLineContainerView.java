@@ -28,8 +28,9 @@ public class HTKLineContainerView extends RelativeLayout {
         super(context);
         this.reactContext = context;
         klineView = new KLineChartView(getContext(), configManager);
-        klineView.setGridColumns(5);
-        klineView.setGridRows(3);
+        // More, smaller grid cells
+        klineView.setGridColumns(8);
+        klineView.setGridRows(5);
         klineView.setChildDraw(0);
         klineView.setDateTimeFormatter(new DateFormatter());
         klineView.configManager = configManager;
