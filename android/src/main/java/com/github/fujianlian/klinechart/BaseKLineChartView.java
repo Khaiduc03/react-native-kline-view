@@ -386,15 +386,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         } else {
             canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
         }
-        //纵向的grid
-        float columnSpace = mWidth / mGridColumns;
-        for (int i = 1; i < mGridColumns; i++) {
-            canvas.drawLine(columnSpace * i, 0, columnSpace * i, mMainRect.bottom, mGridPaint);
-            canvas.drawLine(columnSpace * i, mMainRect.bottom, columnSpace * i, mVolRect.bottom, mGridPaint);
-            if (mChildDraw != null) {
-                canvas.drawLine(columnSpace * i, mVolRect.bottom, columnSpace * i, mChildRect.bottom, mGridPaint);
-            }
-        }
+        // 关闭纵向 grid line (chỉ giữ line ngang)
     }
 
     private void drawClosePriceLine(Canvas canvas) {
