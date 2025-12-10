@@ -20,6 +20,8 @@ class HTKLineView: UIScrollView {
 
     var visibleRange = 0...0
     var selectedIndex = -1
+    // Lưu vị trí chạm cuối cùng (theo view) để Y của crosshair tự do
+    var selectedLocation: CGPoint?
     var scale: CGFloat = 1
 
     let mainDraw = HTMainDraw.init()
@@ -53,6 +55,10 @@ class HTKLineView: UIScrollView {
     // === Grid spacing target (ô to, thưa) ===
     private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
     private let GRID_MIN_H_SPACING_PX: CGFloat = 64   // ngang: 56–72 là vừa mắt
+    private let PRICE_TICK_COUNT: Int = 6
+    private let PRICE_LABEL_VERTICAL_OFFSET: CGFloat = 8
+
+    private var priceGridLevels: [CGFloat] = []
 
     // MARK: - Helpers cho lưới
     @inline(__always)
@@ -80,6 +86,31 @@ class HTKLineView: UIScrollView {
         }
         for b in [1, 2, 3, 5] where b >= r { return b * mag }
         return 5 * mag
+    }
+
+    /// Chọn bước giá "đẹp": 1, 2, 5 × 10^k
+    private func nicePriceStep(minValue: CGFloat,
+                               maxValue: CGFloat,
+                               targetLines: Int) -> CGFloat {
+        let range = maxValue - minValue
+        guard range > 0, targetLines > 0 else { return 1 }
+
+        let roughStep = range / CGFloat(targetLines)
+        let mag = pow(10.0, floor(log10(roughStep)))
+        let norm = roughStep / mag
+
+        let niceNorm: CGFloat
+        if norm < 1.5 {
+            niceNorm = 1
+        } else if norm < 3 {
+            niceNorm = 2
+        } else if norm < 7 {
+            niceNorm = 5
+        } else {
+            niceNorm = 10
+        }
+
+        return niceNorm * mag
     }
 
     // MARK: - Init
@@ -266,26 +297,50 @@ class HTKLineView: UIScrollView {
         guard configManager.gridEnabled else { return }
 
         let baseColor = configManager.gridColor
-        let itemW = configManager.itemWidth
+        let minPrice = mainMinMaxRange.lowerBound
+        let maxPrice = mainMinMaxRange.upperBound
+        let range = maxPrice - minPrice
+        guard range > 0, PRICE_TICK_COUNT >= 2 else { return }
 
-        // --- Dùng cùng line width và alpha cho cả ngang và dọc để đồng nhất ---
-        let gridLineWidth = max(hairlineWidth(), configManager.gridLineWidth)
-        let gridAlpha: CGFloat = 0.4
+        priceGridLevels.removeAll(keepingCapacity: true)
 
-        // --- Lưới ngang: chia theo pixel tối thiểu để thưa & đều ---
-        let hCount = max(2, Int(floor(mainHeight / GRID_MIN_H_SPACING_PX)))
-        if hCount > 0 {
-            context.setLineWidth(gridLineWidth)
-            context.setStrokeColor(baseColor.withAlphaComponent(gridAlpha).cgColor)
-            for i in 1..<hCount {
-                let y = alignToPixel(mainBaseY + (mainHeight * CGFloat(i) / CGFloat(hCount)))
-                context.move(to: CGPoint(x: 0, y: y))
-                context.addLine(to: CGPoint(x: allWidth, y: y))
-                context.strokePath()
-            }
+        let levelsCount = max(2, PRICE_TICK_COUNT)
+        let step = range / CGFloat(levelsCount - 1)
+
+        let gridLineWidth = max(hairlineWidth(), configManager.gridLineWidth * 1.2)
+        context.setLineWidth(gridLineWidth)
+        context.setStrokeColor(baseColor.withAlphaComponent(1.0).cgColor)
+
+        for i in 0..<levelsCount {
+            let value = minPrice + CGFloat(i) * step
+            priceGridLevels.append(value)
+
+            let y = alignToPixel(yFromValue(value))
+            context.move(to: CGPoint(x: 0, y: y))
+            context.addLine(to: CGPoint(x: allWidth, y: y))
+            context.strokePath()
         }
 
-        // --- Lưới dọc: tắt (chỉ giữ line ngang) ---
+        // --- Lưới dọc: bám nhãn thời gian (giống drawTime)
+        let timeStep = niceCandleStep(itemWidth: configManager.itemWidth,
+                                      minSpacing: GRID_MIN_V_SPACING_PX)
+        if timeStep > 0, !visibleModelArray.isEmpty {
+            let firstIndex = (visibleRange.lowerBound / timeStep) * timeStep
+            context.setStrokeColor(baseColor.withAlphaComponent(1.0).cgColor)
+            context.setLineWidth(gridLineWidth)
+
+            var i = firstIndex
+            while i <= visibleRange.upperBound {
+                let xCenter = (CGFloat(i) + 0.5) * configManager.itemWidth - contentOffset.x
+                let x = alignToPixel(xCenter)
+                let startY = mainBaseY
+                let endY = childBaseY + childHeight
+                context.move(to: CGPoint(x: x, y: startY))
+                context.addLine(to: CGPoint(x: x, y: endY))
+                context.strokePath()
+                i += timeStep
+            }
+        }
     }
 
     func drawCandle(_ context: CGContext) {
@@ -321,7 +376,30 @@ class HTKLineView: UIScrollView {
 
     func drawValue(_ context: CGContext) {
         let baseX = self.allWidth
-        mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
+        if !priceGridLevels.isEmpty, mainHeight > 0 {
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let color = configManager.textColor
+
+            for value in priceGridLevels {
+                let y = alignToPixel(yFromValue(value))
+                let title = configManager.precision(value, configManager.price)
+                let width = mainDraw.textWidth(title: title, font: font)
+                let height = mainDraw.textHeight(font: font)
+
+                // Right-aligned, small padding
+                let x = baseX - width - 4
+                let textY = y - height / 2 - PRICE_LABEL_VERTICAL_OFFSET
+
+                mainDraw.drawText(title: title,
+                                  point: CGPoint(x: x, y: textY),
+                                  color: color,
+                                  font: font,
+                                  context: context,
+                                  configManager: configManager)
+            }
+        } else {
+            mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
+        }
         volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
         childDraw?.drawValue(childMinMaxRange.upperBound, childMinMaxRange.lowerBound, baseX, childBaseY, childHeight, context, configManager)
     }
@@ -492,36 +570,64 @@ class HTKLineView: UIScrollView {
     }
 
     func drawSelectedLine(_ context: CGContext) {
-        guard visibleRange.contains(selectedIndex) else {
+        guard visibleRange.contains(selectedIndex),
+              let loc = selectedLocation else {
             return
         }
-        let value = visibleModelArray[selectedIndex - visibleRange.lowerBound].close
-        let x = (CGFloat(selectedIndex) + 0.5) * configManager.itemWidth - contentOffset.x
-        let y = yFromValue(value)
 
+        // X bám tâm nến (snap)
+        let x = (CGFloat(selectedIndex) + 0.5) * configManager.itemWidth - contentOffset.x
+
+        // Y tự do theo tay, giới hạn trong vùng main chart
+        var y = loc.y
+        let minY = mainBaseY
+        let maxY = mainBaseY + mainHeight
+        y = max(minY, min(y, maxY))
+
+        // Giá tại vị trí Y của cursor (dùng cho label)
+        let value = valueFromY(y)
+
+        // === 1) Crosshair lines: ngang + dọc, mỏng và đứt đoạn ===
+        context.saveGState()
         context.setStrokeColor(configManager.candleTextColor.cgColor)
         context.setLineWidth(configManager.lineWidth / 2)
-        context.addLines(between: [CGPoint.init(x: 0, y: y), CGPoint.init(x: allWidth, y: y)])
+        // line đứt đoạn (dashed): [độ dài nét, độ dài khoảng trống]
+        context.setLineDash(phase: 0, lengths: [4, 4])
+
+        // Ngang: full width
+        context.move(to: CGPoint(x: 0, y: y))
+        context.addLine(to: CGPoint(x: allWidth, y: y))
         context.strokePath()
 
-        context.addArc(center: CGPoint.init(x: x, y: y), radius: configManager.candleWidth * 2 / 2, startAngle: 0, endAngle: CGFloat(Double.pi * 2), clockwise: true)
+        // Dọc: từ mainBaseY xuống hết vùng child chart
+        let startY = mainBaseY
+        let endY = childBaseY + childHeight
+        context.move(to: CGPoint(x: x, y: startY))
+        context.addLine(to: CGPoint(x: x, y: endY))
+        context.strokePath()
+
+        context.restoreGState() // reset dash để các phần vẽ khác không bị đứt đoạn
+
+        // === 2) Vẽ 2 vòng tròn ở điểm giao (giữ như cũ) ===
+        context.addArc(center: CGPoint(x: x, y: y),
+                       radius: configManager.candleWidth * 2 / 2,
+                       startAngle: 0,
+                       endAngle: CGFloat(Double.pi * 2),
+                       clockwise: true)
         context.setFillColor(configManager.selectedPointContainerColor.cgColor)
         context.fillPath()
-        context.addArc(center: CGPoint.init(x: x, y: y), radius: configManager.candleWidth / 1.5 / 2, startAngle: 0, endAngle: CGFloat(Double.pi * 2), clockwise: true)
+
+        context.addArc(center: CGPoint(x: x, y: y),
+                       radius: configManager.candleWidth / 1.5 / 2,
+                       startAngle: 0,
+                       endAngle: CGFloat(Double.pi * 2),
+                       clockwise: true)
         context.setFillColor(configManager.selectedPointContentColor.cgColor)
         context.fillPath()
 
-        let colorList = configManager.packGradientColorList(configManager.panelGradientColorList)
-        let locationList = configManager.panelGradientLocationList
-        if let gradient = CGGradient.init(colorSpace: CGColorSpaceCreateDeviceRGB(), colorComponents: colorList, locations: locationList, count: locationList.count) {
-            let start = mainBaseY
-            let end = childBaseY + childHeight
-            context.addRect(CGRect.init(x: x - configManager.candleWidth / 2, y: start, width: configManager.candleWidth, height: end - start))
-            context.clip()
-            context.drawLinearGradient(gradient, start: CGPoint.init(x: 0, y: start), end: CGPoint.init(x: 0, y: end), options: .drawsBeforeStartLocation)
-            context.resetClip()
-        }
+        // === 3) ĐÃ BỎ gradient bar dọc: không còn addRect + clip + drawLinearGradient ===
 
+        // === 4) Label giá bên trái/phải (giữ logic cũ, chỉ dùng value + y mới) ===
         let offset = CGFloat(selectedIndex) * configManager.itemWidth - contentOffset.x
         let halfWidth = allWidth / 2
         let leftAlign = offset < halfWidth
@@ -534,25 +640,30 @@ class HTKLineView: UIScrollView {
         let width = mainDraw.textWidth(title: title, font: font)
         let height = mainDraw.textHeight(font: font)
         let startX = leftAlign ? 0 : allWidth - width - paddingHorizontal * 2
-        let rect = CGRect.init(x: startX, y: y - height / 2 - paddingVertical, width: width + paddingHorizontal * 2, height: height + paddingVertical * 2)
-        let bezierPath = UIBezierPath.init()
-        if (leftAlign) {
-            bezierPath.move(to: CGPoint.init(x: rect.maxX, y: rect.minY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.minX, y: rect.minY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.minX, y: rect.maxY))
-            bezierPath.move(to: CGPoint.init(x: rect.maxX, y: rect.minY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.maxX + triangleWidth, y: y))
-            bezierPath.addLine(to: CGPoint.init(x: rect.maxX, y: rect.maxY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.minX, y: rect.maxY))
+        let rect = CGRect(x: startX,
+                          y: y - height / 2 - paddingVertical,
+                          width: width + paddingHorizontal * 2,
+                          height: height + paddingVertical * 2)
+
+        let bezierPath = UIBezierPath()
+        if leftAlign {
+            bezierPath.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            bezierPath.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+            bezierPath.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            bezierPath.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            bezierPath.addLine(to: CGPoint(x: rect.maxX + triangleWidth, y: y))
+            bezierPath.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            bezierPath.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         } else {
-            bezierPath.move(to: CGPoint.init(x: rect.minX, y: rect.minY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.maxX, y: rect.minY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.maxX, y: rect.maxY))
-            bezierPath.move(to: CGPoint.init(x: rect.minX, y: rect.minY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.minX - triangleWidth, y: y))
-            bezierPath.addLine(to: CGPoint.init(x: rect.minX, y: rect.maxY))
-            bezierPath.addLine(to: CGPoint.init(x: rect.maxX, y: rect.maxY))
+            bezierPath.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            bezierPath.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            bezierPath.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            bezierPath.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            bezierPath.addLine(to: CGPoint(x: rect.minX - triangleWidth, y: y))
+            bezierPath.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            bezierPath.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
         }
+
         context.setFillColor(configManager.panelBackgroundColor.cgColor)
         context.setLineWidth(configManager.lineWidth / 2)
         context.setStrokeColor(configManager.candleTextColor.cgColor)
@@ -560,7 +671,13 @@ class HTKLineView: UIScrollView {
         context.fillPath()
         context.addPath(bezierPath.cgPath)
         context.strokePath()
-        mainDraw.drawText(title: title, point: CGPoint.init(x: startX + paddingHorizontal, y: y - height / 2), color: configManager.candleTextColor, font: font, context: context, configManager: configManager)
+
+        mainDraw.drawText(title: title,
+                          point: CGPoint(x: startX + paddingHorizontal, y: y - height / 2),
+                          color: configManager.candleTextColor,
+                          font: font,
+                          context: context,
+                          configManager: configManager)
     }
 
     func drawSelectedBoard(_ context: CGContext) {
@@ -656,22 +773,26 @@ extension HTKLineView: UIScrollViewDelegate {
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         selectedIndex = -1
+        selectedLocation = nil
         self.setNeedsDisplay()
     }
 
     @objc
     func longPressSelector(_ gesture: UILongPressGestureRecognizer) {
-        let index = Int(floor(gesture.location(in: self).x / configManager.itemWidth))
+        let point = gesture.location(in: self)
+        selectedLocation = point
+
+        var index = Int(floor(point.x / configManager.itemWidth))
+        index = max(0, min(index, configManager.modelArray.count - 1))
         selectedIndex = index
-        if (selectedIndex >= configManager.modelArray.count) {
-            selectedIndex = configManager.modelArray.count - 1
-        }
+
         self.setNeedsDisplay()
     }
 
     @objc
     func tapSelector(_ gesture: UITapGestureRecognizer) {
         selectedIndex = -1
+        selectedLocation = nil
         self.setNeedsDisplay()
     }
 

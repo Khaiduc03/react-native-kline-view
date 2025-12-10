@@ -204,9 +204,10 @@ class HTKLineConfigManager: NSObject {
 
     var panelBorderColor = UIColor.orange
 
-    var selectedPointContainerColor = UIColor.orange
+    // Crosshair center colors (black by default to be visible on light bg)
+    var selectedPointContainerColor = UIColor.black
 
-    var selectedPointContentColor = UIColor.orange
+    var selectedPointContentColor = UIColor.black
 
     var panelMinWidth: CGFloat = 0
 
@@ -231,9 +232,11 @@ class HTKLineConfigManager: NSObject {
     var closePriceRightLightLottieSource = ""
 
     // grid draw
-    var gridColor = UIColor.lightGray
+    // Đậm rõ: màu đen, nét 1.2pt để dễ thấy
+    var gridColor = UIColor.black
 
-    var gridLineWidth: CGFloat = 0.5
+    // Mặc định 1.2pt để line rõ ràng trên light mode
+    var gridLineWidth: CGFloat = 1.2
 
     var gridHorizontalLineCount: Int = 4
 

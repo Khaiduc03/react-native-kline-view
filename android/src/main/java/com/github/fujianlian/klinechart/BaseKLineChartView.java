@@ -117,6 +117,10 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
     private String lastLoadLottieSource = "";
 
+    private static final int PRICE_TICK_COUNT = 6;
+    private static final float GRID_MIN_V_SPACING_DP = 84f;
+    private final List<Float> priceGridLevels = new ArrayList<>();
+
     private int mSelectedIndex;
 
     private IChartDraw mMainDraw;
@@ -373,20 +377,52 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      * @param canvas
      */
     private void drawGird(Canvas canvas) {
-        //-----------------------上方k线图------------------------
-        //横向的grid
-        float rowSpace = mMainRect.height() / mGridRows;
-        for (int i = 0; i <= mGridRows; i++) {
-            canvas.drawLine(0, rowSpace * i + mMainRect.top, mWidth, rowSpace * i + mMainRect.top, mGridPaint);
+        if (mWidth == 0 || mMainRect == null || mVolRect == null || mItemCount <= 0) {
+            return;
         }
-        //-----------------------下方子图------------------------
-        if (mChildDraw != null) {
-            canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
+
+        // Horizontal price grid
+        priceGridLevels.clear();
+        float minPrice = mMainMinValue;
+        float maxPrice = mMainMaxValue;
+        float range = maxPrice - minPrice;
+        if (range > 0 && PRICE_TICK_COUNT >= 2) {
+            int levelsCount = Math.max(2, PRICE_TICK_COUNT);
+            float step = range / (levelsCount - 1);
+            for (int i = 0; i < levelsCount; i++) {
+                float value = minPrice + step * i;
+                priceGridLevels.add(value);
+                float y = yFromValue(value);
+                canvas.drawLine(0, y, mWidth, y, mGridPaint);
+            }
+        }
+
+        // Separators main/vol/child
+        canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
+        if (mChildDraw != null && mChildRect != null) {
             canvas.drawLine(0, mChildRect.bottom, mWidth, mChildRect.bottom, mGridPaint);
-        } else {
-            canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
         }
-        // 关闭纵向 grid line (chỉ giữ line ngang)
+
+        // Vertical time grid
+        float itemWidthPx = mPointWidth * mScaleX;
+        float minSpacingPx = dp2px(GRID_MIN_V_SPACING_DP);
+        int step = niceCandleStep(itemWidthPx, minSpacingPx);
+        if (step < 1) step = 1;
+        int firstIndex = (mStartIndex / step) * step;
+
+        int baseColor = mGridPaint.getColor();
+        int alpha = Math.round(Color.alpha(baseColor) * 0.7f);
+        int verticalColor = Color.argb(alpha, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor));
+        Paint verticalPaint = new Paint(mGridPaint);
+        verticalPaint.setColor(verticalColor);
+
+        int bottom = mChildRect != null ? mChildRect.bottom : mVolRect.bottom;
+
+        for (int i = firstIndex; i <= mStopIndex; i += step) {
+            float centerScrollX = getItemMiddleScrollX(i);
+            float x = scrollXtoViewX(centerScrollX);
+            canvas.drawLine(x, mMainRect.top, x, bottom, verticalPaint);
+        }
     }
 
     private void drawClosePriceLine(Canvas canvas) {
@@ -528,15 +564,15 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         float baseLine = (textHeight - fm.bottom - fm.top) / 2;
         //--------------画上方k线图的值-------------
         if (mMainDraw != null) {
-//            canvas.drawText(formatValue(mMainMaxValue), mWidth - calculateWidth(formatValue(mMainMaxValue)), baseLine + mMainRect.top, mTextPaint);
-//            canvas.drawText(formatValue(mMainMinValue), mWidth - calculateWidth(formatValue(mMainMinValue)), mMainRect.bottom - textHeight + baseLine, mTextPaint);
-            float rowValue = (mMainMaxValue - mMainMinValue) / mGridRows;
-            float rowSpace = mMainRect.height() / mGridRows;
-            for (int i = 0; i < mGridRows + 1; i++) {
-                String text = formatValue(rowValue * (mGridRows - i) + mMainMinValue);
-                float y = rowSpace * i + mMainRect.top;
-                y = fixTextY1(y);
-                canvas.drawText(text, mWidth - calculateWidth(text), y, mTextPaint);
+            if (!priceGridLevels.isEmpty()) {
+                for (Float v : priceGridLevels) {
+                    if (v == null) continue;
+                    String text = formatValue(v);
+                    float textWidth = calculateWidth(text);
+                    float y = yFromValue(v);
+                    float labelY = y - textHeight / 2f;
+                    canvas.drawText(text, mWidth - textWidth, fixTextY1(labelY), mTextPaint);
+                }
             }
         }
         //--------------画中间子图的值-------------
@@ -564,34 +600,20 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                     mWidth - calculateWidth(formatValue(mChildMinValue)), mChildRect.bottom, mTextPaint);*/
         }
         //--------------画时间---------------------
-        float columnSpace = mWidth / mGridColumns;
         float y = fixTextY1((float) (mChildRect.bottom + mBottomPadding / 2.0));
-
-        float startX = getItemMiddleScrollX(mStartIndex) - mPointWidth / 2;
-        float stopX = getItemMiddleScrollX(mStopIndex) + mPointWidth / 2;
-
-        for (int i = 1; i < mGridColumns; i++) {
-            float scrollX = viewXToScrollX(columnSpace * i);
-            if (scrollX >= startX && scrollX <= stopX) {
-                int index = indexFromScrollX(scrollX);
-                String text = getItem(index).Date;
-                canvas.drawText(text, columnSpace * i - mTextPaint.measureText(text) / 2, y, mTextPaint);
+        if (mItemCount > 0) {
+            float itemWidthPx = mPointWidth * mScaleX;
+            float minSpacingPx = dp2px(GRID_MIN_V_SPACING_DP);
+            int step = niceCandleStep(itemWidthPx, minSpacingPx);
+            if (step < 1) step = 1;
+            int firstIndex = (mStartIndex / step) * step;
+            for (int i = firstIndex; i <= mStopIndex; i += step) {
+                KLineEntity entity = getItem(i);
+                String text = entity.Date;
+                float centerScrollX = getItemMiddleScrollX(i);
+                float x = scrollXtoViewX(centerScrollX);
+                canvas.drawText(text, x - mTextPaint.measureText(text) / 2f, y, mTextPaint);
             }
-        }
-
-        if (mStartIndex < 0 || mStopIndex <= 0) {
-            return;
-        }
-
-        float scrollX = viewXToScrollX(0);
-        if (scrollX >= startX && scrollX <= stopX) {
-            String text = getItem(mStartIndex).Date;
-            canvas.drawText(text, -mTextPaint.measureText(text) / 2, y, mTextPaint);
-        }
-        scrollX = viewXToScrollX(mWidth);
-        if (scrollX >= startX && scrollX <= stopX) {
-            String text = getItem(mStopIndex).Date;
-            canvas.drawText(text, mWidth - mTextPaint.measureText(text) / 2, y, mTextPaint);
         }
 
     }
@@ -779,6 +801,25 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     public int sp2px(float spValue) {
         final float fontScale = getContext().getResources().getDisplayMetrics().scaledDensity;
         return (int) (spValue * fontScale + 0.5f);
+    }
+
+    private int niceCandleStep(float itemWidthPx, float minSpacingPx) {
+        if (itemWidthPx <= 0f) return 1;
+        int raw = (int) Math.ceil(minSpacingPx / itemWidthPx);
+        if (raw < 1) raw = 1;
+
+        int mag = 1;
+        int r = raw;
+        while (r > 5) {
+            r = (r + 9) / 10;
+            mag *= 10;
+        }
+
+        int[] bases = {1, 2, 3, 5};
+        for (int b : bases) {
+            if (b >= r) return b * mag;
+        }
+        return 5 * mag;
     }
 
     /**
