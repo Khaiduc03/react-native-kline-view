@@ -12,5 +12,7 @@ RCT_EXPORT_VIEW_PROPERTY(onDrawPointComplete, RCTBubblingEventBlock)
 
 RCT_EXPORT_VIEW_PROPERTY(optionList, NSString)
 
+RCT_EXTERN_METHOD(appendCandle:(nonnull NSNumber *)reactTag payload:(NSDictionary *)payload)
+
 @end
 

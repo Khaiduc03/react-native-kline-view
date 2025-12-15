@@ -80,6 +80,96 @@ class HTKLineContainerView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
+    func appendCandle(_ payload: [String: Any]) {
+        let prefix = "[KLineView][appendCandle]"
+        let requiredFields = ["time", "open", "high", "low", "close", "volume"]
+
+        RNKLineView.queue.async { [weak self] in
+            guard let self = self else { return }
+
+            guard self.configManager.modelArray.isEmpty == false else {
+                print("\(prefix) data source not ready: modelArray is empty")
+                return
+            }
+
+            var missingFields = [String]()
+            for key in requiredFields where payload[key] == nil {
+                missingFields.append(key)
+            }
+            if missingFields.isEmpty == false {
+                print("\(prefix) missing required fields: \(missingFields)")
+                return
+            }
+
+            func numberValue(_ value: Any?) -> Double? {
+                switch value {
+                case let number as NSNumber:
+                    return number.doubleValue
+                case let string as String:
+                    return Double(string)
+                default:
+                    return nil
+                }
+            }
+
+            var numeric = [String: Double]()
+            for key in requiredFields {
+                guard let value = payload[key] else { continue }
+                guard let number = numberValue(value) else {
+                    print("\(prefix) non-numeric field '\(key)' with value: \(value) (\(type(of: value)))")
+                    return
+                }
+                numeric[key] = number
+            }
+
+            guard numeric.count == requiredFields.count else {
+                print("\(prefix) unable to extract all numeric fields from payload: \(payload)")
+                return
+            }
+
+            let open = numeric["open"]!
+            let high = numeric["high"]!
+            let low = numeric["low"]!
+            let close = numeric["close"]!
+            let volume = numeric["volume"]!
+            let rawTime = numeric["time"]!
+            var normalizedTime = rawTime
+
+            if rawTime > 1_000_000_000_000 {
+                normalizedTime = rawTime / 1000
+                print("\(prefix) time appears in ms; normalized to seconds: \(normalizedTime)")
+            } else {
+                print("\(prefix) time treated as seconds: \(normalizedTime)")
+            }
+
+            let maxOpenClose = max(open, close)
+            let minOpenClose = min(open, close)
+            if high < maxOpenClose || low > minOpenClose || high < low {
+                print("\(prefix) invalid candle values open:\(open) high:\(high) low:\(low) close:\(close) volume:\(volume) time:\(normalizedTime)")
+                return
+            }
+
+            let model = HTKLineModel()
+            model.id = CGFloat(normalizedTime)
+            model.dateString = "\(Int(normalizedTime))"
+            model.open = CGFloat(open)
+            model.high = CGFloat(high)
+            model.low = CGFloat(low)
+            model.close = CGFloat(close)
+            model.volume = CGFloat(volume)
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard self.configManager.modelArray.isEmpty == false else {
+                    print("\(prefix) data source not ready on main thread; skip append")
+                    return
+                }
+                self.configManager.modelArray.append(model)
+                self.reloadConfigManager(self.configManager)
+            }
+        }
+    }
+    
     func reloadConfigManager(_ configManager: HTKLineConfigManager) {
         
         configManager.onDrawItemDidTouch = { [weak self] (drawItem, drawItemIndex) in
