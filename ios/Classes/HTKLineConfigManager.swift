@@ -140,17 +140,25 @@ class HTKLineConfigManager: NSObject {
         macdCandleWidth = _macdCandleWidth * scale
     }
 
+    /// Format số theo đúng lượng phần thập phân thực tế (nhận bao nhiêu trả bấy nhiêu).
+    /// - Không còn ép về 2/4 số sau dấu phẩy.
+    /// - In ra tối đa 10 chữ số thập phân, cắt bớt số 0 vô nghĩa ở cuối.
     func precision(_ value: CGFloat, _ precision: Int) -> String {
-        var reloadPrecision = precision
-        if (reloadPrecision == -1) {
-            reloadPrecision = 2
+        // Format với độ chính xác cao, sau đó tự cắt bớt số 0 cuối
+        let raw = String(format: "%.10f", Double(value))
+
+        // Cắt các số 0 vô nghĩa và dấu chấm nếu ở cuối
+        var trimmed = raw
+        while trimmed.contains("."),
+              let last = trimmed.last,
+              (last == "0" || last == ".") {
+            trimmed.removeLast()
+            if last == "." {
+                break
+            }
         }
-        let formatter = NumberFormatter.init()
-        formatter.maximumFractionDigits = reloadPrecision
-        formatter.minimumFractionDigits = reloadPrecision
-        formatter.roundingMode = .down
-        let number = NSNumber.init(value: Double(value))
-        return formatter.string(from: number) ?? ""
+
+        return trimmed
     }
 
 

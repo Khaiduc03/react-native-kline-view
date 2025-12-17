@@ -55,6 +55,14 @@ public class ValueFormatter implements IValueFormatter {
     }
 
     public String _format(float value, boolean isPrice, boolean fillzero) {
+        // Giá: nhận bao nhiêu thập phân trả bấy nhiêu, cắt số 0 vô nghĩa ở cuối.
+        if (isPrice) {
+            BigDecimal bd = new BigDecimal(String.valueOf(value));
+            bd = bd.stripTrailingZeros();
+            return bd.toPlainString();
+        }
+
+        // Volume (và các giá trị khác): giữ nguyên logic cũ theo rightLength.
         Integer rightLength = isPrice ? this.priceRightLength : this.volumeRightLength;
         return format(value, rightLength, fillzero);
     }
