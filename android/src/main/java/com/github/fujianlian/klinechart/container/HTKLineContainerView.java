@@ -67,6 +67,8 @@ public class HTKLineContainerView extends RelativeLayout {
         klineView.setMTextColor(klineView.configManager.candleTextColor);
         klineView.reloadColor();
         Boolean isEnd = klineView.getScrollOffset() >= klineView.getMaxScrollX();
+        // Do not force scroll to end after append/update unless explicitly requested
+        klineView.configManager.shouldScrollToEnd = false;
         klineView.notifyChanged();
         if (isEnd || klineView.configManager.shouldScrollToEnd) {
             klineView.setScrollX(klineView.getMaxScrollX());

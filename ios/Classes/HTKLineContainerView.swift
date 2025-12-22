@@ -51,7 +51,7 @@ class HTKLineContainerView: UIView {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.configManager.modelArray = models
-                self.configManager.shouldScrollToEnd = true
+                self.configManager.shouldScrollToEnd = false
                 self.reloadConfigManager(self.configManager)
             }
         }
@@ -64,7 +64,7 @@ class HTKLineContainerView: UIView {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.configManager.modelArray.append(model)
-                self.configManager.shouldScrollToEnd = true
+                self.configManager.shouldScrollToEnd = false
                 self.reloadConfigManager(self.configManager)
             }
         }
@@ -85,7 +85,7 @@ class HTKLineContainerView: UIView {
                 }
                 let afterCount = self.configManager.modelArray.count
                 print("[RNKLineView][iOS] updateLastCandle beforeCount:", beforeCount, "afterCount:", afterCount, "lastId:", model.id)
-                self.configManager.shouldScrollToEnd = true
+                self.configManager.shouldScrollToEnd = false
                 self.reloadConfigManager(self.configManager)
             }
         }
