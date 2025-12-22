@@ -33,7 +33,11 @@ function runCommand(nativeRef, commandName, payload) {
 
   // Android (and fallback): use UIManager commands
   const config = UIManager.getViewManagerConfig(COMPONENT_NAME);
-  const commandId = config?.Commands?.[commandName] ?? commandName;
+
+  // In the New Architecture (Fabric), commandId is typically a string.
+  // In the Legacy architecture (Paper), commandId is usually a number from config.Commands.
+  const isFabric = !!global?.nativeFabricUIManager;
+  const commandId = (isFabric || !config?.Commands) ? commandName : (config.Commands[commandName] ?? commandName);
   UIManager.dispatchViewManagerCommand(nodeHandle, commandId, [payload]);
 }
 

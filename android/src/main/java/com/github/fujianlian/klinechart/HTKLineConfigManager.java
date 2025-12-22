@@ -207,7 +207,11 @@ public class HTKLineConfigManager {
         entity.Low = ((Number)keyValue.get("low")).floatValue();
         entity.Close = ((Number)keyValue.get("close")).floatValue();
         entity.Volume = ((Number)keyValue.get("vol")).floatValue();
-        entity.selectedItemList = (List<Map<String, Object>>) keyValue.get("selectedItemList");
+        Object selectedItemListObj = keyValue.get("selectedItemList");
+        if (selectedItemListObj instanceof List) {
+            //noinspection unchecked
+            entity.selectedItemList = (List<Map<String, Object>>) selectedItemListObj;
+        }
 
 
         entity.maList = HTKLineTargetItem.packModelArray((List) this.getOrDefault(keyValue, "maList", new ArrayList()));

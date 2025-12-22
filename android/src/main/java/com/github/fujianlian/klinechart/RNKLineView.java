@@ -64,6 +64,10 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
     private static final int COMMAND_SET_DATA = 1;
     private static final int COMMAND_APPEND_CANDLE = 2;
     private static final int COMMAND_UPDATE_LAST_CANDLE = 3;
+
+  private static final String COMMAND_SET_DATA_NAME = "setData";
+  private static final String COMMAND_APPEND_CANDLE_NAME = "appendCandle";
+  private static final String COMMAND_UPDATE_LAST_CANDLE_NAME = "updateLastCandle";
     public Map<String, Integer> getCommandsMap() {
         Map<String, Integer> map = new HashMap<>();
         map.put("setData", COMMAND_SET_DATA);
@@ -71,7 +75,7 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
         map.put("updateLastCandle", COMMAND_UPDATE_LAST_CANDLE);
         return map;
     }
-    public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, final ReadableArray args) {
+public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, @androidx.annotation.Nullable final ReadableArray args) {
         if (root == null) return;
 
         switch (commandId) {
