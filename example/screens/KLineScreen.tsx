@@ -25,7 +25,6 @@ import {
   NativeSyntheticEvent,
 } from 'react-native';
 import RNKLineView from 'react-native-kline-view';
-const { appendCandle } = require('react-native-kline-view');
 
 // ==================== Type Definitions ====================
 
@@ -1460,37 +1459,6 @@ const KLineScreen: React.FC = () => {
     [],
   );
 
-  const handleAppendCandle = useCallback(() => {
-    const last = klineData[klineData.length - 1];
-    const stepMs = 15 * 60 * 1000;
-    const nextTime = (last?.time || Date.now()) + stepMs;
-
-    const open = last?.close ?? 1;
-    const drift = (Math.random() - 0.5) * open * 0.01;
-    const close = Math.max(open + drift, open * 0.99);
-    const maxPrice = Math.max(open, close);
-    const minPrice = Math.min(open, close);
-    const high = parseFloat(
-      (maxPrice + Math.random() * open * 0.005).toFixed(2),
-    );
-    const low = parseFloat(
-      (minPrice - Math.random() * open * 0.005).toFixed(2),
-    );
-    const volume = parseFloat(((0.5 + Math.random()) * 800000).toFixed(0));
-
-    const candle = {
-      time: Math.round(nextTime),
-      open: parseFloat(open.toFixed(2)),
-      high,
-      low,
-      close: parseFloat(close.toFixed(2)),
-      volume,
-    };
-
-    setKlineData(prev => [...prev, candle]);
-    appendCandle(kLineViewRef, candle);
-  }, [klineData]);
-
   const handleSelectDrawTool = useCallback((tool: number) => {
     setSelectedDrawTool(tool);
     setShowDrawToolSelector(false);
@@ -1704,33 +1672,6 @@ const KLineScreen: React.FC = () => {
           color: '#FFFFFF',
           fontWeight: '500',
         },
-        flex1: {
-          flex: 1,
-        },
-        guideCard: {
-          marginHorizontal: 16,
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 12,
-          backgroundColor: theme.backgroundColor9103,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: theme.borderColor,
-        },
-        guideTitle: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: theme.titleColor,
-          marginBottom: 6,
-        },
-        guideDesc: {
-          fontSize: 12,
-          color: theme.detailColor,
-          lineHeight: 18,
-        },
-        guideButton: {
-          marginTop: 10,
-          alignSelf: 'flex-start',
-        },
       }),
     [theme],
   );
@@ -1766,8 +1707,8 @@ const KLineScreen: React.FC = () => {
       return directRender;
     }
     return (
-      <View style={styles.flex1} collapsable={false}>
-        <View style={styles.flex1} collapsable={false}>
+      <View style={{ flex: 1 }} collapsable={false}>
+        <View style={{ flex: 1 }} collapsable={false}>
           <View style={styles.chartContainer} collapsable={false}>
             {directRender}
           </View>
@@ -1826,22 +1767,6 @@ const KLineScreen: React.FC = () => {
         onPress={handleClearDrawings}
       >
         <Text style={styles.controlButtonText}>清除</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderAppendGuide = () => (
-    <View style={styles.guideCard}>
-      <Text style={styles.guideTitle}>追加一根 K 线（appendCandle）</Text>
-      <Text style={styles.guideDesc}>
-        使用 appendCandle(ref, candle) 直接把新蜡烛推送到原生视图，无需重传
-        optionList。点击下方按钮生成一条示例数据并调用命令。
-      </Text>
-      <TouchableOpacity
-        style={[styles.toolbarButton, styles.guideButton]}
-        onPress={handleAppendCandle}
-      >
-        <Text style={styles.buttonText}>追加示例蜡烛</Text>
       </TouchableOpacity>
     </View>
   );
@@ -1992,9 +1917,6 @@ const KLineScreen: React.FC = () => {
 
       {/* K线图表 */}
       {renderKLineChart()}
-
-      {/* appendCandle 使用示例 */}
-      {renderAppendGuide()}
 
       {/* 底部控制栏 */}
       {renderControlBar()}
