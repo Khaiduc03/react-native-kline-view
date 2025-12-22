@@ -130,6 +130,38 @@ If you fork/customize this library, keep the example updated first — it double
 | `onDrawItemComplete`  | `{}`                                                                                                 | Triggered when user completes creating a new drawing item                                    |
 | `onDrawPointComplete` | `{ pointCount }`                                                                                     | Triggered when user completes adding points to a drawing (useful for multi-point drawings)   |
 
+
+## ⚡ Imperative Data Updates (Phase 1)
+
+If you stream real-time candles, you usually **don't want to rebuild the whole `optionList` JSON** on every tick.
+This library exposes an **imperative API** through `ref`:
+
+- `setData(candles: Candle[])` → reset/replace the entire dataset
+- `appendCandle(candle: Candle)` → append 1 candle to the end
+- `updateLastCandle(candle: Candle)` → replace the last candle (or append if empty)
+
+```tsx
+import React, { useRef } from "react";
+import RNKLineView, { type Candle, type RNKLineViewRef } from "react-native-kline-view";
+
+const klineRef = useRef<RNKLineViewRef>(null);
+
+// reset all
+klineRef.current?.setData(candles);
+
+// realtime: a brand-new candle
+klineRef.current?.appendCandle(nextCandle);
+
+// realtime: update the candle currently forming
+klineRef.current?.updateLastCandle(updatedLastCandle);
+```
+
+### Do I need to call `setData` again after `appendCandle`?
+
+**No.** If you've already called `appendCandle(...)`, the native dataset is updated.
+Only call `setData(...)` when you want to fully resync/reset (e.g. you changed timeframe, edited historical candles, or detected drift).
+
+
 ## 🔧 OptionList Configuration
 
 The `optionList` is a JSON string containing all chart configuration. Here's the complete structure:

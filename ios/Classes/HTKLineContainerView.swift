@@ -41,6 +41,49 @@ class HTKLineContainerView: UIView {
         }
     }
 
+    // ----- Imperative API (Phase 1) -----
+    // These methods update only the data set (modelArray) without rebuilding the full optionList JSON.
+    func setData(_ candles: [[String: Any]]) {
+        RNKLineView.queue.async { [weak self] in
+            guard let self = self else { return }
+            let models = HTKLineModel.packModelArray(candles)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.configManager.modelArray = models
+                self.reloadConfigManager(self.configManager)
+            }
+        }
+    }
+
+    func appendCandle(_ candle: [String: Any]) {
+        RNKLineView.queue.async { [weak self] in
+            guard let self = self else { return }
+            let model = HTKLineModel.packModel(candle)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.configManager.modelArray.append(model)
+                self.reloadConfigManager(self.configManager)
+            }
+        }
+    }
+
+    func updateLastCandle(_ candle: [String: Any]) {
+        RNKLineView.queue.async { [weak self] in
+            guard let self = self else { return }
+            let model = HTKLineModel.packModel(candle)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if self.configManager.modelArray.isEmpty {
+                    self.configManager.modelArray.append(model)
+                } else {
+                    self.configManager.modelArray[self.configManager.modelArray.count - 1] = model
+                }
+                self.reloadConfigManager(self.configManager)
+            }
+        }
+    }
+
+
     lazy var klineView: HTKLineView = {
         let klineView = HTKLineView.init(CGRect.zero, configManager)
         return klineView

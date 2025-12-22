@@ -1305,6 +1305,64 @@ const KLineScreen: React.FC = () => {
 
   const kLineViewRef = useRef<any>(null);
 
+  // Hold the latest dataset on the JS side (useful for Phase 1 imperative updates)
+  const nativeDataRef = useRef<KLineModel[]>([]);
+
+  const handleNativeReset = useCallback(() => {
+    kLineViewRef.current?.setData?.(nativeDataRef.current);
+  }, []);
+
+  const handleNativeAppend = useCallback(() => {
+    const list = nativeDataRef.current;
+    if (!list.length) return;
+
+    const last = list[list.length - 1];
+    const nextTime = last.time + 60 * 1000;
+    const nextOpen = last.close;
+    const nextClose = nextOpen * (1 + (Math.random() - 0.5) * 0.01);
+    const nextHigh =
+      Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.005);
+    const nextLow = Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.005);
+    const nextVolume = Math.max(
+      1,
+      Math.round((last.volume || last.vol || 1) * (0.9 + Math.random() * 0.2)),
+    );
+
+    const next: KLineModel = {
+      ...last,
+      time: nextTime,
+      id: nextTime,
+      open: nextOpen,
+      high: nextHigh,
+      low: nextLow,
+      close: nextClose,
+      volume: nextVolume,
+      vol: nextVolume,
+      dateString: formatTime(nextTime),
+    };
+
+    nativeDataRef.current = [...list, next];
+    kLineViewRef.current?.appendCandle?.(next as any);
+  }, []);
+
+  const handleNativeUpdateLast = useCallback(() => {
+    const list = nativeDataRef.current;
+    if (!list.length) return;
+
+    const last = list[list.length - 1];
+    const nextClose = last.close * (1 + (Math.random() - 0.5) * 0.003);
+
+    const updated: KLineModel = {
+      ...last,
+      close: nextClose,
+      high: Math.max(last.high, nextClose),
+      low: Math.min(last.low, nextClose),
+    };
+
+    nativeDataRef.current = [...list.slice(0, -1), updated];
+    kLineViewRef.current?.updateLastCandle?.(updated as any);
+  }, []);
+
   // Update StatusBar when theme changes
   useEffect(() => {
     StatusBar.setBarStyle(isDarkTheme ? 'light-content' : 'dark-content', true);
@@ -1384,6 +1442,11 @@ const KLineScreen: React.FC = () => {
     isRSISelected,
     isWRSelected,
   ]);
+
+  // Keep nativeDataRef in sync with processedKLineData
+  useEffect(() => {
+    nativeDataRef.current = processedKLineData;
+  }, [processedKLineData]);
 
   // Derive drawList from current draw tool and theme
   const drawList = useMemo(() => {
@@ -1592,6 +1655,24 @@ const KLineScreen: React.FC = () => {
         activeButtonText: {
           color: '#FFFFFF',
         },
+        realtimeBar: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginLeft: 12,
+        },
+        realtimeButton: {
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 6,
+          backgroundColor: theme.buttonColor,
+          marginLeft: 8,
+        },
+        realtimeButtonText: {
+          fontSize: 12,
+          color: '#FFFFFF',
+          fontWeight: '600',
+        },
+
         selectorOverlay: {
           position: 'absolute',
           top: 0,
@@ -1718,7 +1799,7 @@ const KLineScreen: React.FC = () => {
   };
 
   const renderControlBar = () => (
-    <View style={styles.controlBar}>
+    <ScrollView horizontal contentContainerStyle={styles.controlBar}>
       <TouchableOpacity
         style={styles.controlButton}
         onPress={() => setShowTimeSelector(true)}
@@ -1768,7 +1849,31 @@ const KLineScreen: React.FC = () => {
       >
         <Text style={styles.controlButtonText}>Clear</Text>
       </TouchableOpacity>
-    </View>
+
+      {/* Phase 1: Imperative data updates */}
+      <View style={styles.realtimeBar}>
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={handleNativeReset}
+        >
+          <Text style={styles.realtimeButtonText}>Reset Data</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={handleNativeAppend}
+        >
+          <Text style={styles.realtimeButtonText}>Append</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={handleNativeUpdateLast}
+        >
+          <Text style={styles.realtimeButtonText}>Update Last</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 
   const renderSelectors = () => (
@@ -1878,33 +1983,57 @@ const KLineScreen: React.FC = () => {
 
       {/* Drawing tool selector */}
       {showDrawToolSelector && (
-        <View style={styles.selectorContainer}>
-          {Object.keys(DrawToolTypes).map(toolKey => (
+        <View style={styles.selectorOverlay}>
+          <View style={styles.selectorModal}>
+            <Text style={styles.selectorTitle}>Select drawing tool</Text>
+            <ScrollView style={styles.selectorList}>
+              <View style={styles.selectorContainer}>
+                {Object.keys(DrawToolTypes).map(toolKey => (
+                  <TouchableOpacity
+                    key={toolKey}
+                    style={[
+                      styles.selectorItem,
+                      selectedDrawTool === parseInt(toolKey, 10) &&
+                        styles.selectedItem,
+                    ]}
+                    onPress={() => handleSelectDrawTool(parseInt(toolKey, 10))}
+                  >
+                    <Text
+                      style={[
+                        styles.selectorItemText,
+                        selectedDrawTool === parseInt(toolKey, 10) &&
+                          styles.selectedItemText,
+                      ]}
+                    >
+                      {DrawToolTypes[parseInt(toolKey, 10)].label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Text style={styles.selectorItemText}>
+                    Continuous drawing:{' '}
+                  </Text>
+                  <Switch
+                    value={drawShouldContinue}
+                    onValueChange={setDrawShouldContinue}
+                  />
+                </View>
+              </View>
+            </ScrollView>
             <TouchableOpacity
-              key={toolKey}
-              style={[
-                styles.selectorItem,
-                selectedDrawTool === parseInt(toolKey, 10) &&
-                  styles.selectedItem,
-              ]}
-              onPress={() => handleSelectDrawTool(parseInt(toolKey, 10))}
+              style={styles.closeButton}
+              onPress={() => setShowDrawToolSelector(false)}
             >
-              <Text
-                style={[
-                  styles.selectorItemText,
-                  selectedDrawTool === parseInt(toolKey, 10) &&
-                    styles.selectedItemText,
-                ]}
-              >
-                {DrawToolTypes[parseInt(toolKey, 10)].label}
-              </Text>
+              <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
-          ))}
-          <Text style={styles.selectorItemText}>Continuous drawing: </Text>
-          <Switch
-            value={drawShouldContinue}
-            onValueChange={setDrawShouldContinue}
-          />
+          </View>
         </View>
       )}
     </>
