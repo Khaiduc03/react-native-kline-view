@@ -41,6 +41,7 @@ class HTKLineContainerView: UIView {
         }
     }
 
+
     // ----- Imperative API (Phase 1) -----
     // These methods update only the data set (modelArray) without rebuilding the full optionList JSON.
     func setData(_ candles: [[String: Any]]) {
@@ -50,6 +51,7 @@ class HTKLineContainerView: UIView {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.configManager.modelArray = models
+                self.configManager.shouldScrollToEnd = true
                 self.reloadConfigManager(self.configManager)
             }
         }
@@ -62,22 +64,28 @@ class HTKLineContainerView: UIView {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.configManager.modelArray.append(model)
+                self.configManager.shouldScrollToEnd = true
                 self.reloadConfigManager(self.configManager)
             }
         }
     }
 
     func updateLastCandle(_ candle: [String: Any]) {
+        print("[RNKLineView][iOS] updateLastCandle payload keys:", Array(candle.keys))
         RNKLineView.queue.async { [weak self] in
             guard let self = self else { return }
             let model = HTKLineModel.packModel(candle)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                let beforeCount = self.configManager.modelArray.count
                 if self.configManager.modelArray.isEmpty {
                     self.configManager.modelArray.append(model)
                 } else {
                     self.configManager.modelArray[self.configManager.modelArray.count - 1] = model
                 }
+                let afterCount = self.configManager.modelArray.count
+                print("[RNKLineView][iOS] updateLastCandle beforeCount:", beforeCount, "afterCount:", afterCount, "lastId:", model.id)
+                self.configManager.shouldScrollToEnd = true
                 self.reloadConfigManager(self.configManager)
             }
         }

@@ -22,9 +22,14 @@ import {
   processColor,
   Platform,
   PixelRatio,
-  NativeSyntheticEvent,
 } from 'react-native';
-import RNKLineView from 'react-native-kline-view';
+import RNKLineView, {
+  type Candle,
+  type DrawItemCompleteEvent,
+  type DrawItemTouchEvent,
+  type DrawPointCompleteEvent,
+  type RNKLineViewRef,
+} from 'react-native-kline-view';
 
 // ==================== Type Definitions ====================
 
@@ -1303,64 +1308,24 @@ const KLineScreen: React.FC = () => {
   );
   const [drawClearFlag, setDrawClearFlag] = useState(false);
 
-  const kLineViewRef = useRef<any>(null);
+  const kLineViewRef = useRef<RNKLineViewRef | null>(null);
+  const [isKLineReady, setIsKLineReady] = useState(false);
+
+  const handleKLineRef = useCallback((ref: RNKLineViewRef | null) => {
+    kLineViewRef.current = ref;
+    setIsKLineReady(!!ref);
+    if (ref) {
+      console.log('RNKLineView ref attached');
+    }
+  }, []);
 
   // Hold the latest dataset on the JS side (useful for Phase 1 imperative updates)
   const nativeDataRef = useRef<KLineModel[]>([]);
 
   const handleNativeReset = useCallback(() => {
-    kLineViewRef.current?.setData?.(nativeDataRef.current);
-  }, []);
-
-  const handleNativeAppend = useCallback(() => {
-    const list = nativeDataRef.current;
-    if (!list.length) return;
-
-    const last = list[list.length - 1];
-    const nextTime = last.time + 60 * 1000;
-    const nextOpen = last.close;
-    const nextClose = nextOpen * (1 + (Math.random() - 0.5) * 0.01);
-    const nextHigh =
-      Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.005);
-    const nextLow = Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.005);
-    const nextVolume = Math.max(
-      1,
-      Math.round((last.volume || last.vol || 1) * (0.9 + Math.random() * 0.2)),
-    );
-
-    const next: KLineModel = {
-      ...last,
-      time: nextTime,
-      id: nextTime,
-      open: nextOpen,
-      high: nextHigh,
-      low: nextLow,
-      close: nextClose,
-      volume: nextVolume,
-      vol: nextVolume,
-      dateString: formatTime(nextTime),
-    };
-
-    nativeDataRef.current = [...list, next];
-    kLineViewRef.current?.appendCandle?.(next as any);
-  }, []);
-
-  const handleNativeUpdateLast = useCallback(() => {
-    const list = nativeDataRef.current;
-    if (!list.length) return;
-
-    const last = list[list.length - 1];
-    const nextClose = last.close * (1 + (Math.random() - 0.5) * 0.003);
-
-    const updated: KLineModel = {
-      ...last,
-      close: nextClose,
-      high: Math.max(last.high, nextClose),
-      low: Math.min(last.low, nextClose),
-    };
-
-    nativeDataRef.current = [...list.slice(0, -1), updated];
-    kLineViewRef.current?.updateLastCandle?.(updated as any);
+    // Clear chart and in-memory dataset
+    nativeDataRef.current = [];
+    kLineViewRef.current?.setData?.([]);
   }, []);
 
   // Update StatusBar when theme changes
@@ -1447,6 +1412,124 @@ const KLineScreen: React.FC = () => {
   useEffect(() => {
     nativeDataRef.current = processedKLineData;
   }, [processedKLineData]);
+
+  const handleNativeAppend = useCallback(() => {
+    const list = nativeDataRef.current;
+    if (!list.length) {
+      // If chart is empty (after reset), re-seed with mock data first
+      const seed = processKLineData(
+        generateMockData(),
+        targetList,
+        isDarkTheme,
+        isMASelected,
+        isBOLLSelected,
+        isMACDSelected,
+        isKDJSelected,
+        isRSISelected,
+        isWRSelected,
+      );
+      nativeDataRef.current = seed;
+      kLineViewRef.current?.setData?.(seed as unknown as Candle[]);
+      return;
+    }
+
+    const last = list[list.length - 1];
+    const nextTime = last.time + 60 * 1000;
+    const nextOpen = last.close;
+    const nextClose = nextOpen * (1 + (Math.random() - 0.5) * 0.01);
+    const nextHigh =
+      Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.005);
+    const nextLow = Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.005);
+    const nextVolume = Math.max(
+      1,
+      Math.round((last.volume || last.vol || 1) * (0.9 + Math.random() * 0.2)),
+    );
+
+    const next: KLineModel = {
+      ...last,
+      time: nextTime,
+      id: nextTime,
+      open: nextOpen,
+      high: nextHigh,
+      low: nextLow,
+      close: nextClose,
+      volume: nextVolume,
+      vol: nextVolume,
+      dateString: formatTime(nextTime),
+    };
+
+    // Recompute indicators for the new dataset so MA/BOLL/MACD/etc. stay correct
+    const processed = processKLineData(
+      [...list, next],
+      targetList,
+      isDarkTheme,
+      isMASelected,
+      isBOLLSelected,
+      isMACDSelected,
+      isKDJSelected,
+      isRSISelected,
+      isWRSelected,
+    );
+    nativeDataRef.current = processed;
+    const latest = processed[processed.length - 1] as unknown as Candle;
+    kLineViewRef.current?.appendCandle?.(latest);
+  }, [
+    targetList,
+    isDarkTheme,
+    isMASelected,
+    isBOLLSelected,
+    isMACDSelected,
+    isKDJSelected,
+    isRSISelected,
+    isWRSelected,
+  ]);
+
+  const handleNativeUpdateLast = useCallback(() => {
+    const list = nativeDataRef.current;
+    if (!list.length) return;
+
+    const last = list[list.length - 1];
+    // Use a larger delta so the update is visibly reflected on chart
+    const nextClose = last.close * (1 + (Math.random() - 0.5) * 0.02);
+
+    // Keep the same id/time; only update OHLC (tick update on current last candle)
+    const updated: KLineModel = {
+      ...last,
+      close: nextClose,
+      high: Math.max(last.high, nextClose),
+      low: Math.min(last.low, nextClose),
+    };
+
+    // Recompute indicators with updated last candle
+    const processed = processKLineData(
+      [...list.slice(0, -1), updated],
+      targetList,
+      isDarkTheme,
+      isMASelected,
+      isBOLLSelected,
+      isMACDSelected,
+      isKDJSelected,
+      isRSISelected,
+      isWRSelected,
+    );
+    nativeDataRef.current = processed;
+    const latest = processed[processed.length - 1] as unknown as Candle;
+
+    if (!kLineViewRef.current?.updateLastCandle) {
+      console.warn('RNKLineView ref not ready for updateLastCandle');
+      return;
+    }
+    kLineViewRef.current.updateLastCandle(latest);
+  }, [
+    targetList,
+    isDarkTheme,
+    isMASelected,
+    isBOLLSelected,
+    isMACDSelected,
+    isKDJSelected,
+    isRSISelected,
+    isWRSelected,
+  ]);
 
   // Derive drawList from current draw tool and theme
   const drawList = useMemo(() => {
@@ -1540,16 +1623,13 @@ const KLineScreen: React.FC = () => {
     setDrawClearFlag(true);
   }, []);
 
-  const handleDrawItemDidTouch = useCallback(
-    (event: NativeSyntheticEvent<any>) => {
-      const { nativeEvent } = event;
-      console.log('Draw item touched:', nativeEvent);
-    },
-    [],
-  );
+  const handleDrawItemDidTouch = useCallback((event: DrawItemTouchEvent) => {
+    const { nativeEvent } = event;
+    console.log('Draw item touched:', nativeEvent);
+  }, []);
 
   const handleDrawItemComplete = useCallback(
-    (event: NativeSyntheticEvent<any>) => {
+    (event: DrawItemCompleteEvent) => {
       const { nativeEvent } = event;
       console.log('Draw item completed:', nativeEvent);
 
@@ -1562,7 +1642,7 @@ const KLineScreen: React.FC = () => {
   );
 
   const handleDrawPointComplete = useCallback(
-    (event: NativeSyntheticEvent<any>) => {
+    (event: DrawPointCompleteEvent) => {
       const { nativeEvent } = event;
       console.log('Draw point completed:', nativeEvent.pointCount);
 
@@ -1627,6 +1707,9 @@ const KLineScreen: React.FC = () => {
         chart: {
           flex: 1,
           backgroundColor: 'transparent',
+        },
+        controlBarScroll: {
+          flexGrow: 0, // avoid taking extra space; just wrap content
         },
         controlBar: {
           flexDirection: 'row',
@@ -1776,7 +1859,7 @@ const KLineScreen: React.FC = () => {
     const directRender = (
       <RNKLineView
         // @ts-ignore - RNKLineView ref is handled internally
-        ref={kLineViewRef}
+        ref={handleKLineRef}
         style={styles.chart}
         optionList={optionListString}
         onDrawItemDidTouch={handleDrawItemDidTouch}
@@ -1784,7 +1867,10 @@ const KLineScreen: React.FC = () => {
         onDrawPointComplete={handleDrawPointComplete}
       />
     );
-    if ((global as any)?.nativeFabricUIManager && Platform.OS === 'ios') {
+    if (
+      (global as { nativeFabricUIManager?: unknown })?.nativeFabricUIManager &&
+      Platform.OS === 'ios'
+    ) {
       return directRender;
     }
     return (
@@ -1799,7 +1885,11 @@ const KLineScreen: React.FC = () => {
   };
 
   const renderControlBar = () => (
-    <ScrollView horizontal contentContainerStyle={styles.controlBar}>
+    <ScrollView
+      horizontal
+      style={styles.controlBarScroll}
+      contentContainerStyle={styles.controlBar}
+    >
       <TouchableOpacity
         style={styles.controlButton}
         onPress={() => setShowTimeSelector(true)}
@@ -1869,6 +1959,7 @@ const KLineScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.realtimeButton}
           onPress={handleNativeUpdateLast}
+          disabled={!isKLineReady}
         >
           <Text style={styles.realtimeButtonText}>Update Last</Text>
         </TouchableOpacity>

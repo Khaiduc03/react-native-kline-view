@@ -1,43 +1,54 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import {
   requireNativeComponent,
   UIManager,
   findNodeHandle,
   Platform,
   NativeModules,
-} from 'react-native';
+} from "react-native";
 
-const COMPONENT_NAME = 'RNKLineView';
+const COMPONENT_NAME = "RNKLineView";
 const NativeRNKLineView = requireNativeComponent(COMPONENT_NAME);
 
 /**
- * Dispatch a native view command on Android, or call the iOS ViewManager method directly.
+ * Dispatch a native view command:
+ * - iOS: use NativeModules.RNKLineView methods directly
+ * - Android: use UIManager.dispatchViewManagerCommand
  */
 function runCommand(nativeRef, commandName, payload) {
   const nodeHandle = findNodeHandle(nativeRef.current);
+  console.log("runCommand", commandName, payload);
   if (!nodeHandle) return;
 
-  // iOS: call ViewManager exported methods (RNKLineView)
-  if (Platform.OS === 'ios') {
+  // iOS: call NativeModules.RNKLineView methods directly
+  if (Platform.OS === "ios") {
     const manager = NativeModules?.RNKLineView;
-    if (manager && typeof manager[commandName] === 'function') {
-      // setData signature: (reactTag, candlesArray)
-      if (commandName === 'setData') {
-        manager.setData(nodeHandle, payload);
-      } else {
-        manager[commandName](nodeHandle, payload);
-      }
+    if (!manager) {
+      console.warn(
+        "[RNKLineView] NativeModules.RNKLineView missing. Run `pod install` and rebuild iOS."
+      );
       return;
     }
+
+    if (typeof manager[commandName] !== "function") {
+      console.warn(
+        `[RNKLineView] iOS method ${commandName} not found on NativeModules.RNKLineView. Run 'pod install' and rebuild iOS.`
+      );
+      return;
+    }
+
+    if (commandName === "setData") {
+      // setData expects an array of candles
+      manager.setData(nodeHandle, payload);
+    } else {
+      // appendCandle / updateLastCandle take a single candle object
+      manager[commandName](nodeHandle, payload);
+    }
+    return;
   }
 
-  // Android (and fallback): use UIManager commands
-  const config = UIManager.getViewManagerConfig(COMPONENT_NAME);
-
-  // In the New Architecture (Fabric), commandId is typically a string.
-  // In the Legacy architecture (Paper), commandId is usually a number from config.Commands.
-  const isFabric = !!global?.nativeFabricUIManager;
-  const commandId = (isFabric || !config?.Commands) ? commandName : (config.Commands[commandName] ?? commandName);
+  // Android (and fallback): use UIManager commands with string commandId
+  const commandId = commandName;
   UIManager.dispatchViewManagerCommand(nodeHandle, commandId, [payload]);
 }
 
@@ -51,9 +62,10 @@ const RNKLineView = forwardRef((props, ref) => {
   const nativeRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
-    setData: (candles) => runCommand(nativeRef, 'setData', candles),
-    appendCandle: (candle) => runCommand(nativeRef, 'appendCandle', candle),
-    updateLastCandle: (candle) => runCommand(nativeRef, 'updateLastCandle', candle),
+    setData: (candles) => runCommand(nativeRef, "setData", candles),
+    appendCandle: (candle) => runCommand(nativeRef, "appendCandle", candle),
+    updateLastCandle: (candle) =>
+      runCommand(nativeRef, "updateLastCandle", candle),
   }));
 
   return <NativeRNKLineView ref={nativeRef} {...props} />;

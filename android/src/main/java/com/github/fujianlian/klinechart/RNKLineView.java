@@ -2,6 +2,7 @@ package com.github.fujianlian.klinechart;
 
 import android.graphics.Color;
 import android.os.Build;
+import android.util.Log;
 import android.view.View;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
@@ -24,6 +25,7 @@ import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
 
 public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
+    private static final String TAG = "RNKLineView";
 
 	public static String onDrawItemDidTouchKey = "onDrawItemDidTouch";
 
@@ -76,13 +78,23 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
         return map;
     }
 public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, @androidx.annotation.Nullable final ReadableArray args) {
-        if (root == null) return;
+        if (root == null) {
+            Log.w(TAG, "receiveCommand: root is null, commandId=" + commandId);
+            return;
+        }
 
         switch (commandId) {
             case COMMAND_SET_DATA: {
-                if (args == null || args.size() == 0 || args.isNull(0)) return;
+                if (args == null || args.size() == 0 || args.isNull(0)) {
+                    Log.w(TAG, "setData: args empty or null");
+                    return;
+                }
                 final ReadableArray candleArray = args.getArray(0);
-                if (candleArray == null) return;
+                if (candleArray == null) {
+                    Log.w(TAG, "setData: candleArray is null");
+                    return;
+                }
+                Log.i(TAG, "setData: count=" + candleArray.size());
 
                 // Copy ReadableArray into plain Java structures on the UI thread (ReadableArray is not thread-safe)
                 final List<Map<String, Object>> candleMaps = new ArrayList<>();
@@ -113,10 +125,17 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
             }
 
             case COMMAND_APPEND_CANDLE: {
-                if (args == null || args.size() == 0 || args.isNull(0)) return;
+                if (args == null || args.size() == 0 || args.isNull(0)) {
+                    Log.w(TAG, "appendCandle: args empty or null");
+                    return;
+                }
                 final ReadableMap candle = args.getMap(0);
-                if (candle == null) return;
+                if (candle == null) {
+                    Log.w(TAG, "appendCandle: candle is null");
+                    return;
+                }
                 final Map<String, Object> candleMap = readableMapToMap(candle);
+                Log.i(TAG, "appendCandle keys=" + candleMap.keySet());
 
                 new Thread(new Runnable() {
                     @Override
@@ -135,10 +154,17 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
             }
 
             case COMMAND_UPDATE_LAST_CANDLE: {
-                if (args == null || args.size() == 0 || args.isNull(0)) return;
+                if (args == null || args.size() == 0 || args.isNull(0)) {
+                    Log.w(TAG, "updateLastCandle: args empty or null");
+                    return;
+                }
                 final ReadableMap candle = args.getMap(0);
-                if (candle == null) return;
+                if (candle == null) {
+                    Log.w(TAG, "updateLastCandle: candle is null");
+                    return;
+                }
                 final Map<String, Object> candleMap = readableMapToMap(candle);
+                Log.i(TAG, "updateLastCandle keys=" + candleMap.keySet());
 
                 new Thread(new Runnable() {
                     @Override

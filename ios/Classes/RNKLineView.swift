@@ -21,35 +21,97 @@ class RNKLineView: RCTViewManager {
         return true
     }
 
-
-
-
-
     // ----- Imperative commands (Phase 1) -----
     // Called from JS: NativeModules.RNKLineView.setData(reactTag, candles)
     @objc func setData(_ reactTag: NSNumber, candles: NSArray) {
-        bridge.uiManager.addUIBlock { (_, viewRegistry) in
-            guard let view = viewRegistry?[reactTag] as? HTKLineContainerView else { return }
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
+            guard let self = self else {
+                print("🚨 [Pods RNKLineView] setData self deallocated for tag:", reactTag)
+                return
+            }
+
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+
+            if view == nil {
+                if let existing = viewRegistry?[reactTag] {
+                    print("🚨 [Pods RNKLineView] setData found view but wrong type: \(type(of: existing)) for tag:", reactTag)
+                } else {
+                    print("🚨 [Pods RNKLineView] setData no view for tag:", reactTag)
+                }
+                let registryKeys = viewRegistry?.keys.map { $0 } ?? []
+                print("🚨 [Pods RNKLineView] setData viewRegistry keys:", registryKeys)
+                return
+            }
+
             let list = candles as? [[String: Any]] ?? []
-            view.setData(list)
+            print("[RNKLineView][iOS] setData count:", list.count)
+            view?.setData(list)
         }
     }
 
     // Called from JS: NativeModules.RNKLineView.appendCandle(reactTag, candle)
     @objc func appendCandle(_ reactTag: NSNumber, candle: NSDictionary) {
-        bridge.uiManager.addUIBlock { (_, viewRegistry) in
-            guard let view = viewRegistry?[reactTag] as? HTKLineContainerView else { return }
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
+            guard let self = self else {
+                print("🚨 [Pods RNKLineView] appendCandle self deallocated for tag:", reactTag)
+                return
+            }
+
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+
+            if view == nil {
+                if let existing = viewRegistry?[reactTag] {
+                    print("🚨 [Pods RNKLineView] appendCandle found view but wrong type: \(type(of: existing)) for tag:", reactTag)
+                } else {
+                    print("🚨 [Pods RNKLineView] appendCandle no view for tag:", reactTag)
+                }
+                let registryKeys = viewRegistry?.keys.map { $0 } ?? []
+                print("🚨 [Pods RNKLineView] appendCandle viewRegistry keys:", registryKeys)
+                return
+            }
+
             let dict = candle as? [String: Any] ?? [:]
-            view.appendCandle(dict)
+            print("[RNKLineView][iOS] appendCandle keys:", Array(dict.keys))
+            view?.appendCandle(dict)
         }
     }
 
     // Called from JS: NativeModules.RNKLineView.updateLastCandle(reactTag, candle)
     @objc func updateLastCandle(_ reactTag: NSNumber, candle: NSDictionary) {
-        bridge.uiManager.addUIBlock { (_, viewRegistry) in
-            guard let view = viewRegistry?[reactTag] as? HTKLineContainerView else { return }
+        print("🚀 [Pods RNKLineView] updateLastCandle called, keys = \(Array(candle.allKeys))")
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
+            guard let self = self else {
+                print("🚨 [Pods RNKLineView] updateLastCandle self deallocated for tag:", reactTag)
+                return
+            }
+
+            // Try both registry and direct lookup (Fabric/Paper)
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+
+            if view == nil {
+                if let existing = viewRegistry?[reactTag] {
+                    print("🚨 [Pods RNKLineView] updateLastCandle found view but wrong type: \(type(of: existing)) for tag:", reactTag)
+                } else {
+                    print("🚨 [Pods RNKLineView] updateLastCandle no view for tag:", reactTag)
+                }
+                let registryKeys = viewRegistry?.keys.map { $0 } ?? []
+                print("🚨 [Pods RNKLineView] updateLastCandle viewRegistry keys:", registryKeys)
+                return
+            }
+
             let dict = candle as? [String: Any] ?? [:]
-            view.updateLastCandle(dict)
+            print("[RNKLineView][iOS] updateLastCandle keys:", Array(dict.keys))
+            print("[Pods RNKLineView] updateLastCandle dispatch to container, tag:", reactTag)
+            view?.updateLastCandle(dict)
         }
     }
 
