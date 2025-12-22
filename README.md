@@ -92,7 +92,9 @@ No additional setup required for Android.
 
 ### Basic Usage
 
-For a comprehensive implementation with all features, please check **[example/App.js](./example/App.js)**
+For a comprehensive implementation with all features, please check **[example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**.
+
+> Note: The example has been migrated to TypeScript, so `example/App.js` is no longer the main reference.
 
 The example app demonstrates:
 
@@ -101,6 +103,13 @@ The example app demonstrates:
 - 📊 **Indicator Management** - Dynamic indicator switching and configuration
 - ✏️ **Drawing Tools** - Full-featured drawing interface with tool selection
 - 📱 **Responsive Design** - Adapts to different screen sizes and orientations
+
+## 🧪 Example (TypeScript)
+
+- Main demo screen: **`example/screens/KLineScreen.tsx`**
+- Entry point (if you added/kept it): **`example/App.tsx`** should render `KLineScreen`
+
+If you fork/customize this library, keep the example updated first — it doubles as the best integration test.
 
 ## 📊 Component Properties
 
@@ -151,7 +160,7 @@ Each data point should contain the following fields:
 - `maVolumeList`: Volume moving average data
 - Various technical indicator data (MACD, KDJ, RSI, etc.)
 
-**For complete data structure examples, see [example/App.js](./example/App.js)**
+**For complete data structure examples, see [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**
 
 ### Visual Configuration (configList)
 
@@ -222,7 +231,7 @@ Contains parameter settings for various technical indicators:
 - `rsiList`: RSI configuration array
 - `wrList`: WR configuration array
 
-**For complete configuration examples, see [example/App.js](./example/App.js)**
+**For complete configuration examples, see [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**
 
 ## 📄 License
 
@@ -260,8 +269,8 @@ While we honor the inspiration from the original project, this implementation re
 ## 📞 Support
 
 - 📧 **Email**: hellohublot@gmail.com
-- 💬 **Issues**: [GitHub Issues](https://github.com/hellohublot/react-native-kline-view/issues)
-- 🎯 **Examples**: Check out [example/App.js](./example/App.js) for comprehensive usage
+- 💬 **Issues**: [GitHub Issues](https://github.com/Khaiduc03/react-native-kline-view/issues)
+- 🎯 **Examples**: Check out [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx) for comprehensive usage
 
 ---
 
