@@ -1,5 +1,5 @@
-import * as React from 'react';
-import type { NativeSyntheticEvent, ViewProps } from 'react-native';
+import * as React from "react";
+import type { NativeSyntheticEvent, ViewProps } from "react-native";
 
 export type Candle = {
   id: number;

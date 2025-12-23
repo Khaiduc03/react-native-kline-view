@@ -1865,6 +1865,12 @@ const KLineScreen: React.FC = () => {
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}
+        customIndicatorOffset={500} // Candle index where indicator should appear
+        customIndicatorView={
+          <View style={{ width: 50, height: 200, backgroundColor: 'red' }}>
+            <Text>Custom Indicator</Text>
+          </View>
+        }
       />
     );
     if (

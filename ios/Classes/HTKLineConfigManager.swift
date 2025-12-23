@@ -239,6 +239,8 @@ class HTKLineConfigManager: NSObject {
 
     var closePriceRightLightLottieSource = ""
 
+    var rightOffsetCandles: Int = 10
+
     // grid draw
     // Đậm rõ: màu đen, nét 1.2pt để dễ thấy
     var gridColor = UIColor.black
@@ -471,6 +473,13 @@ class HTKLineConfigManager: NSObject {
         closePriceRightLightLottieFloder = configList["closePriceRightLightLottieFloder"] as? String ?? ""
         closePriceRightLightLottieScale = configList["closePriceRightLightLottieScale"] as? CGFloat ?? 0
         closePriceRightLightLottieSource = configList["closePriceRightLightLottieSource"] as? String ?? ""
+        if let v = configList["rightOffsetCandles"] as? Int {
+            rightOffsetCandles = v
+        } else if let n = configList["rightOffsetCandles"] as? NSNumber {
+            rightOffsetCandles = n.intValue
+        } else {
+            rightOffsetCandles = 10 // Default: 10 candles for prediction area
+        }
     }
 
 }

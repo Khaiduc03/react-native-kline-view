@@ -190,7 +190,10 @@ class HTKLineView: UIScrollView {
 
     func reloadContentSize() {
         configManager.reloadScrollViewScale(scale)
-        let contentWidth = configManager.itemWidth * CGFloat(configManager.modelArray.count) + configManager.paddingRight
+        // Add candle-based right offset for blank space (e.g., prediction area)
+        // paddingRight is kept for label space only
+        let rightOffsetCandles = max(0, CGFloat(configManager.rightOffsetCandles))
+        let contentWidth = configManager.itemWidth * CGFloat(configManager.modelArray.count + Int(rightOffsetCandles)) + configManager.paddingRight
         contentSize = CGSize.init(width: contentWidth, height: frame.size.height)
     }
 
@@ -333,8 +336,9 @@ class HTKLineView: UIScrollView {
             while i <= visibleRange.upperBound {
                 let xCenter = (CGFloat(i) + 0.5) * configManager.itemWidth - contentOffset.x
                 let x = alignToPixel(xCenter)
-                let startY = mainBaseY
-                let endY = childBaseY + childHeight
+                // Extend vertical grid lines beyond horizontal frame boundaries
+                let startY: CGFloat = 0 // Start from top edge
+                let endY: CGFloat = bounds.size.height // Extend to bottom edge
                 context.move(to: CGPoint(x: x, y: startY))
                 context.addLine(to: CGPoint(x: x, y: endY))
                 context.strokePath()
