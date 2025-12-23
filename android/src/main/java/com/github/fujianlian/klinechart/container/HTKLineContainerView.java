@@ -24,6 +24,15 @@ public class HTKLineContainerView extends RelativeLayout {
 
     public HTShotView shotView;
 
+    // ----- Price Prediction State -----
+    private Map predictionData = null;
+    private int predictionAnchorIndex = -1;
+    private boolean tooltipVisible = false;
+    private float tooltipX = 0f;
+    private float tooltipY = 0f;
+    // TODO: Add tooltip overlay View when implementing tooltip UI
+
+
     public HTKLineContainerView(ThemedReactContext context) {
         super(context);
         this.reactContext = context;
@@ -221,6 +230,37 @@ public class HTKLineContainerView extends RelativeLayout {
             lastLocation = null;
         }
         klineView.drawContext.touchesGesture(location, translation, state);
+    }
+
+    // ----- Price Prediction Methods -----
+    public void setPrediction(Map data) {
+        this.predictionData = data;
+        // Capture anchor index at the moment prediction is set
+        this.predictionAnchorIndex = configManager.modelArray.size() - 1;
+        if (predictionAnchorIndex < 0) {
+            predictionAnchorIndex = 0;
+        }
+        android.util.Log.i("HTKLineContainerView", "setPrediction: anchorIndex=" + predictionAnchorIndex + ", data=" + (data != null));
+        // TODO: Calculate prediction min/max for Y-axis rescale
+        // TODO: Integrate into draw cycle
+        klineView.invalidate();
+    }
+
+    public void clearPrediction() {
+        this.predictionData = null;
+        this.predictionAnchorIndex = -1;
+        this.tooltipVisible = false;
+        android.util.Log.i("HTKLineContainerView", "clearPrediction called");
+        // TODO: Hide tooltip overlay if visible
+        klineView.invalidate();
+    }
+
+    public Map getPredictionData() {
+        return predictionData;
+    }
+
+    public int getPredictionAnchorIndex() {
+        return predictionAnchorIndex;
     }
 
     private void handlerShot(MotionEvent event) {

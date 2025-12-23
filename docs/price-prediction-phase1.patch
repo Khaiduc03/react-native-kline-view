@@ -1,0 +1,550 @@
+diff --git a/android/src/main/java/com/github/fujianlian/klinechart/RNKLineView.java b/android/src/main/java/com/github/fujianlian/klinechart/RNKLineView.java
+index 27ec289..6ba86dd 100644
+--- a/android/src/main/java/com/github/fujianlian/klinechart/RNKLineView.java
++++ b/android/src/main/java/com/github/fujianlian/klinechart/RNKLineView.java
+@@ -66,15 +66,21 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
+     private static final int COMMAND_SET_DATA = 1;
+     private static final int COMMAND_APPEND_CANDLE = 2;
+     private static final int COMMAND_UPDATE_LAST_CANDLE = 3;
++    private static final int COMMAND_SET_PREDICTION = 4;
++    private static final int COMMAND_CLEAR_PREDICTION = 5;
+ 
+   private static final String COMMAND_SET_DATA_NAME = "setData";
+   private static final String COMMAND_APPEND_CANDLE_NAME = "appendCandle";
+   private static final String COMMAND_UPDATE_LAST_CANDLE_NAME = "updateLastCandle";
++  private static final String COMMAND_SET_PREDICTION_NAME = "setPrediction";
++  private static final String COMMAND_CLEAR_PREDICTION_NAME = "clearPrediction";
+     public Map<String, Integer> getCommandsMap() {
+         Map<String, Integer> map = new HashMap<>();
+         map.put("setData", COMMAND_SET_DATA);
+         map.put("appendCandle", COMMAND_APPEND_CANDLE);
+         map.put("updateLastCandle", COMMAND_UPDATE_LAST_CANDLE);
++        map.put("setPrediction", COMMAND_SET_PREDICTION);
++        map.put("clearPrediction", COMMAND_CLEAR_PREDICTION);
+         return map;
+     }
+ public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, @androidx.annotation.Nullable final ReadableArray args) {
+@@ -186,6 +192,45 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
+                 }).start();
+                 return;
+             }
++
++            case COMMAND_SET_PREDICTION: {
++                if (args == null || args.size() == 0 || args.isNull(0)) {
++                    Log.w(TAG, "setPrediction: args empty or null");
++                    return;
++                }
++                final String jsonPayload = args.getString(0);
++                if (jsonPayload == null) {
++                    Log.w(TAG, "setPrediction: payload is null");
++                    return;
++                }
++                Log.i(TAG, "setPrediction: payload length=" + jsonPayload.length());
++                
++                // Parse JSON and dispatch to container on UI thread
++                root.post(new Runnable() {
++                    @Override
++                    public void run() {
++                        try {
++                            int disableDecimalFeature = JSON.DEFAULT_PARSER_FEATURE & ~Feature.UseBigDecimal.getMask();
++                            Map predictionData = (Map)JSON.parse(jsonPayload, disableDecimalFeature);
++                            root.setPrediction(predictionData);
++                        } catch (Exception e) {
++                            Log.e(TAG, "setPrediction: failed to parse JSON", e);
++                        }
++                    }
++                });
++                return;
++            }
++
++            case COMMAND_CLEAR_PREDICTION: {
++                Log.i(TAG, "clearPrediction called");
++                root.post(new Runnable() {
++                    @Override
++                    public void run() {
++                        root.clearPrediction();
++                    }
++                });
++                return;
++            }
+         }
+     }
+ 
+@@ -202,6 +247,12 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
+             case "updateLastCandle":
+                 receiveCommand(root, COMMAND_UPDATE_LAST_CANDLE, args);
+                 return;
++            case "setPrediction":
++                receiveCommand(root, COMMAND_SET_PREDICTION, args);
++                return;
++            case "clearPrediction":
++                receiveCommand(root, COMMAND_CLEAR_PREDICTION, args);
++                return;
+             default:
+                 return;
+         }
+diff --git a/android/src/main/java/com/github/fujianlian/klinechart/container/HTKLineContainerView.java b/android/src/main/java/com/github/fujianlian/klinechart/container/HTKLineContainerView.java
+index f74d679..4bf7454 100644
+--- a/android/src/main/java/com/github/fujianlian/klinechart/container/HTKLineContainerView.java
++++ b/android/src/main/java/com/github/fujianlian/klinechart/container/HTKLineContainerView.java
+@@ -24,6 +24,15 @@ public class HTKLineContainerView extends RelativeLayout {
+ 
+     public HTShotView shotView;
+ 
++    // ----- Price Prediction State -----
++    private Map predictionData = null;
++    private int predictionAnchorIndex = -1;
++    private boolean tooltipVisible = false;
++    private float tooltipX = 0f;
++    private float tooltipY = 0f;
++    // TODO: Add tooltip overlay View when implementing tooltip UI
++
++
+     public HTKLineContainerView(ThemedReactContext context) {
+         super(context);
+         this.reactContext = context;
+@@ -223,6 +232,37 @@ public class HTKLineContainerView extends RelativeLayout {
+         klineView.drawContext.touchesGesture(location, translation, state);
+     }
+ 
++    // ----- Price Prediction Methods -----
++    public void setPrediction(Map data) {
++        this.predictionData = data;
++        // Capture anchor index at the moment prediction is set
++        this.predictionAnchorIndex = configManager.modelArray.size() - 1;
++        if (predictionAnchorIndex < 0) {
++            predictionAnchorIndex = 0;
++        }
++        android.util.Log.i("HTKLineContainerView", "setPrediction: anchorIndex=" + predictionAnchorIndex + ", data=" + (data != null));
++        // TODO: Calculate prediction min/max for Y-axis rescale
++        // TODO: Integrate into draw cycle
++        klineView.invalidate();
++    }
++
++    public void clearPrediction() {
++        this.predictionData = null;
++        this.predictionAnchorIndex = -1;
++        this.tooltipVisible = false;
++        android.util.Log.i("HTKLineContainerView", "clearPrediction called");
++        // TODO: Hide tooltip overlay if visible
++        klineView.invalidate();
++    }
++
++    public Map getPredictionData() {
++        return predictionData;
++    }
++
++    public int getPredictionAnchorIndex() {
++        return predictionAnchorIndex;
++    }
++
+     private void handlerShot(MotionEvent event) {
+         if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+             shotView.setPoint(null);
+diff --git a/index.d.ts b/index.d.ts
+index 6220d40..ca4a8fc 100644
+--- a/index.d.ts
++++ b/index.d.ts
+@@ -27,6 +27,253 @@ export interface RNKLineViewProps extends ViewProps {
+   onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
+ }
+ 
++// ==================== Price Prediction Types ====================
++
++export type PredictionBias = "bullish" | "bearish" | "neutral";
++export type PredictionStrength = "strong" | "medium" | "weak";
++export type PredictionConfidence = "high" | "medium" | "low";
++export type PredictionLevelType =
++  | "SL"
++  | "TP1"
++  | "TP2"
++  | "TP3"
++  | "ENTRY"
++  | "SUP"
++  | "RES";
++
++export interface PredictionPoint {
++  /** Offset from anchor (0 = current candle, 1+ = future) */
++  offset: number;
++  /** Price value at this offset */
++  price: number;
++}
++
++export interface PredictionBand {
++  /** Start offset */
++  startOffset: number;
++  /** End offset */
++  endOffset: number;
++  /** Bottom price of band */
++  bottom: number;
++  /** Top price of band */
++  top: number;
++}
++
++export interface PredictionLevel {
++  /** Level type (SL, TP1, TP2, etc.) */
++  type: PredictionLevelType;
++  /** Price value */
++  price: number;
++  /** Label text */
++  label: string;
++}
++
++export interface PredictionTooltip {
++  /** Question/reason text */
++  question: string;
++  /** Subtitle (bias, strength, etc.) */
++  subtitle: string;
++}
++
++export interface PredictionPayload {
++  /** Interval in milliseconds (e.g., 3600000 for 1h) */
++  intervalMs: number;
++  /** Number of future candles to predict */
++  horizonCandles: number;
++  /** Prediction bias direction */
++  bias: PredictionBias;
++  /** Prediction strength */
++  strength: PredictionStrength;
++  /** Mean line points (offset + price) */
++  points: PredictionPoint[];
++  /** Confidence cone bands */
++  bands: PredictionBand[];
++  /** Horizontal level lines */
++  levels: PredictionLevel[];
++  /** Tooltip configuration */
++  tooltip: PredictionTooltip;
++  /** Optional: predicted OHLCV candles */
++  predictedCandles?: Array<{
++    offset: number;
++    open: number;
++    high: number;
++    low: number;
++    close: number;
++    volume?: number;
++  }>;
++}
++
++// ==================== SMC Data Types ====================
++
++export interface SMCOrderBlock {
++  type: "bullish" | "bearish";
++  time: number;
++  high: number;
++  low: number;
++  open: number;
++  close: number;
++  startIndex: number;
++  endIndex: number | null;
++  mitigated: boolean;
++}
++
++export interface SMCStructureEvent {
++  time: number;
++  type: "BOS" | "CHoCH";
++  direction: "bullish" | "bearish";
++  level: number;
++  fromIndex: number;
++  toIndex: number;
++  category: "swing" | "internal";
++}
++
++export interface SMCLiquidityZone {
++  time: number;
++  type: "EQH" | "EQL";
++  level: number;
++  fromIndex: number;
++  toIndex: number;
++  category: "swing" | "internal";
++}
++
++export interface SMCFairValueGap {
++  type: "bullish" | "bearish";
++  startTime: number;
++  startIndex: number;
++  topPrice: number;
++  bottomPrice: number;
++  mitigated: boolean;
++  mitigatedIndex: number | null;
++}
++
++export interface SMCPremiumDiscount {
++  fromIndex: number;
++  toIndex: number;
++  midpoint: number;
++}
++
++export interface SMCSwing {
++  time: number;
++  price: number;
++  type: "high" | "low";
++  index: number;
++}
++
++export interface SMCData {
++  orderBlocks: SMCOrderBlock[];
++  structureEvents: SMCStructureEvent[];
++  liquidityZones: SMCLiquidityZone[];
++  fairValueGaps: SMCFairValueGap[];
++  premiumDiscount: SMCPremiumDiscount[];
++  swingsInternal: SMCSwing[];
++  swingsSwing: SMCSwing[];
++}
++
++export interface SMCMetadata {
++  totalOrderBlocks: number;
++  activeOrderBlocks: number;
++  mitigatedOrderBlocks: number;
++  totalStructureEvents: number;
++  bosCount: number;
++  chochCount: number;
++  totalLiquidityZones: number;
++  eqhCount: number;
++  eqlCount: number;
++  totalFairValueGaps: number;
++  activeFvgCount: number;
++  mitigatedFvgCount: number;
++  currentTrend: "bullish" | "bearish" | "neutral";
++  lastStructureType: "BOS" | "CHoCH" | string;
++  priceInPremium: boolean;
++  nearestSupport: number;
++  nearestResistance: number;
++}
++
++export interface SMCEntryZone {
++  type: "order_block" | "fvg" | "liquidity" | "structure";
++  price: number;
++  confidence: PredictionConfidence;
++  reason: string;
++}
++
++export interface SMCTarget {
++  level: number;
++  type:
++    | "liquidity_sweep"
++    | "structure_high"
++    | "structure_low"
++    | "fibonacci"
++    | string;
++  reason: string;
++}
++
++export interface SMCTradingSignals {
++  bias: PredictionBias;
++  strength: PredictionStrength;
++  entryZones: SMCEntryZone[];
++  stopLoss: number;
++  targets: SMCTarget[];
++  riskRewardRatio: number;
++}
++
++export interface SMCResult {
++  session_id: string;
++  question_input: string;
++  target_language: string;
++  model_name: string;
++  provider_type: string;
++  collection_name: string;
++  symbol: string;
++  interval: string;
++  mode: "swing" | "scalp" | "day" | string;
++  timestamp: number;
++  currentPrice: number;
++  smcData: SMCData;
++  metadata: SMCMetadata;
++  tradingSignals: SMCTradingSignals;
++}
++
++// ==================== Type Guards ====================
++
++export function isPredictionPayload(x: unknown): x is PredictionPayload {
++  if (typeof x !== "object" || x === null) return false;
++  const p = x as Record<string, unknown>;
++
++  return (
++    typeof p.intervalMs === "number" &&
++    typeof p.horizonCandles === "number" &&
++    (p.bias === "bullish" || p.bias === "bearish" || p.bias === "neutral") &&
++    (p.strength === "strong" ||
++      p.strength === "medium" ||
++      p.strength === "weak") &&
++    Array.isArray(p.points) &&
++    Array.isArray(p.bands) &&
++    Array.isArray(p.levels) &&
++    typeof p.tooltip === "object" &&
++    p.tooltip !== null
++  );
++}
++
++export function isSMCResult(x: unknown): x is SMCResult {
++  if (typeof x !== "object" || x === null) return false;
++  const s = x as Record<string, unknown>;
++
++  return (
++    typeof s.symbol === "string" &&
++    typeof s.interval === "string" &&
++    typeof s.timestamp === "number" &&
++    typeof s.currentPrice === "number" &&
++    typeof s.smcData === "object" &&
++    s.smcData !== null &&
++    typeof s.metadata === "object" &&
++    s.metadata !== null &&
++    typeof s.tradingSignals === "object" &&
++    s.tradingSignals !== null
++  );
++}
++
++// ==================== View Ref Methods ====================
++
+ export interface RNKLineViewRef {
+   /**
+    * Replace the whole dataset (reset all candles).
+@@ -42,6 +289,17 @@ export interface RNKLineViewRef {
+    * Replace the last candle (or append if the dataset is empty).
+    */
+   updateLastCandle: (candle: Candle) => void;
++
++  /**
++   * Set price prediction overlay (confidence cone + mean line + levels).
++   * Prediction anchors at current last candle index and stays fixed when new candles append.
++   */
++  setPrediction: (payload: PredictionPayload) => void;
++
++  /**
++   * Clear the price prediction overlay.
++   */
++  clearPrediction: () => void;
+ }
+ 
+ declare const RNKLineView: React.ForwardRefExoticComponent<
+diff --git a/index.js b/index.js
+index c29d126..eec0c72 100644
+--- a/index.js
++++ b/index.js
+@@ -66,6 +66,9 @@ const RNKLineView = forwardRef((props, ref) => {
+     appendCandle: (candle) => runCommand(nativeRef, "appendCandle", candle),
+     updateLastCandle: (candle) =>
+       runCommand(nativeRef, "updateLastCandle", candle),
++    setPrediction: (payload) =>
++      runCommand(nativeRef, "setPrediction", JSON.stringify(payload)),
++    clearPrediction: () => runCommand(nativeRef, "clearPrediction", null),
+   }));
+ 
+   return <NativeRNKLineView ref={nativeRef} {...props} />;
+diff --git a/ios/Classes/HTKLineContainerView.swift b/ios/Classes/HTKLineContainerView.swift
+index 4289af7..d22ea56 100644
+--- a/ios/Classes/HTKLineContainerView.swift
++++ b/ios/Classes/HTKLineContainerView.swift
+@@ -17,6 +17,11 @@ class HTKLineContainerView: UIView {
+     
+     @objc var onDrawPointComplete: RCTBubblingEventBlock?
+     
++    // ----- Price Prediction State -----
++    var predictionData: [String: Any]? = nil
++    var predictionAnchorIndex: Int = -1
++    var tooltipOverlay: UIView? = nil
++
+     @objc var optionList: String? {
+         didSet {
+             guard let optionList = optionList else {
+@@ -92,6 +97,27 @@ class HTKLineContainerView: UIView {
+     }
+ 
+ 
++    // ----- Price Prediction Methods -----
++    func setPrediction(_ data: [String: Any]) {
++        self.predictionData = data
++        // Capture anchor index at the moment prediction is set
++        self.predictionAnchorIndex = max(0, configManager.modelArray.count - 1)
++        print("[HTKLineContainerView][iOS] setPrediction: anchorIndex=\(predictionAnchorIndex), hasData=\(data.count > 0)")
++        // TODO: Calculate prediction min/max for Y-axis rescale
++        // TODO: Integrate into draw cycle
++        setNeedsDisplay()
++    }
++
++    func clearPrediction() {
++        self.predictionData = nil
++        self.predictionAnchorIndex = -1
++        self.tooltipOverlay?.removeFromSuperview()
++        self.tooltipOverlay = nil
++        print("[HTKLineContainerView][iOS] clearPrediction called")
++        setNeedsDisplay()
++    }
++
++
+     lazy var klineView: HTKLineView = {
+         let klineView = HTKLineView.init(CGRect.zero, configManager)
+         return klineView
+diff --git a/ios/Classes/RNKLineView.swift b/ios/Classes/RNKLineView.swift
+index 8fa46c3..c1461af 100644
+--- a/ios/Classes/RNKLineView.swift
++++ b/ios/Classes/RNKLineView.swift
+@@ -115,4 +115,68 @@ class RNKLineView: RCTViewManager {
+         }
+     }
+ 
++    // ----- Price Prediction Commands -----
++    @objc func setPrediction(_ reactTag: NSNumber, payload: NSString) {
++        let uiManager = bridge.uiManager
++        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
++            guard let self = self else {
++                print("🚨 [Pods RNKLineView] setPrediction self deallocated for tag:", reactTag)
++                return
++            }
++
++            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
++            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
++            let view = viewFromRegistry ?? viewDirect
++
++            if view == nil {
++                if let existing = viewRegistry?[reactTag] {
++                    print("🚨 [Pods RNKLineView] setPrediction found view but wrong type: \(type(of: existing)) for tag:", reactTag)
++                } else {
++                    print("🚨 [Pods RNKLineView] setPrediction no view for tag:", reactTag)
++                }
++                return
++            }
++
++            // Parse JSON string to dictionary
++            if let jsonData = (payload as String).data(using: .utf8) {
++                do {
++                    if let dict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
++                        print("[RNKLineView][iOS] setPrediction: parsed payload")
++                        view?.setPrediction(dict)
++                    } else {
++                        print("🚨 [Pods RNKLineView] setPrediction: JSON is not a dictionary")
++                    }
++                } catch {
++                    print("🚨 [Pods RNKLineView] setPrediction: JSON parse error:", error)
++                }
++            }
++        }
++    }
++
++    @objc func clearPrediction(_ reactTag: NSNumber) {
++        let uiManager = bridge.uiManager
++        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
++            guard let self = self else {
++                print("🚨 [Pods RNKLineView] clearPrediction self deallocated for tag:", reactTag)
++                return
++            }
++
++            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
++            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
++            let view = viewFromRegistry ?? viewDirect
++
++            if view == nil {
++                if let existing = viewRegistry?[reactTag] {
++                    print("🚨 [Pods RNKLineView] clearPrediction found view but wrong type: \(type(of: existing)) for tag:", reactTag)
++                } else {
++                    print("🚨 [Pods RNKLineView] clearPrediction no view for tag:", reactTag)
++                }
++                return
++            }
++
++            print("[RNKLineView][iOS] clearPrediction called")
++            view?.clearPrediction()
++        }
++    }
++
+ }

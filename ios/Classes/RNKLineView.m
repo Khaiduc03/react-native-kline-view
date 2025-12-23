@@ -16,5 +16,9 @@ RCT_EXTERN_METHOD(setData:(nonnull NSNumber *)reactTag candles:(NSArray *)candle
 RCT_EXTERN_METHOD(appendCandle:(nonnull NSNumber *)reactTag candle:(NSDictionary *)candle)
 RCT_EXTERN_METHOD(updateLastCandle:(nonnull NSNumber *)reactTag candle:(NSDictionary *)candle)
 
+// Price Prediction Methods
+RCT_EXTERN_METHOD(setPrediction:(nonnull NSNumber *)reactTag payload:(NSString *)payload)
+RCT_EXTERN_METHOD(clearPrediction:(nonnull NSNumber *)reactTag)
+
 @end
 

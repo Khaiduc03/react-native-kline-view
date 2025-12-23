@@ -66,15 +66,21 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
     private static final int COMMAND_SET_DATA = 1;
     private static final int COMMAND_APPEND_CANDLE = 2;
     private static final int COMMAND_UPDATE_LAST_CANDLE = 3;
+    private static final int COMMAND_SET_PREDICTION = 4;
+    private static final int COMMAND_CLEAR_PREDICTION = 5;
 
   private static final String COMMAND_SET_DATA_NAME = "setData";
   private static final String COMMAND_APPEND_CANDLE_NAME = "appendCandle";
   private static final String COMMAND_UPDATE_LAST_CANDLE_NAME = "updateLastCandle";
+  private static final String COMMAND_SET_PREDICTION_NAME = "setPrediction";
+  private static final String COMMAND_CLEAR_PREDICTION_NAME = "clearPrediction";
     public Map<String, Integer> getCommandsMap() {
         Map<String, Integer> map = new HashMap<>();
         map.put("setData", COMMAND_SET_DATA);
         map.put("appendCandle", COMMAND_APPEND_CANDLE);
         map.put("updateLastCandle", COMMAND_UPDATE_LAST_CANDLE);
+        map.put("setPrediction", COMMAND_SET_PREDICTION);
+        map.put("clearPrediction", COMMAND_CLEAR_PREDICTION);
         return map;
     }
 public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, @androidx.annotation.Nullable final ReadableArray args) {
@@ -186,6 +192,45 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 }).start();
                 return;
             }
+
+            case COMMAND_SET_PREDICTION: {
+                if (args == null || args.size() == 0 || args.isNull(0)) {
+                    Log.w(TAG, "setPrediction: args empty or null");
+                    return;
+                }
+                final String jsonPayload = args.getString(0);
+                if (jsonPayload == null) {
+                    Log.w(TAG, "setPrediction: payload is null");
+                    return;
+                }
+                Log.i(TAG, "setPrediction: payload length=" + jsonPayload.length());
+                
+                // Parse JSON and dispatch to container on UI thread
+                root.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            int disableDecimalFeature = JSON.DEFAULT_PARSER_FEATURE & ~Feature.UseBigDecimal.getMask();
+                            Map predictionData = (Map)JSON.parse(jsonPayload, disableDecimalFeature);
+                            root.setPrediction(predictionData);
+                        } catch (Exception e) {
+                            Log.e(TAG, "setPrediction: failed to parse JSON", e);
+                        }
+                    }
+                });
+                return;
+            }
+
+            case COMMAND_CLEAR_PREDICTION: {
+                Log.i(TAG, "clearPrediction called");
+                root.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        root.clearPrediction();
+                    }
+                });
+                return;
+            }
         }
     }
 
@@ -201,6 +246,12 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 return;
             case "updateLastCandle":
                 receiveCommand(root, COMMAND_UPDATE_LAST_CANDLE, args);
+                return;
+            case "setPrediction":
+                receiveCommand(root, COMMAND_SET_PREDICTION, args);
+                return;
+            case "clearPrediction":
+                receiveCommand(root, COMMAND_CLEAR_PREDICTION, args);
                 return;
             default:
                 return;

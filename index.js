@@ -66,6 +66,9 @@ const RNKLineView = forwardRef((props, ref) => {
     appendCandle: (candle) => runCommand(nativeRef, "appendCandle", candle),
     updateLastCandle: (candle) =>
       runCommand(nativeRef, "updateLastCandle", candle),
+    setPrediction: (payload) =>
+      runCommand(nativeRef, "setPrediction", JSON.stringify(payload)),
+    clearPrediction: () => runCommand(nativeRef, "clearPrediction", null),
   }));
 
   return <NativeRNKLineView ref={nativeRef} {...props} />;

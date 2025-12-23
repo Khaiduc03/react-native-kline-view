@@ -115,4 +115,68 @@ class RNKLineView: RCTViewManager {
         }
     }
 
+    // ----- Price Prediction Commands -----
+    @objc func setPrediction(_ reactTag: NSNumber, payload: NSString) {
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
+            guard let self = self else {
+                print("🚨 [Pods RNKLineView] setPrediction self deallocated for tag:", reactTag)
+                return
+            }
+
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+
+            if view == nil {
+                if let existing = viewRegistry?[reactTag] {
+                    print("🚨 [Pods RNKLineView] setPrediction found view but wrong type: \(type(of: existing)) for tag:", reactTag)
+                } else {
+                    print("🚨 [Pods RNKLineView] setPrediction no view for tag:", reactTag)
+                }
+                return
+            }
+
+            // Parse JSON string to dictionary
+            if let jsonData = (payload as String).data(using: .utf8) {
+                do {
+                    if let dict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                        print("[RNKLineView][iOS] setPrediction: parsed payload")
+                        view?.setPrediction(dict)
+                    } else {
+                        print("🚨 [Pods RNKLineView] setPrediction: JSON is not a dictionary")
+                    }
+                } catch {
+                    print("🚨 [Pods RNKLineView] setPrediction: JSON parse error:", error)
+                }
+            }
+        }
+    }
+
+    @objc func clearPrediction(_ reactTag: NSNumber) {
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
+            guard let self = self else {
+                print("🚨 [Pods RNKLineView] clearPrediction self deallocated for tag:", reactTag)
+                return
+            }
+
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+
+            if view == nil {
+                if let existing = viewRegistry?[reactTag] {
+                    print("🚨 [Pods RNKLineView] clearPrediction found view but wrong type: \(type(of: existing)) for tag:", reactTag)
+                } else {
+                    print("🚨 [Pods RNKLineView] clearPrediction no view for tag:", reactTag)
+                }
+                return
+            }
+
+            print("[RNKLineView][iOS] clearPrediction called")
+            view?.clearPrediction()
+        }
+    }
+
 }

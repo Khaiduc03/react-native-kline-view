@@ -17,6 +17,11 @@ class HTKLineContainerView: UIView {
     
     @objc var onDrawPointComplete: RCTBubblingEventBlock?
     
+    // ----- Price Prediction State -----
+    var predictionData: [String: Any]? = nil
+    var predictionAnchorIndex: Int = -1
+    var tooltipOverlay: UIView? = nil
+
     @objc var optionList: String? {
         didSet {
             guard let optionList = optionList else {
@@ -89,6 +94,42 @@ class HTKLineContainerView: UIView {
                 self.reloadConfigManager(self.configManager)
             }
         }
+    }
+
+
+    // ----- Price Prediction Methods -----
+    func setPrediction(_ data: [String: Any]) {
+        self.predictionData = data
+        // Capture anchor index at the moment prediction is set
+        self.predictionAnchorIndex = max(0, configManager.modelArray.count - 1)
+        
+        // Extract horizon candles from prediction data
+        let horizonCandles = data["horizonCandles"] as? Int ?? 24
+        
+        // Add extra blank space to allow scrolling to see prediction
+        configManager.rightOffsetCandles = horizonCandles + 6
+        
+        // Reload content size and auto-scroll
+        klineView.reloadContentSize()
+        let targetOffset = klineView.contentSize.width - klineView.bounds.width * 0.7
+        klineView.reloadContentOffset(targetOffset, true)
+        
+        print("[HTKLineContainerView][iOS] setPrediction: anchorIndex=\(predictionAnchorIndex), horizonCandles=\(horizonCandles)")
+        setNeedsDisplay()
+    }
+
+    func clearPrediction() {
+        self.predictionData = nil
+        self.predictionAnchorIndex = -1
+        self.tooltipOverlay?.removeFromSuperview()
+        self.tooltipOverlay = nil
+        
+        // Reset right offset when clearing prediction
+        configManager.rightOffsetCandles = 0
+        klineView.reloadContentSize()
+        
+        print("[HTKLineContainerView][iOS] clearPrediction called")
+        setNeedsDisplay()
     }
 
 

@@ -215,7 +215,22 @@ class HTKLineView: UIScrollView {
         }
 
         calculateBaseHeight()
+        
         contextTranslate(context, CGFloat(visibleRange.lowerBound) * configManager.itemWidth, { context in
+            // ===== DRAW PREDICTION OVERLAY (UNDER CANDLES) =====
+            // Draw prediction BEFORE candles so it appears underneath
+            if let container = superview as? HTKLineContainerView {
+                HTPredictionDraw.drawPrediction(
+                    in: context,
+                    container: container,
+                    chartView: self,
+                    baseY: mainBaseY,
+                    height: mainHeight,
+                    configManager: configManager
+                )
+            }
+            // ===== END PREDICTION DRAWING =====
+            
             drawCandle(context)
         })
 
@@ -404,8 +419,63 @@ class HTKLineView: UIScrollView {
         } else {
             mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
         }
+        
+        // Draw prediction price labels on Y-axis
+        if let container = superview as? HTKLineContainerView,
+           let predictionData = container.predictionData,
+           let points = predictionData["points"] as? [[String: Any]],
+           let firstPoint = points.first,
+           let startPrice = firstPoint["price"] as? CGFloat {
+            
+            let font = UIFont.boldSystemFont(ofSize: 12)
+            let padding: CGFloat = 6
+            let cornerRadius: CGFloat = 4
+            
+            // Bullish endpoint (+9%)
+            let bullishEndPrice = startPrice * 1.09
+            let bullishY = alignToPixel(yFromValue(bullishEndPrice))
+            let bullishText = String(format: "%.2f", bullishEndPrice)
+            let bullishColor = UIColor(red: 0.30, green: 0.69, blue: 0.31, alpha: 1.0)
+            drawPriceLabelOnAxis(context: context, text: bullishText, y: bullishY, 
+                                baseX: baseX, font: font, backgroundColor: bullishColor, padding: padding, cornerRadius: cornerRadius)
+            
+            // Bearish endpoint (-9%)
+            let bearishEndPrice = startPrice * 0.91
+            let bearishY = alignToPixel(yFromValue(bearishEndPrice))
+            let bearishText = String(format: "%.2f", bearishEndPrice)
+            let bearishColor = UIColor(red: 1.0, green: 0.27, blue: 0.27, alpha: 1.0)
+            drawPriceLabelOnAxis(context: context, text: bearishText, y: bearishY,
+                                baseX: baseX, font: font, backgroundColor: bearishColor, padding: padding, cornerRadius: cornerRadius)
+        }
+        
         volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
         childDraw?.drawValue(childMinMaxRange.upperBound, childMinMaxRange.lowerBound, baseX, childBaseY, childHeight, context, configManager)
+    }
+    
+    /// Helper to draw price label with background on Y-axis
+    private func drawPriceLabelOnAxis(context: CGContext, text: String, y: CGFloat, baseX: CGFloat, 
+                                      font: UIFont, backgroundColor: UIColor, padding: CGFloat, cornerRadius: CGFloat) {
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.white
+        ]
+        let textSize = (text as NSString).size(withAttributes: textAttributes)
+        
+        let rectWidth = textSize.width + padding * 2
+        let rectHeight = textSize.height + padding * 2
+        let rectX = baseX - rectWidth - 4
+        let rectY = y - rectHeight / 2
+        
+        let backgroundRect = CGRect(x: rectX, y: rectY, width: rectWidth, height: rectHeight)
+        let path = UIBezierPath(roundedRect: backgroundRect, cornerRadius: cornerRadius)
+        
+        context.setFillColor(backgroundColor.cgColor)
+        context.addPath(path.cgPath)
+        context.fillPath()
+        
+        let textX = rectX + padding
+        let textY = rectY + padding
+        (text as NSString).draw(at: CGPoint(x: textX, y: textY), withAttributes: textAttributes)
     }
 
     // MARK: - Time labels (đã chỉnh để khớp vạch dọc & thưa)

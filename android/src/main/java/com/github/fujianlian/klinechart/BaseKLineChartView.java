@@ -275,6 +275,20 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         canvas.scale(1, 1);
         drawGird(canvas);
         if (mItemCount > 0) {
+            // ===== DRAW PREDICTION OVERLAY (UNDER CANDLES) =====
+            // Get container view to access prediction data
+            try {
+                android.view.ViewParent parent = getParent();
+                if (parent instanceof com.github.fujianlian.klinechart.container.HTKLineContainerView) {
+                    com.github.fujianlian.klinechart.container.HTKLineContainerView container = 
+                        (com.github.fujianlian.klinechart.container.HTKLineContainerView) parent;
+                    com.github.fujianlian.klinechart.draw.HTPredictionDraw.drawPrediction(canvas, container, this);
+                }
+            } catch (Exception e) {
+                android.util.Log.e("BaseKLineChartView", "Error drawing prediction", e);
+            }
+            // ===== END PREDICTION DRAWING =====
+            
             drawK(canvas);
             drawText(canvas);
             drawMaxAndMin(canvas);
