@@ -24,6 +24,9 @@ import {
   PixelRatio,
 } from 'react-native';
 import RNKLineView, {
+  PredictionPayload,
+  SMCEntryZone,
+  SMCResult,
   type Candle,
   type DrawItemCompleteEvent,
   type DrawItemTouchEvent,
@@ -617,6 +620,304 @@ const DrawToolHelper = {
     }
     return 0;
   },
+};
+
+// Assuming these types are defined elsewhere or will be added at the top of the file
+// import { PredictionPayload, SMCResult } from './types';
+// import SMC_DEMO_JSON from './smc_demo.json';
+
+// ==================== Mock SMC Demo Data ====================
+
+const smcDemoJson: SMCResult = {
+  session_id: 'demo-session-001',
+  question_input: 'Demo price prediction',
+  target_language: 'en',
+  model_name: 'gpt-4',
+  provider_type: 'openai',
+  collection_name: 'demo',
+  symbol: 'BTCUSDT',
+  interval: '1h',
+  mode: 'swing',
+  timestamp: Date.now(),
+  currentPrice: 50000,
+  smcData: {
+    orderBlocks: [
+      {
+        type: 'bullish',
+        time: Date.now() - 3600000 * 10,
+        high: 48800,
+        low: 48200,
+        open: 48300,
+        close: 48700,
+        startIndex: 0,
+        endIndex: 5,
+        mitigated: false,
+      },
+    ],
+    structureEvents: [
+      {
+        time: Date.now() - 3600000 * 5,
+        type: 'BOS',
+        direction: 'bullish',
+        level: 49500,
+        fromIndex: 0,
+        toIndex: 10,
+        category: 'swing',
+      },
+    ],
+    liquidityZones: [
+      {
+        time: Date.now() - 3600000 * 8,
+        type: 'EQH',
+        level: 53000,
+        fromIndex: 5,
+        toIndex: 12,
+        category: 'swing',
+      },
+    ],
+    fairValueGaps: [
+      {
+        type: 'bullish',
+        startTime: Date.now() - 3600000 * 6,
+        startIndex: 8,
+        topPrice: 49200,
+        bottomPrice: 48900,
+        mitigated: false,
+        mitigatedIndex: null,
+      },
+    ],
+    premiumDiscount: [
+      {
+        fromIndex: 0,
+        toIndex: 20,
+        midpoint: 50500,
+      },
+    ],
+    swingsInternal: [
+      {
+        time: Date.now() - 3600000 * 12,
+        price: 48000,
+        type: 'low',
+        index: 2,
+      },
+      {
+        time: Date.now() - 3600000 * 6,
+        price: 51000,
+        type: 'high',
+        index: 10,
+      },
+    ],
+    swingsSwing: [
+      {
+        time: Date.now() - 3600000 * 24,
+        price: 47000,
+        type: 'low',
+        index: 0,
+      },
+    ],
+  },
+  metadata: {
+    totalOrderBlocks: 1,
+    activeOrderBlocks: 1,
+    mitigatedOrderBlocks: 0,
+    totalStructureEvents: 1,
+    bosCount: 1,
+    chochCount: 0,
+    totalLiquidityZones: 1,
+    eqhCount: 1,
+    eqlCount: 0,
+    totalFairValueGaps: 1,
+    activeFvgCount: 1,
+    mitigatedFvgCount: 0,
+    currentTrend: 'bullish',
+    lastStructureType: 'BOS',
+    priceInPremium: false,
+    nearestSupport: 48000,
+    nearestResistance: 53000,
+  },
+  tradingSignals: {
+    bias: 'bullish',
+    strength: 'medium',
+    entryZones: [
+      {
+        type: 'order_block',
+        price: 48500,
+        confidence: 'high',
+        reason: 'Strong bullish order block with previous reaction',
+      },
+      {
+        type: 'fvg',
+        price: 49000,
+        confidence: 'medium',
+        reason: 'Fair value gap providing secondary entry opportunity',
+      },
+    ],
+    targets: [
+      {
+        level: 52000,
+        type: 'structure_high',
+        reason: 'Previous swing high acting as supply zone',
+      },
+      {
+        level: 54000,
+        type: 'liquidity_sweep',
+        reason: 'Major liquidity zone from weekly timeframe',
+      },
+      {
+        level: 56000,
+        type: 'fibonacci',
+        reason: 'Extended target at 1.618 Fibonacci extension',
+      },
+    ],
+    stopLoss: 47500,
+    riskRewardRatio: 2.8,
+  },
+};
+
+// ==================== Prediction Builder ====================
+
+const buildPredictionPayload = (smcResult: SMCResult): PredictionPayload => {
+  const { interval, currentPrice, tradingSignals, metadata } = smcResult;
+
+  // Map interval to milliseconds
+  const intervalMs = (() => {
+    switch (interval) {
+      case '1m':
+        return 60000;
+      case '3m':
+        return 180000;
+      case '5m':
+        return 300000;
+      case '15m':
+        return 900000;
+      case '30m':
+        return 1800000;
+      case '1h':
+        return 3600000;
+      case '4h':
+        return 14400000;
+      case '1d':
+        return 86400000;
+      case '1w':
+        return 604800000;
+      default:
+        return 3600000; // Default 1h
+    }
+  })();
+
+  // Calculate horizon candles based on interval
+  const horizonCandles = (() => {
+    if (intervalMs <= 900000) return 48; // <=15m
+    if (intervalMs === 3600000) return 24; // 1h
+    return 12; // 4h, 1d
+  })();
+
+  // Build levels from SMC data
+  const levels: PredictionPayload['levels'] = [
+    { type: 'SL', price: tradingSignals.stopLoss, label: 'Stop Loss' },
+    { type: 'SUP', price: metadata.nearestSupport, label: 'Support' },
+    { type: 'RES', price: metadata.nearestResistance, label: 'Resistance' },
+  ];
+
+  // Add entry zone as ENTRY level (prefer high confidence)
+  const bestEntry =
+    tradingSignals.entryZones.find(
+      (z: SMCEntryZone) => z.confidence === 'high',
+    ) || tradingSignals.entryZones[0];
+  if (bestEntry) {
+    levels.push({ type: 'ENTRY', price: bestEntry.price, label: 'Entry' });
+  }
+
+  // Add targets as TP1, TP2, TP3...
+  tradingSignals.targets.forEach((target: any, idx: number) => {
+    const tpType = `TP${idx + 1}` as 'TP1' | 'TP2' | 'TP3';
+    levels.push({
+      type: tpType,
+      price: target.level,
+      label: `Target ${idx + 1}`,
+    });
+  });
+
+  // Build mean line points
+  const isBullish = tradingSignals.bias === 'bullish';
+  const entryPrice = bestEntry?.price || currentPrice;
+  const tp1 = tradingSignals.targets[0]?.level || currentPrice;
+  const tp2 = tradingSignals.targets[1]?.level || tp1;
+
+  const points: PredictionPayload['points'] = [];
+  points.push({ offset: 0, price: currentPrice });
+
+  if (isBullish) {
+    // Dip towards entry around offset 6-10
+    points.push({ offset: 6, price: (currentPrice + entryPrice) / 2 });
+    points.push({ offset: 10, price: entryPrice });
+    // Rise to TP1
+    points.push({ offset: Math.floor(horizonCandles * 0.5), price: tp1 });
+    // Rise to TP2 by horizon
+    points.push({ offset: horizonCandles, price: tp2 });
+  } else {
+    // Bearish: rise towards entry, then fall to targets
+    points.push({ offset: 6, price: (currentPrice + entryPrice) / 2 });
+    points.push({ offset: 10, price: entryPrice });
+    points.push({ offset: Math.floor(horizonCandles * 0.5), price: tp1 });
+    points.push({ offset: horizonCandles, price: tp2 });
+  }
+
+  // Build confidence cone bands
+  const slPrice = tradingSignals.stopLoss;
+  const supPrice = metadata.nearestSupport;
+  const resPrice = metadata.nearestResistance;
+  const lastTarget =
+    tradingSignals.targets[tradingSignals.targets.length - 1]?.level || tp2;
+
+  const bands: PredictionPayload['bands'] = [];
+  const segmentCount = 4;
+  for (let i = 0; i < segmentCount; i++) {
+    const startOffset = Math.floor((i * horizonCandles) / segmentCount);
+    const endOffset = Math.floor(((i + 1) * horizonCandles) / segmentCount);
+    const widthFactor = (i + 1) / segmentCount;
+
+    if (isBullish) {
+      const baseBottom = Math.max(slPrice, supPrice);
+      const baseTop = Math.max(resPrice, lastTarget);
+      const bottom = baseBottom - baseBottom * 0.02 * widthFactor;
+      const top = baseTop + baseTop * 0.02 * widthFactor;
+      bands.push({ startOffset, endOffset, bottom, top });
+    } else {
+      const baseTop = Math.min(slPrice, supPrice);
+      const baseBottom = Math.min(resPrice, lastTarget);
+      const bottom = baseBottom - baseBottom * 0.02 * widthFactor;
+      const top = baseTop + baseTop * 0.02 * widthFactor;
+      bands.push({
+        startOffset,
+        endOffset,
+        bottom: Math.min(bottom, top),
+        top: Math.max(bottom, top),
+      });
+    }
+  }
+
+  // Build tooltip
+  const tooltip: PredictionPayload['tooltip'] = {
+    question:
+      bestEntry?.reason ||
+      tradingSignals.targets[0]?.reason ||
+      'Price prediction based on SMC analysis',
+    subtitle: `${tradingSignals.bias.toUpperCase()} | ${
+      tradingSignals.strength
+    } | R:R ${tradingSignals.riskRewardRatio.toFixed(1)}`,
+  };
+
+  return {
+    intervalMs,
+    horizonCandles,
+    bias: tradingSignals.bias,
+    strength: tradingSignals.strength,
+    points,
+    bands,
+    levels,
+    tooltip,
+  };
 };
 
 // ==================== Pure Functions ====================
@@ -1328,6 +1629,48 @@ const KLineScreen: React.FC = () => {
     kLineViewRef.current?.setData?.([]);
   }, []);
 
+  const handleLoadPredictionDemo = useCallback(() => {
+    try {
+      // Validate SMC JSON with type guard (runtime validation)
+      console.log('Loading prediction demo with SMC data...');
+
+      // Build prediction payload from SMC data
+      const predictionPayload = buildPredictionPayload(smcDemoJson);
+      console.log(
+        'Built prediction payload:',
+        JSON.stringify(predictionPayload, null, 2),
+      );
+
+      // Load mock candles first
+      const mockCandles = generateMockData();
+      const processedData = processKLineData(
+        mockCandles,
+        getTargetList(selectedMainIndicator, selectedSubIndicator),
+        isDarkTheme,
+        isMASelected,
+        isBOLLSelected,
+        isMACDSelected,
+        isKDJSelected,
+        isRSISelected,
+        isWRSelected,
+      );
+
+      //kLineViewRef.current?.setData?.(processedData);
+
+      // Set prediction overlay
+      kLineViewRef.current?.setPrediction?.(predictionPayload);
+
+      console.log('Prediction demo loaded successfully');
+    } catch (error) {
+      console.error('Error loading prediction demo:', error);
+    }
+  }, [
+    selectedMainIndicator,
+    selectedSubIndicator,
+    selectedTimeType,
+    isDarkTheme,
+  ]);
+
   // Update StatusBar when theme changes
   useEffect(() => {
     StatusBar.setBarStyle(isDarkTheme ? 'light-content' : 'dark-content', true);
@@ -1858,19 +2201,12 @@ const KLineScreen: React.FC = () => {
   const renderKLineChart = () => {
     const directRender = (
       <RNKLineView
-        // @ts-ignore - RNKLineView ref is handled internally
         ref={handleKLineRef}
         style={styles.chart}
         optionList={optionListString}
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}
-        customIndicatorOffset={500} // Candle index where indicator should appear
-        customIndicatorView={
-          <View style={{ width: 50, height: 200, backgroundColor: 'red' }}>
-            <Text>Custom Indicator</Text>
-          </View>
-        }
       />
     );
     if (
@@ -1968,6 +2304,14 @@ const KLineScreen: React.FC = () => {
           disabled={!isKLineReady}
         >
           <Text style={styles.realtimeButtonText}>Update Last</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.realtimeButton, { backgroundColor: '#4CAF50' }]}
+          onPress={handleLoadPredictionDemo}
+          disabled={!isKLineReady}
+        >
+          <Text style={styles.realtimeButtonText}>Prediction</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
