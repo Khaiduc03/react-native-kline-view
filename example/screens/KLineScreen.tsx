@@ -31,6 +31,7 @@ import RNKLineView, {
   type RNKLineViewRef,
 } from 'react-native-kline-view';
 import { runSMCStrategyLux, SMCResult } from './smc-strategy';
+import { fetchBinanceKLineData } from './BinanceService';
 
 // ==================== Type Definitions ====================
 
@@ -121,6 +122,12 @@ interface DrawList {
   shouldClearDraw: boolean;
 }
 
+interface PredictionTarget {
+  value: number;
+  type: string;
+  color: number;
+}
+
 interface ConfigList {
   colorList: {
     increaseColor: number;
@@ -166,6 +173,7 @@ interface ConfigList {
   panelMinWidth: number;
   fontFamily: string;
   closePriceRightLightLottieSource: string;
+  rightOffsetCandles?: number;
 }
 
 interface KLineOptionList {
@@ -179,6 +187,8 @@ interface KLineOptionList {
   time: number;
   configList: ConfigList;
   drawList: DrawList;
+  predictionList?: PredictionTarget[];
+  predictionStartTime?: number;
 }
 
 interface Theme {
@@ -295,6 +305,7 @@ const calculateMACD = (
   l = 26,
   m = 9,
 ): KLineModel[] => {
+  if (!data || data.length === 0) return [];
   let ema12 = data[0].close;
   let ema26 = data[0].close;
   let dea = 0;
@@ -1021,73 +1032,75 @@ const processKLineData = (
     isWRSelected,
   );
 
-  return processedData.map(item => {
-    // Time formatting
-    const time = formatTime(item.id, 'MM-DD HH:mm');
+  return processedData
+    .filter(item => !!item)
+    .map(item => {
+      // Time formatting
+      const time = formatTime(item.id, 'MM-DD HH:mm');
 
-    // Calculate Change and Change %
-    const appendValue = item.close - item.open;
-    const appendPercent = (appendValue / item.open) * 100;
-    const isAppend = appendValue >= 0;
-    const prefixString = isAppend ? '+' : '-';
-    const appendValueString =
-      prefixString + fixRound(Math.abs(appendValue), priceCount, true, false);
-    const appendPercentString =
-      prefixString + fixRound(Math.abs(appendPercent), 2, true, false) + '%';
+      // Calculate Change and Change %
+      const appendValue = item.close - item.open;
+      const appendPercent = (appendValue / item.open) * 100;
+      const isAppend = appendValue >= 0;
+      const prefixString = isAppend ? '+' : '-';
+      const appendValueString =
+        prefixString + fixRound(Math.abs(appendValue), priceCount, true, false);
+      const appendPercentString =
+        prefixString + fixRound(Math.abs(appendPercent), 2, true, false) + '%';
 
-    // Color configuration
-    const theme = ThemeManager.getCurrentTheme(isDarkTheme);
-    const colorValue = isAppend
-      ? processColor(theme.increaseColor)
-      : processColor(theme.decreaseColor);
-    const color: number | undefined =
-      colorValue !== null && colorValue !== undefined
-        ? toColorNumber(colorValue)
-        : undefined;
+      // Color configuration
+      const theme = ThemeManager.getCurrentTheme(isDarkTheme);
+      const colorValue = isAppend
+        ? processColor(theme.increaseColor)
+        : processColor(theme.decreaseColor);
+      const color: number | undefined =
+        colorValue !== null && colorValue !== undefined
+          ? toColorNumber(colorValue)
+          : undefined;
 
-    // Add formatted fields
-    item.dateString = `${time}`;
-    item.selectedItemList = [
-      { title: FORMAT('Time'), detail: `${time}` },
-      {
-        title: FORMAT('Open'),
-        detail: fixRound(item.open, priceCount, true, false),
-      },
-      {
-        title: FORMAT('High'),
-        detail: fixRound(item.high, priceCount, true, false),
-      },
-      {
-        title: FORMAT('Low'),
-        detail: fixRound(item.low, priceCount, true, false),
-      },
-      {
-        title: FORMAT('Close'),
-        detail: fixRound(item.close, priceCount, true, false),
-      },
-      { title: FORMAT('Change'), detail: appendValueString, color },
-      { title: FORMAT('Change %'), detail: appendPercentString, color },
-      {
-        title: FORMAT('Volume'),
-        detail: fixRound(item.vol, volumeCount, true, false),
-      },
-    ];
+      // Add formatted fields
+      item.dateString = `${time}`;
+      item.selectedItemList = [
+        { title: FORMAT('Time'), detail: `${time}` },
+        {
+          title: FORMAT('Open'),
+          detail: fixRound(item.open, priceCount, true, false),
+        },
+        {
+          title: FORMAT('High'),
+          detail: fixRound(item.high, priceCount, true, false),
+        },
+        {
+          title: FORMAT('Low'),
+          detail: fixRound(item.low, priceCount, true, false),
+        },
+        {
+          title: FORMAT('Close'),
+          detail: fixRound(item.close, priceCount, true, false),
+        },
+        { title: FORMAT('Change'), detail: appendValueString, color },
+        { title: FORMAT('Change %'), detail: appendPercentString, color },
+        {
+          title: FORMAT('Volume'),
+          detail: fixRound(item.vol, volumeCount, true, false),
+        },
+      ];
 
-    // Add indicator display info to selectedItemList
-    addIndicatorToSelectedList(
-      item,
-      targetList,
-      priceCount,
-      isMASelected,
-      isBOLLSelected,
-      isMACDSelected,
-      isKDJSelected,
-      isRSISelected,
-      isWRSelected,
-    );
+      // Add indicator display info to selectedItemList
+      addIndicatorToSelectedList(
+        item,
+        targetList,
+        priceCount,
+        isMASelected,
+        isBOLLSelected,
+        isMACDSelected,
+        isKDJSelected,
+        isRSISelected,
+        isWRSelected,
+      );
 
-    return item;
-  });
+      return item;
+    });
 };
 
 const getTargetList = (
@@ -1141,6 +1154,8 @@ const packOptionList = (
   selectedSubIndicator: number,
   selectedTimeType: number,
   drawList: DrawList,
+  predictionList: PredictionTarget[],
+  predictionStartTime?: number,
 ): KLineOptionList => {
   const theme = ThemeManager.getCurrentTheme(isDarkTheme);
 
@@ -1269,6 +1284,7 @@ const packOptionList = (
         android: '',
       }) || '',
     closePriceRightLightLottieSource: '',
+    rightOffsetCandles: predictionList.length > 0 ? 12 : 0,
   };
 
   return {
@@ -1282,6 +1298,8 @@ const packOptionList = (
     time: TimeTypes[selectedTimeType].value,
     configList: configList,
     drawList: drawList,
+    predictionList: predictionList,
+    predictionStartTime: predictionStartTime,
   };
 };
 
@@ -1301,13 +1319,17 @@ const KLineScreen: React.FC = () => {
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [showDrawToolSelector, setShowDrawToolSelector] = useState(false);
   const [klineData, setKlineData] = useState<KLineRawPoint[]>(
-    generateMockData(),
+    [], // Start with empty data, fetch from API
   );
   const [drawShouldContinue, setDrawShouldContinue] = useState(true);
   const [drawReloadIndex, setDrawReloadIndex] = useState(
     DrawStateConstants.none,
   );
   const [drawClearFlag, setDrawClearFlag] = useState(false);
+  const [predictionList, setPredictionList] = useState<PredictionTarget[]>([]);
+  const [predictionStartTime, setPredictionStartTime] = useState<
+    number | undefined
+  >(undefined);
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
   const [isKLineReady, setIsKLineReady] = useState(false);
@@ -1319,6 +1341,66 @@ const KLineScreen: React.FC = () => {
       console.log('RNKLineView ref attached');
     }
   }, []);
+
+  // Fetch Binance Data
+  useEffect(() => {
+    const fetchBTCData = async () => {
+      // Map local TimeType index to Binance interval string
+      let interval = '1m'; // Default
+      const type = TimeTypes[selectedTimeType];
+      if (type) {
+        // Simple mapping: use label directly if it matches, else map
+        switch (type.label) {
+          case 'Intraday':
+            interval = '1m';
+            break;
+          case '1m':
+            interval = '1m';
+            break;
+          case '3m':
+            interval = '3m';
+            break;
+          case '5m':
+            interval = '5m';
+            break;
+          case '15m':
+            interval = '15m';
+            break;
+          case '30m':
+            interval = '30m';
+            break;
+          case '1h':
+            interval = '1h';
+            break;
+          case '4h':
+            interval = '4h';
+            break;
+          case '6h':
+            interval = '6h';
+            break;
+          case '1D':
+            interval = '1d';
+            break;
+          case '1W':
+            interval = '1w';
+            break;
+          case '1M':
+            interval = '1M';
+            break;
+          default:
+            interval = '1h';
+        }
+      }
+
+      console.log(`Fetching BTCUSDT data for interval: ${interval}`);
+      const data = await fetchBinanceKLineData('BTCUSDT', interval);
+      if (data && data.length > 0) {
+        setKlineData(data);
+      }
+    };
+
+    fetchBTCData();
+  }, [selectedTimeType]);
 
   // Hold the latest dataset on the JS side (useful for Phase 1 imperative updates)
   const nativeDataRef = useRef<KLineModel[]>([]);
@@ -1416,31 +1498,33 @@ const KLineScreen: React.FC = () => {
 
   const handleNativeAppend = useCallback(() => {
     const list = nativeDataRef.current;
-    if (!list.length) {
-      // If chart is empty (after reset), re-seed with mock data first
-      const seed = processKLineData(
-        generateMockData(),
-        targetList,
-        isDarkTheme,
-        isMASelected,
-        isBOLLSelected,
-        isMACDSelected,
-        isKDJSelected,
-        isRSISelected,
-        isWRSelected,
-      );
-      nativeDataRef.current = seed;
-      kLineViewRef.current?.setData?.(seed as unknown as Candle[]);
-      return;
-    }
+    if (!list.length) return;
 
     const last = list[list.length - 1];
-    const nextTime = last.time + 60 * 1000;
+
+    // Determine time interval based on selectedTimeType
+    let intervalMs = 60 * 1000; // Default 1m
+    const typeLabel = TimeTypes[selectedTimeType]?.label;
+    if (typeLabel) {
+      if (typeLabel.endsWith('m')) intervalMs = parseInt(typeLabel) * 60 * 1000;
+      else if (typeLabel.endsWith('h'))
+        intervalMs = parseInt(typeLabel) * 60 * 60 * 1000;
+      else if (typeLabel.endsWith('D'))
+        intervalMs = parseInt(typeLabel) * 24 * 60 * 60 * 1000;
+      else if (typeLabel.endsWith('W'))
+        intervalMs = parseInt(typeLabel) * 7 * 24 * 60 * 60 * 1000;
+      else if (typeLabel.endsWith('M'))
+        intervalMs = parseInt(typeLabel) * 30 * 24 * 60 * 60 * 1000; // Approx
+    }
+
+    const nextTime = last.time + intervalMs;
     const nextOpen = last.close;
-    const nextClose = nextOpen * (1 + (Math.random() - 0.5) * 0.01);
+    // Reduced volatility to 0.1%
+    const nextClose = nextOpen * (1 + (Math.random() - 0.5) * 0.001);
     const nextHigh =
-      Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.005);
-    const nextLow = Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.005);
+      Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.0005);
+    const nextLow =
+      Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.0005);
     const nextVolume = Math.max(
       1,
       Math.round((last.volume || last.vol || 1) * (0.9 + Math.random() * 0.2)),
@@ -1448,18 +1532,19 @@ const KLineScreen: React.FC = () => {
 
     const next: KLineModel = {
       ...last,
-      time: nextTime,
       id: nextTime,
+      time: nextTime,
       open: nextOpen,
+      close: nextClose,
       high: nextHigh,
       low: nextLow,
-      close: nextClose,
       volume: nextVolume,
       vol: nextVolume,
       dateString: formatTime(nextTime),
+      selectedItemList: [], // Reset selected indicators
     };
 
-    // Recompute indicators for the new dataset so MA/BOLL/MACD/etc. stay correct
+    // Recompute indicators including the new candle
     const processed = processKLineData(
       [...list, next],
       targetList,
@@ -1471,10 +1556,13 @@ const KLineScreen: React.FC = () => {
       isRSISelected,
       isWRSelected,
     );
+
+    // Update ref and native view
     nativeDataRef.current = processed;
     const latest = processed[processed.length - 1] as unknown as Candle;
     kLineViewRef.current?.appendCandle?.(latest);
   }, [
+    selectedTimeType,
     targetList,
     isDarkTheme,
     isMASelected,
@@ -1556,6 +1644,25 @@ const KLineScreen: React.FC = () => {
     console.log('Interval:', TimeTypes[selectedTimeType].label);
     console.log('Result:', JSON.stringify(smcResult.tradingSignal, null, 2));
     console.log('---------------------------');
+
+    // Generate prediction targets from SMC result
+    if (smcResult.tradingSignal?.targets) {
+      const currentPrice = inputCandles[inputCandles.length - 1].close;
+      setPredictionStartTime(inputCandles[inputCandles.length - 1].time);
+      const predictions: PredictionTarget[] =
+        smcResult.tradingSignal.targets.map(t => ({
+          value: t.level,
+          type: t.type,
+          color:
+            t.level > currentPrice
+              ? toColorNumber(processColor('#4CAF50')) // Green for bullish targets
+              : toColorNumber(processColor('#F44336')), // Red for bearish targets
+        }));
+      setPredictionList(predictions);
+    } else {
+      setPredictionList([]);
+      setPredictionStartTime(undefined);
+    }
   }, [processedKLineData, selectedTimeType]);
 
   // Derive drawList from current draw tool and theme
@@ -1592,6 +1699,8 @@ const KLineScreen: React.FC = () => {
       selectedSubIndicator,
       selectedTimeType,
       drawList,
+      predictionList,
+      predictionStartTime,
     );
   }, [
     processedKLineData,
@@ -1601,6 +1710,8 @@ const KLineScreen: React.FC = () => {
     selectedSubIndicator,
     selectedTimeType,
     drawList,
+    predictionList,
+    predictionStartTime,
   ]);
 
   // Serialize optionList to JSON string for native component

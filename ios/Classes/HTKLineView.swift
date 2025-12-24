@@ -190,7 +190,8 @@ class HTKLineView: UIScrollView {
 
     func reloadContentSize() {
         configManager.reloadScrollViewScale(scale)
-        let contentWidth = configManager.itemWidth * CGFloat(configManager.modelArray.count) + configManager.paddingRight
+        let rightOffset = CGFloat(configManager.rightOffsetCandles)
+        let contentWidth = configManager.itemWidth * (CGFloat(configManager.modelArray.count) + rightOffset) + configManager.paddingRight
         contentSize = CGSize.init(width: contentWidth, height: frame.size.height)
     }
 
@@ -226,6 +227,7 @@ class HTKLineView: UIScrollView {
 
             drawHighLow(context)
             drawTime(context)
+            drawPrediction(context)
             drawClosePrice(context)
             drawSelectedLine(context)
             drawSelectedBoard(context)
@@ -242,7 +244,15 @@ class HTKLineView: UIScrollView {
         self.allHeight = self.bounds.size.height - configManager.paddingBottom
         self.allWidth = self.bounds.size.width
 
-        self.mainMinMaxRange = mainDraw.minMaxRange(visibleModelArray, configManager)
+        var mainMinMax = mainDraw.minMaxRange(visibleModelArray, configManager)
+        // Include prediction targets in min/max range
+        for prediction in configManager.predictionList {
+            if let value = prediction["value"] as? CGFloat {
+                mainMinMax = min(mainMinMax.lowerBound, value)..<max(mainMinMax.upperBound, value)
+            }
+        }
+        self.mainMinMaxRange = mainMinMax
+
         self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
         self.mainBaseY = configManager.paddingTop - textHeight
         self.mainHeight = allHeight * volumeRange.lowerBound - mainBaseY - textHeight
@@ -479,6 +489,105 @@ class HTKLineView: UIScrollView {
         }
         drawValue(highIndex, visibleModelArray[highIndex].high)
         drawValue(lowIndex, visibleModelArray[lowIndex].low)
+    }
+
+    // MARK: - Prediction / Live Analyst
+    func drawPrediction(_ context: CGContext) {
+        guard let lastModel = configManager.modelArray.last,
+              !configManager.predictionList.isEmpty else {
+            return
+        }
+
+        let count = configManager.modelArray.count
+        
+        var targetIndex = count - 1
+        if let startTime = configManager.predictionStartTime {
+            // Find index matching startTime
+            for i in (0..<count).reversed() {
+                if configManager.modelArray[i].id <= startTime {
+                    targetIndex = i
+                    break
+                }
+            }
+        }
+        
+        let targetModel = configManager.modelArray[targetIndex]
+        
+        // X position of analysis start candle
+        let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
+        let startY = yFromValue(targetModel.close)
+
+        // X position for future target (end of prediction area)
+        // Ensure futureX starts from startX
+        let futureX = startX + CGFloat(configManager.rightOffsetCandles) * configManager.itemWidth
+
+        // Draw gradient background
+        let bgRect = CGRect(x: startX, y: mainBaseY, width: futureX - startX, height: mainHeight)
+        context.saveGState()
+        context.clip(to: bgRect)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        // Blueish gradient
+        let startColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.15).cgColor
+        let endColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.02).cgColor
+        let colors = [startColor, endColor] as CFArray
+        let locations: [CGFloat] = [0.0, 1.0]
+        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locations) {
+            context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: mainBaseY), end: CGPoint(x: startX, y: mainBaseY + mainHeight), options: [])
+        }
+        context.restoreGState()
+
+        for prediction in configManager.predictionList {
+            guard let value = prediction["value"] as? CGFloat,
+                  let colorInt = prediction["color"] as? Int,
+                  let color = RCTConvert.uiColor(colorInt) else {
+                continue
+            }
+
+            let targetY = yFromValue(value)
+
+            // 1. Draw dashed line from last candle to future target
+            context.saveGState()
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(1.5)
+            context.setLineDash(phase: 0, lengths: [6, 4])
+            context.move(to: CGPoint(x: startX, y: startY))
+            context.addLine(to: CGPoint(x: futureX, y: targetY))
+            context.strokePath()
+            context.restoreGState()
+
+            // 2. Draw colored price label on the right Y-axis (pinned to screen edge)
+            let labelText = configManager.precision(value, configManager.price)
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: UIColor.white
+            ]
+            let labelSize = (labelText as NSString).size(withAttributes: attributes)
+            let paddingX: CGFloat = 4
+            let paddingY: CGFloat = 2
+            let labelWidth = labelSize.width + paddingX * 2
+            let labelHeight = labelSize.height + paddingY * 2
+
+            // Pin label to right edge of screen
+            let labelX = allWidth - labelWidth - 2
+            let labelY = targetY - labelHeight / 2
+
+            let labelRect = CGRect(x: labelX, y: labelY, width: labelWidth, height: labelHeight)
+
+            // Draw background
+            context.saveGState()
+            context.setFillColor(color.cgColor)
+            let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            context.restoreGState()
+
+            // Draw text
+            (labelText as NSString).draw(
+                at: CGPoint(x: labelX + paddingX, y: labelY + paddingY),
+                withAttributes: attributes
+            )
+        }
     }
 
     func drawClosePrice(_ context: CGContext) {
