@@ -533,9 +533,17 @@ class HTKLineView: UIScrollView {
             }
         }
 
-        // Calculate Background Extension (Always min 10 or follows data)
-        let currentDataLen = (count - 1) - targetIndex
-        let bgExtension = max(currentDataLen, 10)
+        // Calculate Background Extension
+        // If hit: stop at hit (but min 10).
+        // If not hit: extend with data (min 10).
+        let bgExtension: Int
+        if let hit = hitIndex {
+            let hitExtension = hit - targetIndex
+            bgExtension = max(hitExtension, 10)
+        } else {
+            let currentDataLen = (count - 1) - targetIndex
+            bgExtension = max(currentDataLen, 10)
+        }
 
         // X positions
         let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x

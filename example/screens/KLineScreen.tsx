@@ -1621,13 +1621,15 @@ const KLineScreen: React.FC = () => {
   ]);
 
   const handleNativeTradingSignal = useCallback(() => {
-    if (!processedKLineData.length) {
+    // Use nativeDataRef to get the latest data including native appends
+    const currentData = nativeDataRef.current;
+    if (!currentData.length) {
       console.log('No K-line data available for strategy analysis');
       return;
     }
 
-    // Convert processedKLineData to the Candle format expected by the strategy
-    const inputCandles = processedKLineData.map(c => ({
+    // Convert to Candle format
+    const inputCandles = currentData.map(c => ({
       time: c.time,
       open: c.open,
       high: c.high,
@@ -1664,7 +1666,12 @@ const KLineScreen: React.FC = () => {
       setPredictionList([]);
       setPredictionStartTime(undefined);
     }
-  }, [processedKLineData, selectedTimeType]);
+  }, [selectedTimeType]); // removed processedKLineData dep as we use ref
+
+  const handleClearSignal = useCallback(() => {
+    setPredictionList([]);
+    setPredictionStartTime(undefined);
+  }, []);
 
   // Derive drawList from current draw tool and theme
   const drawList = useMemo(() => {
@@ -2117,6 +2124,14 @@ const KLineScreen: React.FC = () => {
           disabled={!isKLineReady}
         >
           <Text style={styles.realtimeButtonText}>Trading Signal</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.realtimeButton, { backgroundColor: '#FF5252' }]}
+          onPress={handleClearSignal}
+          disabled={!isKLineReady}
+        >
+          <Text style={styles.realtimeButtonText}>Clear Signal</Text>
         </TouchableOpacity>
       </View>
     </View>
