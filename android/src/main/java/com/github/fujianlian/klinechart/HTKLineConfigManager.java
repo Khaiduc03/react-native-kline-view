@@ -127,7 +127,6 @@ public class HTKLineConfigManager {
 
     public float closePriceRightLightLottieScale = 1;
 
-    public int rightOffsetCandles = 10;
 
     public int[] panelGradientColorList = { Color.BLUE, Color.BLUE };
 
@@ -409,13 +408,6 @@ public class HTKLineConfigManager {
         this.closePriceRightLightLottieSource = (String) configList.get("closePriceRightLightLottieSource");
         this.closePriceRightLightLottieFloder = (String) configList.get("closePriceRightLightLottieFloder");
         this.closePriceRightLightLottieScale = ((Number)configList.get("closePriceRightLightLottieScale")).floatValue();
-        
-        Object rightOffsetObj = configList.get("rightOffsetCandles");
-        if (rightOffsetObj instanceof Number) {
-            rightOffsetCandles = ((Number) rightOffsetObj).intValue();
-        } else {
-            rightOffsetCandles = 10; // Default: 10 candles for prediction area
-        }
 
         this.panelGradientColorList = parseColorList(configList.get("panelGradientColorList"));
         this.panelGradientLocationList = parseLocationList(configList.get("panelGradientLocationList"));

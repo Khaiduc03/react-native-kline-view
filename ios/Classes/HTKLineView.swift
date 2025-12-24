@@ -190,10 +190,7 @@ class HTKLineView: UIScrollView {
 
     func reloadContentSize() {
         configManager.reloadScrollViewScale(scale)
-        // Add candle-based right offset for blank space (e.g., prediction area)
-        // paddingRight is kept for label space only
-        let rightOffsetCandles = max(0, CGFloat(configManager.rightOffsetCandles))
-        let contentWidth = configManager.itemWidth * CGFloat(configManager.modelArray.count + Int(rightOffsetCandles)) + configManager.paddingRight
+        let contentWidth = configManager.itemWidth * CGFloat(configManager.modelArray.count) + configManager.paddingRight
         contentSize = CGSize.init(width: contentWidth, height: frame.size.height)
     }
 
@@ -215,22 +212,15 @@ class HTKLineView: UIScrollView {
         }
 
         calculateBaseHeight()
-        
-        // Draw grid FIRST (before candles) so it appears underneath
-        contextTranslate(context, contentOffset.x, { context in
-            drawGrid(context)
-        })
-        
-        // Draw candles AFTER grid so they appear on top
         contextTranslate(context, CGFloat(visibleRange.lowerBound) * configManager.itemWidth, { context in
             drawCandle(context)
         })
 
-        // Draw other elements (text, labels, etc.)
         contextTranslate(context, contentOffset.x, { context in
             // context.setFillColor(UIColor.red.withAlphaComponent(0.1).cgColor)
             // context.fill(CGRect.init(x: 0, y: mainBaseY, width: allWidth, height: mainHeight))
 
+            drawGrid(context)
             drawText(context)
             drawValue(context)
 
@@ -343,9 +333,8 @@ class HTKLineView: UIScrollView {
             while i <= visibleRange.upperBound {
                 let xCenter = (CGFloat(i) + 0.5) * configManager.itemWidth - contentOffset.x
                 let x = alignToPixel(xCenter)
-                // Extend vertical grid lines beyond horizontal frame boundaries
-                let startY: CGFloat = 0 // Start from top edge
-                let endY: CGFloat = bounds.size.height // Extend to bottom edge
+                let startY = mainBaseY
+                let endY = childBaseY + childHeight
                 context.move(to: CGPoint(x: x, y: startY))
                 context.addLine(to: CGPoint(x: x, y: endY))
                 context.strokePath()

@@ -837,16 +837,13 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      */
     public void notifyChanged() {
         mItemCount = configManager.modelArray.size();
-        // Add candle-based right offset for blank space (e.g., prediction area)
-        // paddingRight is kept for label space only
-        int rightOffsetCandles = Math.max(0, configManager.rightOffsetCandles);
-        mDataLen = (mItemCount + rightOffsetCandles) * mPointWidth;
+        mDataLen = mItemCount * mPointWidth;
         if (isShowChild && mChildDrawPosition == -1) {
             mChildDraw = mChildDraws.get(0);
             mChildDrawPosition = 0;
         }
         if (mItemCount != 0) {
-            mDataLen = (mItemCount + rightOffsetCandles) * mPointWidth;
+            mDataLen = mItemCount * mPointWidth;
             checkAndFixScrollX();
         }
         if (mSelectedIndex >= mItemCount) {
