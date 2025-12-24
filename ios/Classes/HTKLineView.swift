@@ -51,6 +51,12 @@ class HTKLineView: UIScrollView {
     var childMinMaxRange = Range<CGFloat>.init(uncheckedBounds: (lower: 0, upper: 0))
     var childBaseY: CGFloat  = 0
     var childHeight: CGFloat  = 0
+    
+    // Cache for prediction logic
+    private var cachedPredictionDataCount: Int = 0
+    private var cachedPredictionStartTime: Double? = nil
+    private var cachedHitIndex: Int?
+    private var cachedWinningPredictionIndex: Int?
 
     // === Grid spacing target (ô to, thưa) ===
     private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
@@ -246,6 +252,12 @@ class HTKLineView: UIScrollView {
 
         var mainMinMax = mainDraw.minMaxRange(visibleModelArray, configManager)
         // Include prediction targets in min/max range
+        if let entry = configManager.predictionEntry {
+            mainMinMax = min(mainMinMax.lowerBound, CGFloat(entry))..<max(mainMinMax.upperBound, CGFloat(entry))
+        }
+        if let sl = configManager.predictionStopLoss {
+            mainMinMax = min(mainMinMax.lowerBound, CGFloat(sl))..<max(mainMinMax.upperBound, CGFloat(sl))
+        }
         for prediction in configManager.predictionList {
             if let value = prediction["value"] as? CGFloat {
                 mainMinMax = min(mainMinMax.lowerBound, value)..<max(mainMinMax.upperBound, value)
@@ -518,19 +530,33 @@ class HTKLineView: UIScrollView {
         var hitIndex: Int?
         var winningPredictionIndex: Int?
         
-        scanLoop: for i in (targetIndex + 1)..<count {
-            let candle = configManager.modelArray[i]
-            for (pIndex, prediction) in configManager.predictionList.enumerated() {
-                if let val = prediction["value"] as? CGFloat {
-                    // Check for target hit:
-                    if (val > startPrice && candle.high >= val) ||
-                        (val < startPrice && candle.low <= val) {
-                        hitIndex = i
-                        winningPredictionIndex = pIndex
-                        break scanLoop
+        let currentStartTime = configManager.predictionStartTime
+        
+        // Use cache if available and data hasn't changed
+        if cachedPredictionDataCount == count && cachedPredictionStartTime == currentStartTime {
+            hitIndex = cachedHitIndex
+            winningPredictionIndex = cachedWinningPredictionIndex
+        } else {
+            // Re-scan
+            scanLoop: for i in (targetIndex + 1)..<count {
+                let candle = configManager.modelArray[i]
+                for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                    if let val = prediction["value"] as? CGFloat {
+                        // Check for target hit:
+                        if (val > startPrice && candle.high >= val) ||
+                            (val < startPrice && candle.low <= val) {
+                            hitIndex = i
+                            winningPredictionIndex = pIndex
+                            break scanLoop
+                        }
                     }
                 }
             }
+            // Update cache
+            cachedPredictionDataCount = count
+            cachedPredictionStartTime = currentStartTime
+            cachedHitIndex = hitIndex
+            cachedWinningPredictionIndex = winningPredictionIndex
         }
 
         // Calculate Background Extension
@@ -547,27 +573,154 @@ class HTKLineView: UIScrollView {
 
         // X positions
         let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
-        let startY = yFromValue(startPrice)
         let bgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
         
-        // Draw gradient background (using bgEndX)
-        let bgRect = CGRect(x: startX, y: mainBaseY, width: bgEndX - startX, height: mainHeight)
-        
-        context.saveGState()
-        context.clip(to: bgRect)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        // Blueish gradient
-        let startColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.15).cgColor
-        let endColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.02).cgColor
-        let colors = [startColor, endColor] as CFArray
-        let locations: [CGFloat] = [0.0, 1.0]
-        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locations) {
-            context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: mainBaseY), end: CGPoint(x: startX, y: mainBaseY + mainHeight), options: [])
-        }
-        context.restoreGState()
+        // --- GRADIENT DRAWING ---
+        let entryVal = configManager.predictionEntry
+        if let bias = configManager.predictionBias, let entry = entryVal {
+            let entryY = yFromValue(CGFloat(entry))
+            
+            // 1. Valid Bias Logic
+            context.saveGState()
+            let bgWidth = bgEndX - startX
+            
+            // SL Zone (Red Gradient)
+            if let sl = configManager.predictionStopLoss {
+                let slY = yFromValue(CGFloat(sl))
+                // Rect between Entry and SL
+                let rectY = min(entryY, slY)
+                let rectH = abs(entryY - slY)
+                let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                
+                context.saveGState()
+                context.clip(to: rect)
+                let colorSpace = CGColorSpaceCreateDeviceRGB()
+                // Red gradient
+                let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
+                let color2 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.05).cgColor
+                let colors = [color1, color2] as CFArray
+                if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                    // Draw from Entry towards SL
+                    context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: slY), options: [])
+                }
+                context.restoreGState()
+            }
+            
+            // TP Zone (Green Gradient)
+            let targets = configManager.predictionList.compactMap { $0["value"] as? CGFloat }
+            if !targets.isEmpty {
+                let extremeTarget = (bias.lowercased() == "bullish") ? (targets.max() ?? CGFloat(entry)) : (targets.min() ?? CGFloat(entry))
+                let targetY = yFromValue(extremeTarget)
+                
+                let rectY = min(entryY, targetY)
+                let rectH = abs(entryY - targetY)
+                let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                
+                context.saveGState()
+                context.clip(to: rect)
+                let colorSpace = CGColorSpaceCreateDeviceRGB()
+                // Green gradient
+                let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor
+                let color2 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.05).cgColor
+                let colors = [color1, color2] as CFArray
+                if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                    context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: targetY), options: [])
+                }
+                context.restoreGState()
+            }
+            context.restoreGState()
+            
+            // Draw "Long" / "Short" Label
+            // Draw "Long" / "Short" Label at Top-Left of Analysis Zone
+            let labelText = (bias.lowercased() == "bullish") ? "LONG" : "SHORT"
+            let labelFont = configManager.createFont(configManager.rightTextFontSize + 2) // Slightly larger
+            let labelAttrs: [NSAttributedString.Key: Any] = [
+                .font: labelFont,
+                .foregroundColor: (bias.lowercased() == "bullish") ? UIColor.green : UIColor.red
+            ]
+            let labelSize = (labelText as NSString).size(withAttributes: labelAttrs)
+            // Position at top of the gradient stripe (mainBaseY) at startX
+            (labelText as NSString).draw(at: CGPoint(x: startX + 6, y: mainBaseY + 4), withAttributes: labelAttrs)
 
+        } else {
+            // Fallback: Old Blueish Gradient across full height
+            let bgRect = CGRect(x: startX, y: mainBaseY, width: bgEndX - startX, height: mainHeight)
+            context.saveGState()
+            context.clip(to: bgRect)
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            let startColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.15).cgColor
+            let endColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.02).cgColor
+            let colors = [startColor, endColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: mainBaseY), end: CGPoint(x: startX, y: mainBaseY + mainHeight), options: [])
+            }
+            context.restoreGState()
+        }
+
+        // --- DRAW LINES ---
+        
+        let entryY = (entryVal != nil) ? yFromValue(CGFloat(entryVal!)) : yFromValue(targetModel.close)
+        
+        // 1. Entry Line (if present) - Yellow dashed + Label
+        if let val = entryVal {
+            let color = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0) // Gold/Yellow
+            context.saveGState()
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(1.0)
+            context.setLineDash(phase: 0, lengths: [4, 4])
+            context.move(to: CGPoint(x: startX, y: entryY))
+            context.addLine(to: CGPoint(x: bgEndX, y: entryY))
+            context.strokePath()
+            
+            // Entry Label
+            let priceText = configManager.precision(CGFloat(val), configManager.price)
+            let labelText = "Entry \(priceText)"
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black] // Black text on yellow
+            let labelSize = (labelText as NSString).size(withAttributes: attributes)
+            let labelRect = CGRect(x: bgEndX + 2, y: entryY - labelSize.height/2, width: labelSize.width + 8, height: labelSize.height + 4)
+            
+            context.setFillColor(color.cgColor)
+            let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (labelText as NSString).draw(at: CGPoint(x: bgEndX + 6, y: entryY - labelSize.height/2 + 2), withAttributes: attributes)
+            context.restoreGState()
+        }
+        
+        // 2. Stop Loss Line (if present) - Red dashed + Label
+        if let sl = configManager.predictionStopLoss {
+            let val = CGFloat(sl)
+            let slY = yFromValue(val)
+            let color = UIColor.red
+            
+            context.saveGState()
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(1.0)
+            context.setLineDash(phase: 0, lengths: [4, 4])
+            context.move(to: CGPoint(x: startX, y: slY))
+            context.addLine(to: CGPoint(x: bgEndX, y: slY))
+            context.strokePath()
+            
+            // SL Label
+            let priceText = configManager.precision(val, configManager.price)
+            let labelText = "SL \(priceText)"
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
+            let labelSize = (labelText as NSString).size(withAttributes: attributes)
+            let labelRect = CGRect(x: bgEndX + 2, y: slY - labelSize.height/2, width: labelSize.width + 8, height: labelSize.height + 4)
+            
+            context.setFillColor(color.cgColor)
+            let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (labelText as NSString).draw(at: CGPoint(x: bgEndX + 6, y: slY - labelSize.height/2 + 2), withAttributes: attributes)
+            context.restoreGState()
+        }
+
+        // 3. Targets (Prediction Lines)
         for (pIndex, prediction) in configManager.predictionList.enumerated() {
-            // Winner takes all: If a target was hit, only show that target
+            // Winner takes all
             if let winner = winningPredictionIndex, winner != pIndex {
                 continue
             }
@@ -577,9 +730,14 @@ class HTKLineView: UIScrollView {
                   let color = RCTConvert.uiColor(colorInt) else {
                 continue
             }
-
-            let targetY = yFromValue(value)
             
+            // Note: Use entryY as start Y for aesthetic connection? 
+            // Previous code used 'yFromValue(startPrice)'. Since entry != startPrice potentially, 
+            // lines should originate from Entry Price if we are visualizing a Trade Setup.
+            // I'll stick to 'entryY' as the origin source Y if available.
+            let originY = entryY 
+            let targetY = yFromValue(value)
+
             // DNA of the line: Ends at Hit or Background End
             let lineEndX: CGFloat
             if let hit = hitIndex {
@@ -589,17 +747,17 @@ class HTKLineView: UIScrollView {
                 lineEndX = bgEndX
             }
 
-            // 1. Draw dashed line from start
+            // Draw dashed line
             context.saveGState()
             context.setStrokeColor(color.cgColor)
             context.setLineWidth(1.5)
             context.setLineDash(phase: 0, lengths: [6, 4])
-            context.move(to: CGPoint(x: startX, y: startY))
+            context.move(to: CGPoint(x: startX, y: originY))
             context.addLine(to: CGPoint(x: lineEndX, y: targetY))
             context.strokePath()
             context.restoreGState()
 
-            // Draw dot if hit (Winner only, implied by loop check)
+            // Draw dot if hit
             if hitIndex != nil {
                 context.saveGState()
                 context.setFillColor(color.cgColor)
@@ -609,8 +767,9 @@ class HTKLineView: UIScrollView {
                 context.restoreGState()
             }
 
-            // 2. Draw colored price label at the END of the line (lineEndX)
-            let labelText = configManager.precision(value, configManager.price)
+            // Label
+            let priceText = configManager.precision(value, configManager.price)
+            let labelText = "TP \(priceText)"
             let font = configManager.createFont(configManager.rightTextFontSize)
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
@@ -622,13 +781,11 @@ class HTKLineView: UIScrollView {
             let labelWidth = labelSize.width + paddingX * 2
             let labelHeight = labelSize.height + paddingY * 2
 
-            // Attach label to the end of the line
             let labelX = lineEndX + 2
             let labelY = targetY - labelHeight / 2
 
             let labelRect = CGRect(x: labelX, y: labelY, width: labelWidth, height: labelHeight)
 
-            // Draw background
             context.saveGState()
             context.setFillColor(color.cgColor)
             let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
@@ -636,7 +793,6 @@ class HTKLineView: UIScrollView {
             context.fillPath()
             context.restoreGState()
 
-            // Draw text
             (labelText as NSString).draw(
                 at: CGPoint(x: labelX + paddingX, y: labelY + paddingY),
                 withAttributes: attributes

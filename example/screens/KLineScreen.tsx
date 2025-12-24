@@ -189,6 +189,9 @@ interface KLineOptionList {
   drawList: DrawList;
   predictionList?: PredictionTarget[];
   predictionStartTime?: number;
+  predictionEntry?: number;
+  predictionStopLoss?: number;
+  predictionBias?: string;
 }
 
 interface Theme {
@@ -1154,8 +1157,11 @@ const packOptionList = (
   selectedSubIndicator: number,
   selectedTimeType: number,
   drawList: DrawList,
-  predictionList: PredictionTarget[],
+  predictionList?: PredictionTarget[],
   predictionStartTime?: number,
+  predictionEntry?: number,
+  predictionStopLoss?: number,
+  predictionBias?: string,
 ): KLineOptionList => {
   const theme = ThemeManager.getCurrentTheme(isDarkTheme);
 
@@ -1284,7 +1290,7 @@ const packOptionList = (
         android: '',
       }) || '',
     closePriceRightLightLottieSource: '',
-    rightOffsetCandles: predictionList.length > 0 ? 12 : 0,
+    rightOffsetCandles: predictionList?.length > 0 ? 12 : 0,
   };
 
   return {
@@ -1300,6 +1306,9 @@ const packOptionList = (
     drawList: drawList,
     predictionList: predictionList,
     predictionStartTime: predictionStartTime,
+    predictionEntry: predictionEntry,
+    predictionStopLoss: predictionStopLoss,
+    predictionBias: predictionBias,
   };
 };
 
@@ -1330,6 +1339,11 @@ const KLineScreen: React.FC = () => {
   const [predictionStartTime, setPredictionStartTime] = useState<
     number | undefined
   >(undefined);
+  const [predictionEntry, setPredictionEntry] = useState<number | undefined>();
+  const [predictionStopLoss, setPredictionStopLoss] = useState<
+    number | undefined
+  >();
+  const [predictionBias, setPredictionBias] = useState<string | undefined>();
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
   const [isKLineReady, setIsKLineReady] = useState(false);
@@ -1647,30 +1661,57 @@ const KLineScreen: React.FC = () => {
     console.log('Result:', JSON.stringify(smcResult.tradingSignal, null, 2));
     console.log('---------------------------');
 
-    // Generate prediction targets from SMC result
-    if (smcResult.tradingSignal?.targets) {
+    // Generate prediction data from SMC result
+    if (smcResult.tradingSignal) {
       const currentPrice = inputCandles[inputCandles.length - 1].close;
       setPredictionStartTime(inputCandles[inputCandles.length - 1].time);
-      const predictions: PredictionTarget[] =
-        smcResult.tradingSignal.targets.map(t => ({
-          value: t.level,
-          type: t.type,
-          color:
-            t.level > currentPrice
-              ? toColorNumber(processColor('#4CAF50')) // Green for bullish targets
-              : toColorNumber(processColor('#F44336')), // Red for bearish targets
-        }));
 
-      setPredictionList(predictions);
+      // Entry
+      if (
+        smcResult.tradingSignal.entryZones &&
+        smcResult.tradingSignal.entryZones.length > 0
+      ) {
+        setPredictionEntry(smcResult.tradingSignal.entryZones[0].price);
+      } else {
+        setPredictionEntry(undefined);
+      }
+
+      // Stop Loss
+      setPredictionStopLoss(smcResult.tradingSignal.stopLoss ?? undefined);
+
+      // Bias
+      setPredictionBias(smcResult.tradingSignal.bias);
+
+      // Targets
+      if (smcResult.tradingSignal.targets) {
+        const predictions: PredictionTarget[] =
+          smcResult.tradingSignal.targets.map(t => ({
+            value: t.level,
+            type: t.type,
+            color:
+              t.level > currentPrice
+                ? toColorNumber(processColor('#4CAF50')) // Green
+                : toColorNumber(processColor('#F44336')), // Red
+          }));
+        setPredictionList(predictions);
+      } else {
+        setPredictionList([]);
+      }
     } else {
       setPredictionList([]);
       setPredictionStartTime(undefined);
+      setPredictionEntry(undefined);
+      setPredictionStopLoss(undefined);
+      setPredictionBias(undefined);
     }
   }, [selectedTimeType]); // removed processedKLineData dep as we use ref
 
   const handleClearSignal = useCallback(() => {
     setPredictionList([]);
     setPredictionStartTime(undefined);
+    setPredictionEntry(undefined);
+    setPredictionStopLoss(undefined);
+    setPredictionBias(undefined);
   }, []);
 
   // Derive drawList from current draw tool and theme
@@ -1709,6 +1750,9 @@ const KLineScreen: React.FC = () => {
       drawList,
       predictionList,
       predictionStartTime,
+      predictionEntry,
+      predictionStopLoss,
+      predictionBias,
     );
   }, [
     processedKLineData,
@@ -1720,6 +1764,9 @@ const KLineScreen: React.FC = () => {
     drawList,
     predictionList,
     predictionStartTime,
+    predictionEntry,
+    predictionStopLoss,
+    predictionBias,
   ]);
 
   // Serialize optionList to JSON string for native component

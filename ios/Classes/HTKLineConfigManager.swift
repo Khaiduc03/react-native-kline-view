@@ -243,6 +243,9 @@ class HTKLineConfigManager: NSObject {
     var rightOffsetCandles: Int = 0
     var predictionList = [[String: Any]]()
     var predictionStartTime: Double? = nil
+    var predictionEntry: Double? = nil
+    var predictionStopLoss: Double? = nil
+    var predictionBias: String? = nil
 
     // grid draw
     // Đậm rõ: màu đen, nét 1.2pt để dễ thấy
@@ -490,6 +493,10 @@ class HTKLineConfigManager: NSObject {
         } else {
             predictionStartTime = nil
         }
+        
+        predictionEntry = optionList["predictionEntry"] as? Double
+        predictionStopLoss = optionList["predictionStopLoss"] as? Double
+        predictionBias = optionList["predictionBias"] as? String
     }
 
 }
