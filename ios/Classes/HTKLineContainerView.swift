@@ -10,6 +10,10 @@ import UIKit
 class HTKLineContainerView: UIView {
     
     var configManager = HTKLineConfigManager()
+
+    // Tooltip overlay (card)
+    private var predictionOverlayView: UIView?
+    private var predictionCardView: HTPredictionTooltipView?
     
     @objc var onDrawItemDidTouch: RCTBubblingEventBlock?
     
@@ -91,6 +95,27 @@ class HTKLineContainerView: UIView {
         }
     }
 
+    // ----- Price Prediction overlay (Phase 2 - iOS only) -----
+    func setPrediction(_ payload: [String: Any]) {
+        let anchorIndex = max(0, configManager.modelArray.count - 1)
+        guard let state = HTPredictionState.fromPayload(payload, anchorIndex: anchorIndex) else {
+            print("[RNKLineView][iOS] setPrediction invalid payload keys:", Array(payload.keys))
+            return
+        }
+
+        // Make sure there is enough blank space on the right for horizon candles.
+        configManager.rightOffsetCandles = max(configManager.rightOffsetCandles, state.horizonCandles + 3)
+
+        klineView.setPredictionState(state)
+        reloadConfigManager(configManager)
+    }
+
+    func clearPrediction() {
+        hidePredictionTooltip()
+        klineView.clearPredictionState()
+        reloadConfigManager(configManager)
+    }
+
 
     lazy var klineView: HTKLineView = {
         let klineView = HTKLineView.init(CGRect.zero, configManager)
@@ -125,6 +150,16 @@ class HTKLineContainerView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         addSubview(klineView)
+
+        // Prediction interactions (tooltip is hosted by this container)
+        klineView.onPredictionTap = { [weak self] offset, pointInKLineView in
+            guard let self = self else { return }
+            let pointInContainer = self.convert(pointInKLineView, from: self.klineView)
+            self.showPredictionTooltip(offset: offset, at: pointInContainer)
+        }
+        klineView.onInteractionBegan = { [weak self] in
+            self?.hidePredictionTooltip()
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -259,6 +294,167 @@ class HTKLineContainerView: UIView {
         klineView.drawContext.touchesGesture(location, translation, state)
         shotView.shotPoint = state != .ended ? touched.first?.location(in: self) : nil
     }
+
+    // MARK: - Prediction tooltip
+
+    private func hidePredictionTooltip() {
+        predictionOverlayView?.removeFromSuperview()
+        predictionOverlayView = nil
+        predictionCardView = nil
+    }
+
+    private func showPredictionTooltip(offset: Int, at anchor: CGPoint) {
+        guard let state = klineView.predictionState else { return }
+
+        // Build content
+        let candle = state.predictedCandleByOffset[offset]
+        let band = state.bands.first(where: { $0.contains(offset: offset) })
+        let mean = state.points.first(where: { $0.offset == offset })?.price
+
+        let tsMs = state.baseTimestampMs + state.intervalMs * Int64(offset)
+        let date = Date(timeIntervalSince1970: TimeInterval(tsMs) / 1000.0)
+        let df = DateFormatter()
+        df.dateFormat = "MM-dd HH:mm"
+        let dateText = df.string(from: date)
+
+        let title = "Prediction"
+        var lines: [String] = []
+        lines.append("t: \(dateText) (+\(offset))")
+        if let candle = candle {
+            lines.append(String(format: "O: %.2f  H: %.2f", candle.open, candle.high))
+            lines.append(String(format: "L: %.2f  C: %.2f", candle.low, candle.close))
+        } else if let mean = mean {
+            lines.append(String(format: "Mean: %.2f", mean))
+        }
+        if let band = band {
+            lines.append(String(format: "Band: %.2f - %.2f", band.bottom, band.top))
+            if let c = band.confidence {
+                lines.append(String(format: "Conf: %.0f%%", c * 100))
+            }
+        }
+
+        // Recreate overlay
+        hidePredictionTooltip()
+        let overlay = UIView(frame: bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.backgroundColor = UIColor.clear
+        overlay.isUserInteractionEnabled = true
+
+        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(onOverlayTapped(_:)))
+        dismissTap.cancelsTouchesInView = false
+        dismissTap.delegate = self
+        overlay.addGestureRecognizer(dismissTap)
+
+        let card = HTPredictionTooltipView(title: title, lines: lines)
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        overlay.addSubview(card)
+        addSubview(overlay)
+        bringSubview(overlay)
+
+        // Position card near anchor
+        let maxWidth: CGFloat = 240
+        let estimatedHeight = card.estimatedHeight(width: maxWidth)
+        let padding: CGFloat = 10
+        var x = anchor.x + 10
+        var y = anchor.y - estimatedHeight - 10
+        if x + maxWidth + padding > bounds.width {
+            x = max(padding, bounds.width - maxWidth - padding)
+        }
+        if y < padding {
+            y = min(bounds.height - estimatedHeight - padding, anchor.y + 10)
+        }
+
+        NSLayoutConstraint.activate([
+            card.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: x),
+            card.topAnchor.constraint(equalTo: overlay.topAnchor, constant: y),
+            card.widthAnchor.constraint(equalToConstant: maxWidth),
+            card.heightAnchor.constraint(equalToConstant: estimatedHeight)
+        ])
+
+        predictionOverlayView = overlay
+        predictionCardView = card
+    }
+
+    @objc private func onOverlayTapped(_ gesture: UITapGestureRecognizer) {
+        hidePredictionTooltip()
+    }
     
+}
+
+// MARK: - UIGestureRecognizerDelegate
+
+extension HTKLineContainerView: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        // Only dismiss when tapping outside the card
+        if let card = predictionCardView {
+            let v = touch.view
+            if let v = v, v.isDescendant(of: card) {
+                return false
+            }
+        }
+        return true
+    }
+}
+
+// MARK: - Tooltip view
+
+private final class HTPredictionTooltipView: UIView {
+    private let titleLabel = UILabel()
+    private let stack = UIStackView()
+
+    init(title: String, lines: [String]) {
+        super.init(frame: .zero)
+        layer.cornerRadius = 12
+        layer.masksToBounds = true
+
+        backgroundColor = UIColor.black.withAlphaComponent(0.75)
+
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 14)
+        titleLabel.textColor = .white
+        titleLabel.text = title
+
+        stack.axis = .vertical
+        stack.spacing = 4
+        stack.alignment = .leading
+
+        addSubview(titleLabel)
+        addSubview(stack)
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+
+            stack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)
+        ])
+
+        for line in lines {
+            let lbl = UILabel()
+            lbl.font = UIFont.systemFont(ofSize: 12)
+            lbl.textColor = .white
+            lbl.numberOfLines = 1
+            lbl.text = line
+            stack.addArrangedSubview(lbl)
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func estimatedHeight(width: CGFloat) -> CGFloat {
+        // Very lightweight estimate based on line count
+        let titleH: CGFloat = 18
+        let lineH: CGFloat = 16
+        let count = CGFloat(stack.arrangedSubviews.count)
+        return 10 + titleH + 8 + (count * lineH) + 10
+    }
 }
 

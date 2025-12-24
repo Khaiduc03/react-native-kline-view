@@ -1,0 +1,84 @@
+# OSX
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+*.xcworkspace
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata
+project.xcworkspace/
+
+# Android/IntelliJ
+.idea/
+.gradle/
+local.properties
+*.iml
+*.hprof
+.cxx/
+
+# Build outputs
+android/build/
+android/app/build/
+ios/build/
+example/android/build/
+example/android/app/build/
+example/ios/build/
+
+# CocoaPods
+ios/Pods/
+example/ios/Pods/
+!Podfile
+!Podfile.lock
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+yarn-debug.log*
+.pnpm-debug.log*
+
+# Metro
+.metro-health-check*
+
+# Bundle
+*.jsbundle
+.bundle/
+
+# Testing
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor directories
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*~
+
+# Ruby (for CocoaPods)
+vendor/
+.ruby-version
+Gemfile.lock

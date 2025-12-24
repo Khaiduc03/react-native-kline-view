@@ -1,0 +1,110 @@
+# Cursor Rules for React Native KLine View
+
+You are an expert in React Native, TypeScript, Swift, and Java development for a professional K-Line charting library.
+
+## Context
+This is a **LIBRARY development project** (not an app). 
+- Library source: Root folder (`index.js`, `ios/`, `android/`)
+- Test app: `example/` folder
+- ALWAYS rebuild example app after library changes
+- ALWAYS verify bridge with console.log/print/Log.i
+
+## Code Style
+
+### TypeScript/JavaScript
+- Use functional components with hooks
+- Prefer `const` over `let`
+- Use single quotes, trailing commas
+- 2 space indentation
+- Use TypeScript types from index.d.ts
+
+### Swift (iOS)
+- 4 space indentation
+- Use guard for early returns
+- Use lazy var for expensive computations
+- Handle optionals with guard let/if let
+- Follow HTKLineDrawProtocol for new drawing components
+
+### Java (Android)
+- 4 space indentation
+- Use final for immutable variables
+- Handle nulls explicitly
+- Follow existing patterns in draw/ folder
+
+## Bridge Verification (CRITICAL)
+When implementing bridge methods:
+```javascript
+// JS - ALWAYS log before sending
+console.log('[RNKLineView] Sending:', commandName, payload);
+manager[commandName](nodeHandle, payload);
+```
+```swift
+// iOS - ALWAYS log when receiving  
+print("[RNKLineView][iOS] Received:", commandName)
+```
+```java
+// Android - ALWAYS log when receiving
+Log.i(TAG, "Received: " + commandName);
+```
+
+## Architecture Patterns
+
+### Bridge Pattern
+```javascript
+// Imperative commands via ref
+klineRef.current?.setData(candles)
+klineRef.current?.appendCandle(candle)
+klineRef.current?.updateLastCandle(candle)
+```
+
+### Drawing Protocol (iOS)
+```swift
+protocol HTKLineDrawProtocol {
+    func minMaxRange(_ visibleModelArray: [HTKLineModel], _ configManager: HTKLineConfigManager) -> Range<CGFloat>
+    func drawCandle(...)
+    func drawLine(...)
+    func drawText(...)
+}
+```
+
+## Key Files
+- `index.js` - React Native bridge
+- `index.d.ts` - TypeScript definitions
+- `ios/Classes/HTKLineView.swift` - Main iOS chart (880 lines)
+- `ios/Classes/RNKLineView.swift` - iOS RN bridge
+- `android/.../RNKLineView.java` - Android RN bridge
+- `android/.../KLineChartView.java` - Main Android chart
+
+## Performance Rules
+- Parse data on background thread
+- Minimize allocations in draw loops
+- Use object pooling for frequent operations
+- Batch UI updates
+
+## Development Workflow
+1. Edit library code (root folder)
+2. Rebuild: `cd example && yarn ios` or `yarn android`
+3. Test in example app
+4. Check JS console + native logs
+5. Verify bridge data flow
+
+## When Adding Features
+1. Update TypeScript types in index.d.ts
+2. Implement in both iOS (Swift) and Android (Java)
+3. Add to imperative ref if needed
+4. **Add console.log in JS** for verification
+5. **Add print/Log.i in native** for verification
+6. **Rebuild example app**
+7. **Check logs** to verify bridge works
+8. Test with large datasets (1000+ candles)
+
+## Naming Conventions
+- iOS classes: `HT{Feature}{Type}` (e.g., HTMainDraw)
+- Android classes: Similar pattern
+- TypeScript: PascalCase for types, camelCase for functions
+
+## Response Format
+- Be concise and direct
+- Show code examples when helpful
+- Consider both iOS and Android implications
+- Highlight performance considerations

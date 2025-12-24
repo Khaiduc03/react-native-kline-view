@@ -1,0 +1,21 @@
+# node_modules
+node_modules/
+
+# Build outputs
+android/build/
+ios/build/
+ios/Pods/
+
+# Generated
+*.lock
+Podfile.lock
+
+# Assets
+*.png
+*.jpg
+*.gif
+
+# IDE
+.idea/
+*.xcworkspacedata
+*.pbxproj

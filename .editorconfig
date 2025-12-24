@@ -1,0 +1,52 @@
+# EditorConfig - Consistent coding styles across different editors
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# JavaScript/TypeScript
+[*.{js,jsx,ts,tsx}]
+indent_size = 2
+
+# Swift
+[*.swift]
+indent_size = 4
+
+# Java/Kotlin
+[*.{java,kt,kts}]
+indent_size = 4
+
+# JSON
+[*.json]
+indent_size = 2
+
+# YAML
+[*.{yml,yaml}]
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Gradle
+[*.gradle]
+indent_size = 4
+
+# XML (Android layouts, etc.)
+[*.xml]
+indent_size = 4
+
+# Podspec
+[*.podspec]
+indent_size = 2
+
+# Shell scripts
+[*.sh]
+indent_size = 2

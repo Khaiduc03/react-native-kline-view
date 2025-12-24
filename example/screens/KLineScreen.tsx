@@ -3,13 +3,7 @@
  * Supports indicators, touch drawing tools, and theme switching.
  */
 
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  useRef,
-} from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,8 +22,12 @@ import RNKLineView, {
   type DrawItemCompleteEvent,
   type DrawItemTouchEvent,
   type DrawPointCompleteEvent,
+  type PredictionPayload,
   type RNKLineViewRef,
 } from 'react-native-kline-view';
+
+import smcDemo from '../assets/smc-demo.json';
+import { buildPredictionPayloadFromSmcDemo, type SmcDemo } from '../utils/predictionDemo';
 
 // ==================== Type Definitions ====================
 
@@ -288,12 +286,7 @@ const calculateBOLL = (data: KLineModel[], n = 20, p = 2): KLineModel[] => {
   });
 };
 
-const calculateMACD = (
-  data: KLineModel[],
-  s = 12,
-  l = 26,
-  m = 9,
-): KLineModel[] => {
+const calculateMACD = (data: KLineModel[], s = 12, l = 26, m = 9): KLineModel[] => {
   let ema12 = data[0].close;
   let ema26 = data[0].close;
   let dea = 0;
@@ -325,12 +318,7 @@ const calculateMACD = (
   });
 };
 
-const calculateKDJ = (
-  data: KLineModel[],
-  n = 9,
-  m1 = 3,
-  m2 = 3,
-): KLineModel[] => {
+const calculateKDJ = (data: KLineModel[], n = 9, m1 = 3, m2 = 3): KLineModel[] => {
   let k = 50;
   let d = 50;
 
@@ -354,10 +342,7 @@ const calculateKDJ = (
       lowest = Math.min(lowest, data[i].low);
     }
 
-    const rsv =
-      highest === lowest
-        ? 50
-        : ((item.close - lowest) / (highest - lowest)) * 100;
+    const rsv = highest === lowest ? 50 : ((item.close - lowest) / (highest - lowest)) * 100;
     k = (rsv + (m1 - 1) * k) / m1;
     d = (k + (m1 - 1) * d) / m1;
     const j = m2 * k - 2 * d;
@@ -377,13 +362,9 @@ const isHorizontalScreen = screenWidth > screenHeight;
 
 const COLOR = (r: number, g: number, b: number, a = 1): string => {
   if (a === 1) {
-    return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(
-      b * 255,
-    )})`;
+    return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
   } else {
-    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(
-      b * 255,
-    )}, ${a})`;
+    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
   }
 };
 
@@ -609,10 +590,7 @@ const DrawToolHelper = {
     ) {
       return 2;
     }
-    if (
-      type === DrawTypeConstants.parallelLine ||
-      type === DrawTypeConstants.parallelogram
-    ) {
+    if (type === DrawTypeConstants.parallelLine || type === DrawTypeConstants.parallelogram) {
       return 3;
     }
     return 0;
@@ -794,10 +772,7 @@ const calculateWRWithConfig = (
         lowest = Math.min(lowest, data[i].low);
       }
 
-      const wr =
-        highest === lowest
-          ? -50
-          : -((highest - item.close) / (highest - lowest)) * 100;
+      const wr = highest === lowest ? -50 : -((highest - item.close) / (highest - lowest)) * 100;
       wrList[config.index] = {
         value: wr,
         index: config.index,
@@ -836,10 +811,7 @@ const calculateIndicatorsFromTargetList = (
     .map(item => ({ period: parseInt(item.title, 10), index: item.index }));
 
   if (selectedVolumeMAPeriods.length > 0) {
-    processedData = calculateVolumeMAWithConfig(
-      processedData,
-      selectedVolumeMAPeriods,
-    );
+    processedData = calculateVolumeMAWithConfig(processedData, selectedVolumeMAPeriods);
   }
 
   // Calculate Bollinger Bands
@@ -1040,9 +1012,7 @@ const processKLineData = (
       ? processColor(theme.increaseColor)
       : processColor(theme.decreaseColor);
     const color: number | undefined =
-      colorValue !== null && colorValue !== undefined
-        ? toColorNumber(colorValue)
-        : undefined;
+      colorValue !== null && colorValue !== undefined ? toColorNumber(colorValue) : undefined;
 
     // Add formatted fields
     item.dateString = `${time}`;
@@ -1089,10 +1059,7 @@ const processKLineData = (
   });
 };
 
-const getTargetList = (
-  selectedMainIndicator: number,
-  selectedSubIndicator: number,
-): TargetList => {
+const getTargetList = (selectedMainIndicator: number, selectedSubIndicator: number): TargetList => {
   const isMASelected = selectedMainIndicator === 1;
   const isRSISelected = selectedSubIndicator === 5;
   const isWRSelected = selectedSubIndicator === 6;
@@ -1165,18 +1132,10 @@ const packOptionList = (
     ],
     minuteLineColor: toColorNumber(processColor(theme.minuteLineColor)),
     minuteGradientColorList: [
-      toColorNumber(
-        processColor(COLOR(0.094117647, 0.341176471, 0.831372549, 0.149019608)),
-      ),
-      toColorNumber(
-        processColor(COLOR(0.266666667, 0.501960784, 0.97254902, 0.149019608)),
-      ),
-      toColorNumber(
-        processColor(COLOR(0.074509804, 0.121568627, 0.188235294, 0)),
-      ),
-      toColorNumber(
-        processColor(COLOR(0.074509804, 0.121568627, 0.188235294, 0)),
-      ),
+      toColorNumber(processColor(COLOR(0.094117647, 0.341176471, 0.831372549, 0.149019608))),
+      toColorNumber(processColor(COLOR(0.266666667, 0.501960784, 0.97254902, 0.149019608))),
+      toColorNumber(processColor(COLOR(0.074509804, 0.121568627, 0.188235294, 0))),
+      toColorNumber(processColor(COLOR(0.074509804, 0.121568627, 0.188235294, 0))),
     ],
     minuteGradientLocationList: [0, 0.3, 0.6, 1],
     backgroundColor: toColorNumber(processColor(theme.backgroundColor)),
@@ -1184,9 +1143,7 @@ const packOptionList = (
     gridColor: toColorNumber(processColor(theme.gridColor)),
     candleTextColor: toColorNumber(processColor(theme.titleColor)),
     panelBackgroundColor: toColorNumber(
-      processColor(
-        isDarkTheme ? COLOR(0.03, 0.09, 0.14, 0.9) : COLOR(1, 1, 1, 0.95),
-      ),
+      processColor(isDarkTheme ? COLOR(0.03, 0.09, 0.14, 0.9) : COLOR(1, 1, 1, 0.95)),
     ),
     panelBorderColor: toColorNumber(processColor(theme.detailColor)),
     panelTextColor: toColorNumber(processColor(theme.titleColor)),
@@ -1194,58 +1151,31 @@ const packOptionList = (
     selectedPointContentColor: toColorNumber(
       processColor(isDarkTheme ? theme.titleColor : 'white'),
     ),
-    closePriceCenterBackgroundColor: toColorNumber(
-      processColor(theme.backgroundColor9703),
-    ),
-    closePriceCenterBorderColor: toColorNumber(
-      processColor(theme.textColor7724),
-    ),
-    closePriceCenterTriangleColor: toColorNumber(
-      processColor(theme.textColor7724),
-    ),
-    closePriceCenterSeparatorColor: toColorNumber(
-      processColor(theme.detailColor),
-    ),
-    closePriceRightBackgroundColor: toColorNumber(
-      processColor(theme.backgroundColor),
-    ),
-    closePriceRightSeparatorColor: toColorNumber(
-      processColor(theme.backgroundColorBlue),
-    ),
+    closePriceCenterBackgroundColor: toColorNumber(processColor(theme.backgroundColor9703)),
+    closePriceCenterBorderColor: toColorNumber(processColor(theme.textColor7724)),
+    closePriceCenterTriangleColor: toColorNumber(processColor(theme.textColor7724)),
+    closePriceCenterSeparatorColor: toColorNumber(processColor(theme.detailColor)),
+    closePriceRightBackgroundColor: toColorNumber(processColor(theme.backgroundColor)),
+    closePriceRightSeparatorColor: toColorNumber(processColor(theme.backgroundColorBlue)),
     closePriceRightLightLottieFloder: 'images',
     closePriceRightLightLottieScale: 0.4,
     panelGradientColorList: isDarkTheme
       ? [
-          toColorNumber(
-            processColor(COLOR(0.0588235, 0.101961, 0.160784, 0.2)),
-          ),
-          toColorNumber(
-            processColor(COLOR(0.811765, 0.827451, 0.913725, 0.101961)),
-          ),
+          toColorNumber(processColor(COLOR(0.0588235, 0.101961, 0.160784, 0.2))),
+          toColorNumber(processColor(COLOR(0.811765, 0.827451, 0.913725, 0.101961))),
           toColorNumber(processColor(COLOR(0.811765, 0.827451, 0.913725, 0.2))),
-          toColorNumber(
-            processColor(COLOR(0.811765, 0.827451, 0.913725, 0.101961)),
-          ),
-          toColorNumber(
-            processColor(COLOR(0.0784314, 0.141176, 0.223529, 0.2)),
-          ),
+          toColorNumber(processColor(COLOR(0.811765, 0.827451, 0.913725, 0.101961))),
+          toColorNumber(processColor(COLOR(0.0784314, 0.141176, 0.223529, 0.2))),
         ]
       : [
           toColorNumber(processColor(COLOR(1, 1, 1, 0))),
-          toColorNumber(
-            processColor(COLOR(0.54902, 0.623529, 0.678431, 0.101961)),
-          ),
-          toColorNumber(
-            processColor(COLOR(0.54902, 0.623529, 0.678431, 0.25098)),
-          ),
-          toColorNumber(
-            processColor(COLOR(0.54902, 0.623529, 0.678431, 0.101961)),
-          ),
+          toColorNumber(processColor(COLOR(0.54902, 0.623529, 0.678431, 0.101961))),
+          toColorNumber(processColor(COLOR(0.54902, 0.623529, 0.678431, 0.25098))),
+          toColorNumber(processColor(COLOR(0.54902, 0.623529, 0.678431, 0.101961))),
           toColorNumber(processColor(COLOR(1, 1, 1, 0))),
         ],
     panelGradientLocationList: [0, 0.25, 0.5, 0.75, 1],
-    mainFlex:
-      selectedSubIndicator === 0 ? (isHorizontalScreen ? 0.75 : 0.85) : 0.6,
+    mainFlex: selectedSubIndicator === 0 ? (isHorizontalScreen ? 0.75 : 0.85) : 0.6,
     volumeFlex: isHorizontalScreen ? 0.25 : 0.15,
     paddingTop: 20 * pixelRatio,
     paddingBottom: 20 * pixelRatio,
@@ -1290,22 +1220,14 @@ const KLineScreen: React.FC = () => {
   const [isDarkTheme, setIsDarkTheme] = useState(false);
   const [selectedTimeType, setSelectedTimeType] = useState(2); // corresponds to 1m
   const [selectedMainIndicator, setSelectedMainIndicator] = useState(1); // corresponds to MA
-  const [selectedSubIndicator, setSelectedSubIndicator] = useState(
-    isHorizontalScreen ? 0 : 3,
-  ); // corresponds to MACD
-  const [selectedDrawTool, setSelectedDrawTool] = useState(
-    DrawTypeConstants.none,
-  );
+  const [selectedSubIndicator, setSelectedSubIndicator] = useState(isHorizontalScreen ? 0 : 3); // corresponds to MACD
+  const [selectedDrawTool, setSelectedDrawTool] = useState(DrawTypeConstants.none);
   const [showIndicatorSelector, setShowIndicatorSelector] = useState(false);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [showDrawToolSelector, setShowDrawToolSelector] = useState(false);
-  const [klineData, setKlineData] = useState<KLineRawPoint[]>(
-    generateMockData(),
-  );
+  const [klineData, setKlineData] = useState<KLineRawPoint[]>(generateMockData());
   const [drawShouldContinue, setDrawShouldContinue] = useState(true);
-  const [drawReloadIndex, setDrawReloadIndex] = useState(
-    DrawStateConstants.none,
-  );
+  const [drawReloadIndex, setDrawReloadIndex] = useState(DrawStateConstants.none);
   const [drawClearFlag, setDrawClearFlag] = useState(false);
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
@@ -1353,30 +1275,12 @@ const KLineScreen: React.FC = () => {
   }, [drawClearFlag]);
 
   // Indicator selection helpers
-  const isMASelected = useMemo(
-    () => selectedMainIndicator === 1,
-    [selectedMainIndicator],
-  );
-  const isBOLLSelected = useMemo(
-    () => selectedMainIndicator === 2,
-    [selectedMainIndicator],
-  );
-  const isMACDSelected = useMemo(
-    () => selectedSubIndicator === 3,
-    [selectedSubIndicator],
-  );
-  const isKDJSelected = useMemo(
-    () => selectedSubIndicator === 4,
-    [selectedSubIndicator],
-  );
-  const isRSISelected = useMemo(
-    () => selectedSubIndicator === 5,
-    [selectedSubIndicator],
-  );
-  const isWRSelected = useMemo(
-    () => selectedSubIndicator === 6,
-    [selectedSubIndicator],
-  );
+  const isMASelected = useMemo(() => selectedMainIndicator === 1, [selectedMainIndicator]);
+  const isBOLLSelected = useMemo(() => selectedMainIndicator === 2, [selectedMainIndicator]);
+  const isMACDSelected = useMemo(() => selectedSubIndicator === 3, [selectedSubIndicator]);
+  const isKDJSelected = useMemo(() => selectedSubIndicator === 4, [selectedSubIndicator]);
+  const isRSISelected = useMemo(() => selectedSubIndicator === 5, [selectedSubIndicator]);
+  const isWRSelected = useMemo(() => selectedSubIndicator === 6, [selectedSubIndicator]);
 
   // Derive targetList from selected indicators
   const targetList = useMemo(() => {
@@ -1437,8 +1341,7 @@ const KLineScreen: React.FC = () => {
     const nextTime = last.time + 60 * 1000;
     const nextOpen = last.close;
     const nextClose = nextOpen * (1 + (Math.random() - 0.5) * 0.01);
-    const nextHigh =
-      Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.005);
+    const nextHigh = Math.max(nextOpen, nextClose) * (1 + Math.random() * 0.005);
     const nextLow = Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.005);
     const nextVolume = Math.max(
       1,
@@ -1531,6 +1434,30 @@ const KLineScreen: React.FC = () => {
     isWRSelected,
   ]);
 
+  // ----- Prediction demo (iOS only for this phase) -----
+  const handlePredictionDemo = useCallback(() => {
+    if (Platform.OS !== 'ios') {
+      console.warn('Prediction demo is iOS-only in this phase');
+      return;
+    }
+
+    const ref = kLineViewRef.current;
+    if (!ref?.setPrediction) {
+      console.warn('RNKLineView ref not ready for setPrediction');
+      return;
+    }
+
+    const payload: PredictionPayload = buildPredictionPayloadFromSmcDemo(smcDemo as SmcDemo, 24);
+    ref.setPrediction(payload);
+  }, []);
+
+  const handleClearPrediction = useCallback(() => {
+    if (Platform.OS !== 'ios') return;
+    const ref = kLineViewRef.current;
+    if (!ref?.clearPrediction) return;
+    ref.clearPrediction();
+  }, []);
+
   // Derive drawList from current draw tool and theme
   const drawList = useMemo(() => {
     const theme = ThemeManager.getCurrentTheme(isDarkTheme);
@@ -1547,13 +1474,7 @@ const KLineScreen: React.FC = () => {
       shouldFixDraw: false,
       shouldClearDraw: drawClearFlag,
     };
-  }, [
-    selectedDrawTool,
-    drawShouldContinue,
-    isDarkTheme,
-    drawReloadIndex,
-    drawClearFlag,
-  ]);
+  }, [selectedDrawTool, drawShouldContinue, isDarkTheme, drawReloadIndex, drawClearFlag]);
 
   // Pack optionList for native component
   const optionList = useMemo(() => {
@@ -1593,26 +1514,21 @@ const KLineScreen: React.FC = () => {
     console.log('Switch timeframe:', TimeTypes[timeType].label);
   }, []);
 
-  const handleSelectIndicator = useCallback(
-    (type: 'main' | 'sub', indicator: number) => {
-      if (type === 'main') {
-        setSelectedMainIndicator(indicator);
-      } else {
-        setSelectedSubIndicator(indicator);
-      }
-      setShowIndicatorSelector(false);
-    },
-    [],
-  );
+  const handleSelectIndicator = useCallback((type: 'main' | 'sub', indicator: number) => {
+    if (type === 'main') {
+      setSelectedMainIndicator(indicator);
+    } else {
+      setSelectedSubIndicator(indicator);
+    }
+    setShowIndicatorSelector(false);
+  }, []);
 
   const handleSelectDrawTool = useCallback((tool: number) => {
     setSelectedDrawTool(tool);
     setShowDrawToolSelector(false);
     // Set the reload index flag to notify native component
     setDrawReloadIndex(
-      tool === DrawTypeConstants.none
-        ? DrawStateConstants.none
-        : DrawStateConstants.showContext,
+      tool === DrawTypeConstants.none ? DrawStateConstants.none : DrawStateConstants.showContext,
     );
   }, []);
 
@@ -1658,10 +1574,7 @@ const KLineScreen: React.FC = () => {
   );
 
   // Render helpers
-  const theme = useMemo(
-    () => ThemeManager.getCurrentTheme(isDarkTheme),
-    [isDarkTheme],
-  );
+  const theme = useMemo(() => ThemeManager.getCurrentTheme(isDarkTheme), [isDarkTheme]);
 
   const styles = useMemo(
     () =>
@@ -1865,12 +1778,6 @@ const KLineScreen: React.FC = () => {
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}
-        customIndicatorOffset={500} // Candle index where indicator should appear
-        customIndicatorView={
-          <View style={{ width: 50, height: 200, backgroundColor: 'red' }}>
-            <Text>Custom Indicator</Text>
-          </View>
-        }
       />
     );
     if (
@@ -1896,19 +1803,11 @@ const KLineScreen: React.FC = () => {
       style={styles.controlBarScroll}
       contentContainerStyle={styles.controlBar}
     >
-      <TouchableOpacity
-        style={styles.controlButton}
-        onPress={() => setShowTimeSelector(true)}
-      >
-        <Text style={styles.controlButtonText}>
-          {TimeTypes[selectedTimeType].label}
-        </Text>
+      <TouchableOpacity style={styles.controlButton} onPress={() => setShowTimeSelector(true)}>
+        <Text style={styles.controlButtonText}>{TimeTypes[selectedTimeType].label}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.controlButton}
-        onPress={() => setShowIndicatorSelector(true)}
-      >
+      <TouchableOpacity style={styles.controlButton} onPress={() => setShowIndicatorSelector(true)}>
         <Text style={styles.controlButtonText}>
           {IndicatorTypes.main[selectedMainIndicator]?.label || 'NONE'}/
           {IndicatorTypes.sub[selectedSubIndicator]?.label || 'NONE'}
@@ -1929,8 +1828,7 @@ const KLineScreen: React.FC = () => {
         <Text
           style={[
             styles.buttonText,
-            selectedDrawTool !== DrawTypeConstants.none &&
-              styles.activeButtonText,
+            selectedDrawTool !== DrawTypeConstants.none && styles.activeButtonText,
           ]}
         >
           {selectedDrawTool !== DrawTypeConstants.none
@@ -1939,26 +1837,17 @@ const KLineScreen: React.FC = () => {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.controlButton}
-        onPress={handleClearDrawings}
-      >
+      <TouchableOpacity style={styles.controlButton} onPress={handleClearDrawings}>
         <Text style={styles.controlButtonText}>Clear</Text>
       </TouchableOpacity>
 
       {/* Phase 1: Imperative data updates */}
       <View style={styles.realtimeBar}>
-        <TouchableOpacity
-          style={styles.realtimeButton}
-          onPress={handleNativeReset}
-        >
+        <TouchableOpacity style={styles.realtimeButton} onPress={handleNativeReset}>
           <Text style={styles.realtimeButtonText}>Reset Data</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.realtimeButton}
-          onPress={handleNativeAppend}
-        >
+        <TouchableOpacity style={styles.realtimeButton} onPress={handleNativeAppend}>
           <Text style={styles.realtimeButtonText}>Append</Text>
         </TouchableOpacity>
 
@@ -1968,6 +1857,25 @@ const KLineScreen: React.FC = () => {
           disabled={!isKLineReady}
         >
           <Text style={styles.realtimeButtonText}>Update Last</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Phase 2: Price prediction overlay demo (iOS only in this phase) */}
+      <View style={styles.realtimeBar}>
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={handlePredictionDemo}
+          disabled={!isKLineReady || Platform.OS !== 'ios'}
+        >
+          <Text style={styles.realtimeButtonText}>Prediction Demo</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={handleClearPrediction}
+          disabled={!isKLineReady || Platform.OS !== 'ios'}
+        >
+          <Text style={styles.realtimeButtonText}>Clear Prediction</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -1995,8 +1903,7 @@ const KLineScreen: React.FC = () => {
                     <Text
                       style={[
                         styles.selectorItemText,
-                        selectedTimeType === timeType &&
-                          styles.selectedItemText,
+                        selectedTimeType === timeType && styles.selectedItemText,
                       ]}
                     >
                       {TimeTypes[timeType].label}
@@ -2005,10 +1912,7 @@ const KLineScreen: React.FC = () => {
                 );
               })}
             </ScrollView>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowTimeSelector(false)}
-            >
+            <TouchableOpacity style={styles.closeButton} onPress={() => setShowTimeSelector(false)}>
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -2026,45 +1930,35 @@ const KLineScreen: React.FC = () => {
                   <Text style={styles.selectorSectionTitle}>
                     {type === 'main' ? 'Main' : 'Sub'}
                   </Text>
-                  {Object.keys(
-                    IndicatorTypes[type as keyof typeof IndicatorTypes],
-                  ).map(indicatorKey => {
-                    const indicator = parseInt(indicatorKey, 10);
-                    return (
-                      <TouchableOpacity
-                        key={indicator}
-                        style={[
-                          styles.selectorItem,
-                          ((type === 'main' &&
-                            selectedMainIndicator === indicator) ||
-                            (type === 'sub' &&
-                              selectedSubIndicator === indicator)) &&
-                            styles.selectedItem,
-                        ]}
-                        onPress={() =>
-                          handleSelectIndicator(
-                            type as 'main' | 'sub',
-                            indicator,
-                          )
-                        }
-                      >
-                        <Text
+                  {Object.keys(IndicatorTypes[type as keyof typeof IndicatorTypes]).map(
+                    indicatorKey => {
+                      const indicator = parseInt(indicatorKey, 10);
+                      return (
+                        <TouchableOpacity
+                          key={indicator}
                           style={[
-                            styles.selectorItemText,
-                            ((type === 'main' &&
-                              selectedMainIndicator === indicator) ||
-                              (type === 'sub' &&
-                                selectedSubIndicator === indicator)) &&
-                              styles.selectedItemText,
+                            styles.selectorItem,
+                            ((type === 'main' && selectedMainIndicator === indicator) ||
+                              (type === 'sub' && selectedSubIndicator === indicator)) &&
+                              styles.selectedItem,
                           ]}
+                          onPress={() => handleSelectIndicator(type as 'main' | 'sub', indicator)}
                         >
-                          {IndicatorTypes[type as keyof typeof IndicatorTypes][
-                            indicator
-                          ]?.label || 'NONE'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                          <Text
+                            style={[
+                              styles.selectorItemText,
+                              ((type === 'main' && selectedMainIndicator === indicator) ||
+                                (type === 'sub' && selectedSubIndicator === indicator)) &&
+                                styles.selectedItemText,
+                            ]}
+                          >
+                            {IndicatorTypes[type as keyof typeof IndicatorTypes][indicator]
+                              ?.label || 'NONE'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    },
+                  )}
                 </View>
               ))}
             </ScrollView>
@@ -2090,16 +1984,14 @@ const KLineScreen: React.FC = () => {
                     key={toolKey}
                     style={[
                       styles.selectorItem,
-                      selectedDrawTool === parseInt(toolKey, 10) &&
-                        styles.selectedItem,
+                      selectedDrawTool === parseInt(toolKey, 10) && styles.selectedItem,
                     ]}
                     onPress={() => handleSelectDrawTool(parseInt(toolKey, 10))}
                   >
                     <Text
                       style={[
                         styles.selectorItemText,
-                        selectedDrawTool === parseInt(toolKey, 10) &&
-                          styles.selectedItemText,
+                        selectedDrawTool === parseInt(toolKey, 10) && styles.selectedItemText,
                       ]}
                     >
                       {DrawToolTypes[parseInt(toolKey, 10)].label}
@@ -2114,13 +2006,8 @@ const KLineScreen: React.FC = () => {
                     paddingHorizontal: 16,
                   }}
                 >
-                  <Text style={styles.selectorItemText}>
-                    Continuous drawing:{' '}
-                  </Text>
-                  <Switch
-                    value={drawShouldContinue}
-                    onValueChange={setDrawShouldContinue}
-                  />
+                  <Text style={styles.selectorItemText}>Continuous drawing: </Text>
+                  <Switch value={drawShouldContinue} onValueChange={setDrawShouldContinue} />
                 </View>
               </View>
             </ScrollView>

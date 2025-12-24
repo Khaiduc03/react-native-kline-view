@@ -1,0 +1,94 @@
+{
+  // Editor settings
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "never"
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+
+  // File associations
+  "files.associations": {
+    "*.js": "javascriptreact",
+    "*.tsx": "typescriptreact"
+  },
+
+  // ESLint
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.workingDirectories": [
+    { "directory": "./", "changeProcessCWD": true },
+    { "directory": "./example", "changeProcessCWD": true }
+  ],
+
+  // Prettier
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // Swift
+  "[swift]": {
+    "editor.tabSize": 4
+  },
+
+  // Java/Kotlin
+  "[java]": {
+    "editor.tabSize": 4
+  },
+  "[kotlin]": {
+    "editor.tabSize": 4
+  },
+
+  // TypeScript
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.suggest.autoImports": true,
+
+  // Search exclusions
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/build": true,
+    "**/ios/Pods": true,
+    "**/ios/build": true,
+    "**/android/build": true,
+    "**/.gradle": true
+  },
+
+  // Files exclusions
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": false
+  },
+
+  // File watcher exclusions
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/ios/Pods/**": true,
+    "**/ios/build/**": true,
+    "**/android/build/**": true,
+    "**/.gradle/**": true
+  }
+}

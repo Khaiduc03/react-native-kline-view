@@ -115,4 +115,36 @@ class RNKLineView: RCTViewManager {
         }
     }
 
+    // ----- Price Prediction overlay (Phase 2 - iOS only) -----
+    // Called from JS: NativeModules.RNKLineView.setPrediction(reactTag, payload)
+    @objc func setPrediction(_ reactTag: NSNumber, payload: NSDictionary) {
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { (_, viewRegistry) in
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+            guard let view = view else {
+                print("🚨 [Pods RNKLineView] setPrediction no view for tag:", reactTag)
+                return
+            }
+            let dict = payload as? [String: Any] ?? [:]
+            view.setPrediction(dict)
+        }
+    }
+
+    // Called from JS: NativeModules.RNKLineView.clearPrediction(reactTag)
+    @objc func clearPrediction(_ reactTag: NSNumber) {
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { (_, viewRegistry) in
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+            guard let view = view else {
+                print("🚨 [Pods RNKLineView] clearPrediction no view for tag:", reactTag)
+                return
+            }
+            view.clearPrediction()
+        }
+    }
+
 }

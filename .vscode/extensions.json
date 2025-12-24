@@ -1,0 +1,32 @@
+{
+  "recommendations": [
+    // Essential
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+
+    // React Native
+    "msjsdiag.vscode-react-native",
+    "dsznajder.es7-react-js-snippets",
+
+    // TypeScript
+    "ms-vscode.vscode-typescript-next",
+
+    // Swift (iOS)
+    "sswg.swift-lang",
+
+    // Java/Kotlin (Android)
+    "redhat.java",
+    "fwcd.kotlin",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // Utilities
+    "streetsidesoftware.code-spell-checker",
+    "gruntfuggly.todo-tree",
+    "aaron-bond.better-comments",
+    "christian-kohler.path-intellisense"
+  ]
+}

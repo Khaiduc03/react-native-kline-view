@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+android/build/
+android/app/build/
+ios/build/
+ios/Pods/
+example/ios/build/
+example/ios/Pods/
+example/android/build/
+example/android/app/build/
+
+# Generated files
+*.lock
+yarn.lock
+package-lock.json
+Podfile.lock
+
+# Coverage
+coverage/
+
+# Bundle
+.bundle/
+
+# Assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+
+# Native generated
+*.pbxproj
+*.xcworkspacedata
+
+# Misc
+.DS_Store
+.git/

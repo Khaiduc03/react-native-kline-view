@@ -1,0 +1,311 @@
+{
+  "session_id": "",
+  "question_input": "",
+  "target_language": "en",
+  "model_name": "gpt-4.1-nano",
+  "provider_type": "openai",
+  "collection_name": "string",
+  "symbol": "BTCUSDT",
+  "interval": "1h",
+  "mode": "swing",
+  "timestamp": 1733673600000,
+  "currentPrice": 98750.50,
+  "smcData": {
+    "orderBlocks": [
+      {
+        "type": "bullish",
+        "time": 1733655600,
+        "high": 97850.00,
+        "low": 97200.00,
+        "open": 97300.00,
+        "close": 97750.00,
+        "startIndex": 145,
+        "endIndex": null,
+        "mitigated": false
+      },
+      {
+        "type": "bearish",
+        "time": 1733648400,
+        "high": 99500.00,
+        "low": 98800.00,
+        "open": 98900.00,
+        "close": 99400.00,
+        "startIndex": 143,
+        "endIndex": 148,
+        "mitigated": true
+      },
+      {
+        "type": "bullish",
+        "time": 1733637600,
+        "high": 96500.00,
+        "low": 95800.00,
+        "open": 95900.00,
+        "close": 96400.00,
+        "startIndex": 140,
+        "endIndex": null,
+        "mitigated": false
+      },
+      {
+        "type": "bearish",
+        "time": 1733623200,
+        "high": 100200.00,
+        "low": 99400.00,
+        "open": 99500.00,
+        "close": 100100.00,
+        "startIndex": 136,
+        "endIndex": 142,
+        "mitigated": true
+      },
+      {
+        "type": "bullish",
+        "time": 1733608800,
+        "high": 95200.00,
+        "low": 94500.00,
+        "open": 94600.00,
+        "close": 95100.00,
+        "startIndex": 132,
+        "endIndex": null,
+        "mitigated": false
+      }
+    ],
+    "structureEvents": [
+      {
+        "time": 1733670000,
+        "type": "BOS",
+        "direction": "bullish",
+        "level": 98850.00,
+        "fromIndex": 148,
+        "toIndex": 151,
+        "category": "swing"
+      },
+      {
+        "time": 1733662800,
+        "type": "CHoCH",
+        "direction": "bearish",
+        "level": 99200.00,
+        "fromIndex": 145,
+        "toIndex": 149,
+        "category": "swing"
+      },
+      {
+        "time": 1733651400,
+        "type": "BOS",
+        "direction": "bearish",
+        "level": 97500.00,
+        "fromIndex": 142,
+        "toIndex": 146,
+        "category": "swing"
+      },
+      {
+        "time": 1733640200,
+        "type": "CHoCH",
+        "direction": "bullish",
+        "level": 96800.00,
+        "fromIndex": 138,
+        "toIndex": 142,
+        "category": "swing"
+      },
+      {
+        "time": 1733626800,
+        "type": "BOS",
+        "direction": "bullish",
+        "level": 95400.00,
+        "fromIndex": 134,
+        "toIndex": 138,
+        "category": "swing"
+      }
+    ],
+    "liquidityZones": [
+      {
+        "time": 1733666400,
+        "type": "EQH",
+        "level": 99500.00,
+        "fromIndex": 146,
+        "toIndex": 150,
+        "category": "swing"
+      },
+      {
+        "time": 1733655600,
+        "type": "EQL",
+        "level": 97100.00,
+        "fromIndex": 142,
+        "toIndex": 145,
+        "category": "swing"
+      },
+      {
+        "time": 1733644800,
+        "type": "EQH",
+        "level": 100300.00,
+        "fromIndex": 138,
+        "toIndex": 141,
+        "category": "swing"
+      },
+      {
+        "time": 1733630400,
+        "type": "EQL",
+        "level": 94800.00,
+        "fromIndex": 133,
+        "toIndex": 136,
+        "category": "swing"
+      }
+    ],
+    "fairValueGaps": [
+      {
+        "type": "bullish",
+        "startTime": 1733669400,
+        "startIndex": 150,
+        "topPrice": 98600.00,
+        "bottomPrice": 98200.00,
+        "mitigated": false,
+        "mitigatedIndex": null
+      },
+      {
+        "type": "bearish",
+        "startTime": 1733662200,
+        "startIndex": 148,
+        "topPrice": 99100.00,
+        "bottomPrice": 98700.00,
+        "mitigated": true,
+        "mitigatedIndex": 151
+      },
+      {
+        "type": "bullish",
+        "startTime": 1733652000,
+        "startIndex": 146,
+        "topPrice": 97400.00,
+        "bottomPrice": 96900.00,
+        "mitigated": false,
+        "mitigatedIndex": null
+      },
+      {
+        "type": "bearish",
+        "startTime": 1733641200,
+        "startIndex": 141,
+        "topPrice": 99800.00,
+        "bottomPrice": 99300.00,
+        "mitigated": true,
+        "mitigatedIndex": 145
+      },
+      {
+        "type": "bullish",
+        "startTime": 1733627400,
+        "startIndex": 135,
+        "topPrice": 95600.00,
+        "bottomPrice": 95100.00,
+        "mitigated": false,
+        "mitigatedIndex": null
+      }
+    ],
+    "premiumDiscount": [
+      {
+        "fromIndex": 148,
+        "toIndex": 151,
+        "midpoint": 98425.00
+      },
+      {
+        "fromIndex": 145,
+        "toIndex": 148,
+        "midpoint": 98275.00
+      },
+      {
+        "fromIndex": 142,
+        "toIndex": 145,
+        "midpoint": 97850.00
+      },
+      {
+        "fromIndex": 138,
+        "toIndex": 142,
+        "midpoint": 98100.00
+      },
+      {
+        "fromIndex": 134,
+        "toIndex": 138,
+        "midpoint": 96300.00
+      }
+    ],
+    "swingsInternal": [],
+    "swingsSwing": [
+      {
+        "time": 1733670000,
+        "price": 99500.00,
+        "type": "high",
+        "index": 151
+      },
+      {
+        "time": 1733655600,
+        "price": 97100.00,
+        "type": "low",
+        "index": 145
+      },
+      {
+        "time": 1733644800,
+        "price": 100300.00,
+        "type": "high",
+        "index": 141
+      },
+      {
+        "time": 1733630400,
+        "price": 94800.00,
+        "type": "low",
+        "index": 136
+      },
+      {
+        "time": 1733616000,
+        "price": 96200.00,
+        "type": "high",
+        "index": 132
+      }
+    ]
+  },
+  "metadata": {
+    "totalOrderBlocks": 5,
+    "activeOrderBlocks": 3,
+    "mitigatedOrderBlocks": 2,
+    "totalStructureEvents": 5,
+    "bosCount": 3,
+    "chochCount": 2,
+    "totalLiquidityZones": 4,
+    "eqhCount": 2,
+    "eqlCount": 2,
+    "totalFairValueGaps": 5,
+    "activeFvgCount": 3,
+    "mitigatedFvgCount": 2,
+    "currentTrend": "bullish",
+    "lastStructureType": "BOS",
+    "priceInPremium": true,
+    "nearestSupport": 97100.00,
+    "nearestResistance": 99500.00
+  },
+  "tradingSignals": {
+    "bias": "bullish",
+    "strength": "strong",
+    "entryZones": [
+      {
+        "type": "order_block",
+        "price": 97200.00,
+        "confidence": "high",
+        "reason": "Unmitigated Bullish OB + BOS confirmation"
+      },
+      {
+        "type": "fvg",
+        "price": 98200.00,
+        "confidence": "medium",
+        "reason": "Bullish FVG in discount zone"
+      }
+    ],
+    "stopLoss": 96800.00,
+    "targets": [
+      {
+        "level": 99500.00,
+        "type": "liquidity_sweep",
+        "reason": "EQH liquidity target"
+      },
+      {
+        "level": 100300.00,
+        "type": "structure_high",
+        "reason": "Previous swing high"
+      }
+    ],
+    "riskRewardRatio": 3.2
+  }
+}

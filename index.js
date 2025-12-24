@@ -37,13 +37,19 @@ function runCommand(nativeRef, commandName, payload) {
       return;
     }
 
+    if (commandName === "clearPrediction") {
+      manager.clearPrediction(nodeHandle);
+      return;
+    }
+
     if (commandName === "setData") {
       // setData expects an array of candles
       manager.setData(nodeHandle, payload);
-    } else {
-      // appendCandle / updateLastCandle take a single candle object
-      manager[commandName](nodeHandle, payload);
+      return;
     }
+
+    // appendCandle / updateLastCandle / setPrediction take a single object payload
+    manager[commandName](nodeHandle, payload);
     return;
   }
 
@@ -66,6 +72,23 @@ const RNKLineView = forwardRef((props, ref) => {
     appendCandle: (candle) => runCommand(nativeRef, "appendCandle", candle),
     updateLastCandle: (candle) =>
       runCommand(nativeRef, "updateLastCandle", candle),
+
+    /**
+     * iOS-only (Phase 2): set a price prediction overlay.
+     * Android support will be added in a later phase.
+     */
+    setPrediction: (prediction) => {
+      if (Platform.OS !== "ios") return;
+      runCommand(nativeRef, "setPrediction", prediction);
+    },
+
+    /**
+     * iOS-only (Phase 2): clear prediction overlay and tooltip.
+     */
+    clearPrediction: () => {
+      if (Platform.OS !== "ios") return;
+      runCommand(nativeRef, "clearPrediction");
+    },
   }));
 
   return <NativeRNKLineView ref={nativeRef} {...props} />;

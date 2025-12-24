@@ -24,6 +24,15 @@ class HTKLineView: UIScrollView {
     var selectedLocation: CGPoint?
     var scale: CGFloat = 1
 
+    // ----- Price prediction overlay (Phase 2 - iOS only) -----
+    var predictionState: HTPredictionState? = nil
+    private let predictionDraw = HTPredictionDraw()
+
+    /// Tap inside prediction region (tooltip is hosted by container view).
+    var onPredictionTap: ((Int, CGPoint) -> Void)?
+    /// Any scroll/pinch should hide tooltip.
+    var onInteractionBegan: (() -> Void)?
+
     let mainDraw = HTMainDraw.init()
     let volumeDraw = HTVolumeDraw.init()
     let macdDraw = HTMacdDraw.init()
@@ -188,6 +197,18 @@ class HTKLineView: UIScrollView {
         }
     }
 
+    // MARK: - Prediction API
+
+    func setPredictionState(_ state: HTPredictionState?) {
+        self.predictionState = state
+        self.setNeedsDisplay()
+    }
+
+    func clearPredictionState() {
+        self.predictionState = nil
+        self.setNeedsDisplay()
+    }
+
     func reloadContentSize() {
         configManager.reloadScrollViewScale(scale)
         // Add candle-based right offset for blank space (e.g., prediction area)
@@ -216,6 +237,17 @@ class HTKLineView: UIScrollView {
 
         calculateBaseHeight()
         contextTranslate(context, CGFloat(visibleRange.lowerBound) * configManager.itemWidth, { context in
+            if let state = self.predictionState {
+                self.predictionDraw.draw(
+                    context,
+                    state: state,
+                    visibleLowerBoundIndex: self.visibleRange.lowerBound,
+                    mainMinMaxRange: self.mainMinMaxRange,
+                    mainBaseY: self.mainBaseY,
+                    mainHeight: self.mainHeight,
+                    configManager: self.configManager
+                )
+            }
             drawCandle(context)
         })
 
@@ -246,6 +278,13 @@ class HTKLineView: UIScrollView {
         self.allWidth = self.bounds.size.width
 
         self.mainMinMaxRange = mainDraw.minMaxRange(visibleModelArray, configManager)
+        if let state = predictionState, state.includeInScale, let pr = predictionDraw.minMaxRange(state) {
+            let lower = min(self.mainMinMaxRange.lowerBound, pr.lowerBound)
+            let upper = max(self.mainMinMaxRange.upperBound, pr.upperBound)
+            if upper > lower {
+                self.mainMinMaxRange = lower..<upper
+            }
+        }
         self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
         self.mainBaseY = configManager.paddingTop - textHeight
         self.mainHeight = allHeight * volumeRange.lowerBound - mainBaseY - textHeight
@@ -776,6 +815,7 @@ extension HTKLineView: UIScrollViewDelegate {
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        onInteractionBegan?()
         selectedIndex = -1
         selectedLocation = nil
         self.setNeedsDisplay()
@@ -795,6 +835,20 @@ extension HTKLineView: UIScrollViewDelegate {
 
     @objc
     func tapSelector(_ gesture: UITapGestureRecognizer) {
+        onInteractionBegan?()
+        let point = gesture.location(in: self)
+        if let state = predictionState {
+            let index = Int(floor(point.x / configManager.itemWidth))
+            let offset = index - state.anchorIndex
+            if offset >= 0 && offset <= state.horizonCandles {
+                onPredictionTap?(offset, point)
+                selectedIndex = -1
+                selectedLocation = nil
+                self.setNeedsDisplay()
+                return
+            }
+        }
+
         selectedIndex = -1
         selectedLocation = nil
         self.setNeedsDisplay()
@@ -803,7 +857,10 @@ extension HTKLineView: UIScrollViewDelegate {
     @objc
     func pinchSelector(_ gesture: UIPinchGestureRecognizer) {
         switch gesture.state {
+        case .began:
+            onInteractionBegan?()
         case .changed:
+            onInteractionBegan?()
             scale += (gesture.scale - 1) / 10
         default:
             break
