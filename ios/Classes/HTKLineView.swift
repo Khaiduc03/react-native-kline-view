@@ -30,6 +30,7 @@ class HTKLineView: UIScrollView {
     let kdjDraw = HTKdjDraw.init()
     let rsiDraw = HTRsiDraw.init()
     let wrDraw = HTWrDraw.init()
+    let signalDraw = HTSignalDraw.init()
 
     var childDraw: HTKLineDrawProtocol?
 
@@ -227,6 +228,10 @@ class HTKLineView: UIScrollView {
             drawHighLow(context)
             drawTime(context)
             drawClosePrice(context)
+            
+            // Draw trading signal visualization (prediction zones, targets, price boxes)
+            signalDraw.draw(context, self, configManager.tradingSignal, configManager)
+            
             drawSelectedLine(context)
             drawSelectedBoard(context)
             drawSelectedTime(context)

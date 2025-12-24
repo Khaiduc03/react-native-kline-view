@@ -30,7 +30,7 @@ import RNKLineView, {
   type DrawPointCompleteEvent,
   type RNKLineViewRef,
 } from 'react-native-kline-view';
-import { runSMCStrategyLux, SMCResult } from './smc-strategy';
+import { runSMCStrategyLux, SMCResult, TradingSignal } from './smc-strategy';
 
 // ==================== Type Definitions ====================
 
@@ -179,6 +179,7 @@ interface KLineOptionList {
   time: number;
   configList: ConfigList;
   drawList: DrawList;
+  tradingSignal?: TradingSignal | null;
 }
 
 interface Theme {
@@ -1141,6 +1142,7 @@ const packOptionList = (
   selectedSubIndicator: number,
   selectedTimeType: number,
   drawList: DrawList,
+  tradingSignal?: TradingSignal | null,
 ): KLineOptionList => {
   const theme = ThemeManager.getCurrentTheme(isDarkTheme);
 
@@ -1282,6 +1284,7 @@ const packOptionList = (
     time: TimeTypes[selectedTimeType].value,
     configList: configList,
     drawList: drawList,
+    tradingSignal: tradingSignal ?? null,
   };
 };
 
@@ -1308,6 +1311,11 @@ const KLineScreen: React.FC = () => {
     DrawStateConstants.none,
   );
   const [drawClearFlag, setDrawClearFlag] = useState(false);
+
+  // Live Analyst - Trading Signal State
+  const [isLiveAnalystEnabled, setIsLiveAnalystEnabled] = useState(false);
+  const [currentTradingSignal, setCurrentTradingSignal] =
+    useState<TradingSignal | null>(null);
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
   const [isKLineReady, setIsKLineReady] = useState(false);
@@ -1413,6 +1421,47 @@ const KLineScreen: React.FC = () => {
   useEffect(() => {
     nativeDataRef.current = processedKLineData;
   }, [processedKLineData]);
+
+  // Calculate trading signal when Live Analyst is enabled
+  const calculatedTradingSignal = useMemo(() => {
+    if (!isLiveAnalystEnabled || !processedKLineData.length) {
+      return null;
+    }
+
+    // Convert processedKLineData to the Candle format expected by the strategy
+    const inputCandles = processedKLineData.map(c => ({
+      time: c.time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+
+    try {
+      const smcResult: SMCResult = runSMCStrategyLux(inputCandles, {
+        generateSignals: true,
+        interval: TimeTypes[selectedTimeType].label,
+      });
+
+      if (smcResult.tradingSignal) {
+        // Add current price for prediction line drawing
+        const lastCandle = processedKLineData[processedKLineData.length - 1];
+        return {
+          ...smcResult.tradingSignal,
+          currentPrice: lastCandle?.close,
+        };
+      }
+    } catch (error) {
+      console.warn('SMC Strategy calculation error:', error);
+    }
+
+    return null;
+  }, [processedKLineData, selectedTimeType, isLiveAnalystEnabled]);
+
+  // Update currentTradingSignal when calculated signal changes
+  useEffect(() => {
+    setCurrentTradingSignal(calculatedTradingSignal);
+  }, [calculatedTradingSignal]);
 
   const handleNativeAppend = useCallback(() => {
     const list = nativeDataRef.current;
@@ -1533,29 +1582,37 @@ const KLineScreen: React.FC = () => {
   ]);
 
   const handleNativeTradingSignal = useCallback(() => {
-    if (!processedKLineData.length) {
-      console.log('No K-line data available for strategy analysis');
-      return;
-    }
+    // Toggle Live Analyst mode
+    setIsLiveAnalystEnabled(prev => {
+      const newValue = !prev;
+      console.log('Live Analyst:', newValue ? 'ENABLED' : 'DISABLED');
 
-    // Convert processedKLineData to the Candle format expected by the strategy
-    const inputCandles = processedKLineData.map(c => ({
-      time: c.time,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }));
+      if (newValue && processedKLineData.length) {
+        // Log current signal when enabling
+        const inputCandles = processedKLineData.map(c => ({
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }));
 
-    const smcResult: SMCResult = runSMCStrategyLux(inputCandles, {
-      generateSignals: true,
-      interval: TimeTypes[selectedTimeType].label,
+        const smcResult: SMCResult = runSMCStrategyLux(inputCandles, {
+          generateSignals: true,
+          interval: TimeTypes[selectedTimeType].label,
+        });
+
+        console.log('--- SMC Strategy Result ---');
+        console.log('Interval:', TimeTypes[selectedTimeType].label);
+        console.log(
+          'Result:',
+          JSON.stringify(smcResult.tradingSignal, null, 2),
+        );
+        console.log('---------------------------');
+      }
+
+      return newValue;
     });
-
-    console.log('--- SMC Strategy Result ---');
-    console.log('Interval:', TimeTypes[selectedTimeType].label);
-    console.log('Result:', JSON.stringify(smcResult.tradingSignal, null, 2));
-    console.log('---------------------------');
   }, [processedKLineData, selectedTimeType]);
 
   // Derive drawList from current draw tool and theme
@@ -1592,6 +1649,7 @@ const KLineScreen: React.FC = () => {
       selectedSubIndicator,
       selectedTimeType,
       drawList,
+      currentTradingSignal,
     );
   }, [
     processedKLineData,
@@ -1601,6 +1659,7 @@ const KLineScreen: React.FC = () => {
     selectedSubIndicator,
     selectedTimeType,
     drawList,
+    currentTradingSignal,
   ]);
 
   // Serialize optionList to JSON string for native component
@@ -1786,10 +1845,16 @@ const KLineScreen: React.FC = () => {
           backgroundColor: theme.buttonColor,
           marginLeft: 8,
         },
+        realtimeButtonActive: {
+          backgroundColor: '#10B981', // Green when active
+        },
         realtimeButtonText: {
           fontSize: 12,
           color: '#FFFFFF',
           fontWeight: '600',
+        },
+        realtimeButtonTextActive: {
+          color: '#FFFFFF',
         },
 
         selectorOverlay: {
@@ -2000,11 +2065,21 @@ const KLineScreen: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.realtimeButton}
+          style={[
+            styles.realtimeButton,
+            isLiveAnalystEnabled && styles.realtimeButtonActive,
+          ]}
           onPress={handleNativeTradingSignal}
           disabled={!isKLineReady}
         >
-          <Text style={styles.realtimeButtonText}>Trading Signal</Text>
+          <Text
+            style={[
+              styles.realtimeButtonText,
+              isLiveAnalystEnabled && styles.realtimeButtonTextActive,
+            ]}
+          >
+            {isLiveAnalystEnabled ? '📊 Live ON' : 'Live Analyst'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

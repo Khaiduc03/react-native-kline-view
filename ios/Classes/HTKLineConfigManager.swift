@@ -285,12 +285,9 @@ class HTKLineConfigManager: NSObject {
 
     var drawShouldTrash = false
 
-
-
-
-
-
-
+    // Trading Signal Data
+    var tradingSignalData: [String: Any]?
+    var tradingSignal: HTTradingSignalModel?
 
     func createFont(_ size: CGFloat) -> UIFont {
         let font = UIFont(name: fontFamily, size: size)
@@ -471,6 +468,15 @@ class HTKLineConfigManager: NSObject {
         closePriceRightLightLottieFloder = configList["closePriceRightLightLottieFloder"] as? String ?? ""
         closePriceRightLightLottieScale = configList["closePriceRightLightLottieScale"] as? CGFloat ?? 0
         closePriceRightLightLottieSource = configList["closePriceRightLightLottieSource"] as? String ?? ""
+        
+        // Parse Trading Signal data
+        if let signalData = optionList["tradingSignal"] as? [String: Any] {
+            self.tradingSignalData = signalData
+            self.tradingSignal = HTTradingSignalModel.parse(from: signalData)
+        } else {
+            self.tradingSignalData = nil
+            self.tradingSignal = nil
+        }
     }
 
 }
