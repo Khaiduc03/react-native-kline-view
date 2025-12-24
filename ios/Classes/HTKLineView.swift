@@ -58,6 +58,11 @@ class HTKLineView: UIScrollView {
     private var cachedHitIndex: Int?
     private var cachedWinningPredictionIndex: Int?
     private var cachedEntryHitIndex: Int?
+    
+    // Prediction Selection
+    var onPredictionSelect: ((_ details: [String: Any]?) -> Void)?
+    var selectedPredictionType: String? = nil // "entry", "sl", "tp"
+    var selectedPredictionIndex: Int? = nil // Index for TP list
 
     // === Grid spacing target (ô to, thưa) ===
     private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
@@ -733,10 +738,11 @@ class HTKLineView: UIScrollView {
         
         // 1. Entry Line (if present) - Yellow dashed + Label
         if let val = entryVal {
-            let color = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0) // Gold/Yellow
+            let isSelected = (selectedPredictionType == "entry")
+            let color = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: isSelected ? 1.0 : 0.8) // Gold/Yellow
             context.saveGState()
             context.setStrokeColor(color.cgColor)
-            context.setLineWidth(1.0)
+            context.setLineWidth(isSelected ? 4.0 : 1.0)
             context.setLineDash(phase: 0, lengths: [4, 4])
             context.move(to: CGPoint(x: startX, y: entryY))
             context.addLine(to: CGPoint(x: bgEndX, y: entryY))
@@ -760,13 +766,14 @@ class HTKLineView: UIScrollView {
         
         // 2. Stop Loss Line (if present) - Red dashed + Label
         if let sl = configManager.predictionStopLoss {
+            let isSelected = (selectedPredictionType == "sl")
             let val = CGFloat(sl)
             let slY = yFromValue(val)
             let color = UIColor.red
             
             context.saveGState()
             context.setStrokeColor(color.cgColor)
-            context.setLineWidth(1.0)
+            context.setLineWidth(isSelected ? 4.0 : 1.0)
             context.setLineDash(phase: 0, lengths: [4, 4])
             context.move(to: CGPoint(x: startX, y: slY))
             context.addLine(to: CGPoint(x: bgEndX, y: slY))
@@ -818,9 +825,10 @@ class HTKLineView: UIScrollView {
             }
 
             // Draw dashed line
+            let isSelected = (selectedPredictionType == "tp" && selectedPredictionIndex == pIndex)
             context.saveGState()
-            context.setStrokeColor(color.cgColor)
-            context.setLineWidth(1.5)
+            context.setStrokeColor(color.withAlphaComponent(isSelected ? 1.0 : 0.8).cgColor)
+            context.setLineWidth(isSelected ? 4.0 : 1.5)
             context.setLineDash(phase: 0, lengths: [6, 4])
             context.move(to: CGPoint(x: startX, y: originY))
             context.addLine(to: CGPoint(x: lineEndX, y: targetY))
@@ -1163,6 +1171,12 @@ extension HTKLineView: UIScrollViewDelegate {
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         selectedIndex = -1
         selectedLocation = nil
+        // Deselect prediction on scroll
+        if selectedPredictionType != nil {
+            selectedPredictionType = nil
+            selectedPredictionIndex = nil
+            onPredictionSelect?([:])
+        }
         self.setNeedsDisplay()
     }
 
@@ -1180,8 +1194,79 @@ extension HTKLineView: UIScrollViewDelegate {
 
     @objc
     func tapSelector(_ gesture: UITapGestureRecognizer) {
-        selectedIndex = -1
-        selectedLocation = nil
+        let point = gesture.location(in: self)
+        var didSelectPrediction = false
+        
+        // Only check if prediction exists
+        if let _ = configManager.predictionEntry {
+            let hitThreshold: CGFloat = 60.0
+            var candidates: [(type: String, price: CGFloat, index: Int?, dist: CGFloat)] = []
+            
+            // 1. Check Entry
+            if let entry = configManager.predictionEntry {
+                let entryY = yFromValue(CGFloat(entry))
+                let dist = abs(point.y - entryY)
+                if dist < hitThreshold {
+                    candidates.append(("entry", CGFloat(entry), nil, dist))
+                }
+            }
+            
+            // 2. Check SL
+            if let sl = configManager.predictionStopLoss {
+                let slY = yFromValue(CGFloat(sl))
+                let dist = abs(point.y - slY)
+                if dist < hitThreshold {
+                    candidates.append(("sl", CGFloat(sl), nil, dist))
+                }
+            }
+            
+            // 3. Check Targets
+            for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                if let val = prediction["value"] as? CGFloat {
+                    let tY = yFromValue(val)
+                    let dist = abs(point.y - tY)
+                    if dist < hitThreshold {
+                        candidates.append(("tp", val, pIndex, dist))
+                    }
+                }
+            }
+            
+            // Find closest candidate
+            if let best = candidates.min(by: { $0.dist < $1.dist }) {
+                selectedPredictionType = best.type
+                selectedPredictionIndex = best.index
+                didSelectPrediction = true
+                
+                var payload: [String: Any] = [
+                    "type": best.type,
+                    "price": Double(best.price)
+                ]
+                if let idx = best.index {
+                    payload["index"] = idx
+                }
+                onPredictionSelect?(payload)
+            }
+            
+
+        }
+        
+        if didSelectPrediction {
+            // Clear candle selection context
+            selectedIndex = -1
+            selectedLocation = nil
+        } else {
+            // Tapped empty space -> Deselect prediction
+             if selectedPredictionType != nil {
+                 selectedPredictionType = nil
+                 selectedPredictionIndex = nil
+                 onPredictionSelect?([:]) // Empty dict or nil to indicate deselect
+             }
+             
+            // Normal behavior: Clear selected Index
+            selectedIndex = -1
+            selectedLocation = nil
+        }
+        
         self.setNeedsDisplay()
     }
 

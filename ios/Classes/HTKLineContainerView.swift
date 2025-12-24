@@ -17,6 +17,8 @@ class HTKLineContainerView: UIView {
     
     @objc var onDrawPointComplete: RCTBubblingEventBlock?
     
+    @objc var onPredictionSelect: RCTBubblingEventBlock?
+    
     @objc var optionList: String? {
         didSet {
             guard let optionList = optionList else {
@@ -132,6 +134,13 @@ class HTKLineContainerView: UIView {
     }
     
     func reloadConfigManager(_ configManager: HTKLineConfigManager) {
+        
+        // Bind Prediction Selection
+        klineView.onPredictionSelect = { [weak self] (details) in
+             // If details is nil/empty, we can send empty dict to signal deselect
+             let payload = details ?? [:]
+             self?.onPredictionSelect?(payload)
+        }
         
         configManager.onDrawItemDidTouch = { [weak self] (drawItem, drawItemIndex) in
             self?.configManager.shouldReloadDrawItemIndex = drawItemIndex

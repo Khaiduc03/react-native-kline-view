@@ -10,6 +10,8 @@ RCT_EXPORT_VIEW_PROPERTY(onDrawItemComplete, RCTBubblingEventBlock)
 
 RCT_EXPORT_VIEW_PROPERTY(onDrawPointComplete, RCTBubblingEventBlock)
 
+RCT_EXPORT_VIEW_PROPERTY(onPredictionSelect, RCTBubblingEventBlock)
+
 RCT_EXPORT_VIEW_PROPERTY(optionList, NSString)
 
 RCT_EXTERN_METHOD(setData:(nonnull NSNumber *)reactTag candles:(NSArray *)candles)

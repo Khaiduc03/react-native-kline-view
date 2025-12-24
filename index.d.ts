@@ -18,6 +18,7 @@ export type Candle = {
 export type DrawItemTouchEvent = NativeSyntheticEvent<Record<string, any>>;
 export type DrawItemCompleteEvent = NativeSyntheticEvent<Record<string, any>>;
 export type DrawPointCompleteEvent = NativeSyntheticEvent<Record<string, any>>;
+export type PredictionSelectEvent = NativeSyntheticEvent<Record<string, any>>;
 
 export interface RNKLineViewProps extends ViewProps {
   optionList?: string;
@@ -25,6 +26,7 @@ export interface RNKLineViewProps extends ViewProps {
   onDrawItemDidTouch?: (event: DrawItemTouchEvent) => void;
   onDrawItemComplete?: (event: DrawItemCompleteEvent) => void;
   onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
+  onPredictionSelect?: (event: PredictionSelectEvent) => void;
 }
 
 export interface RNKLineViewRef {

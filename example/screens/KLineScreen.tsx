@@ -2067,6 +2067,9 @@ const KLineScreen: React.FC = () => {
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}
+        onPredictionSelect={event => {
+          console.log('Prediction Selected:', event.nativeEvent);
+        }}
       />
     );
     if (

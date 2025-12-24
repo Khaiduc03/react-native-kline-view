@@ -38,7 +38,7 @@ export const fetchBinanceKLineData = async (
   limit: number = 200,
 ): Promise<KLineRawPoint[]> => {
   try {
-    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${1000}`;
+    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${500}`;
     const response = await fetch(url);
 
     if (!response.ok) {
