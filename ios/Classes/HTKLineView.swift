@@ -57,6 +57,7 @@ class HTKLineView: UIScrollView {
     private var cachedPredictionStartTime: Double? = nil
     private var cachedHitIndex: Int?
     private var cachedWinningPredictionIndex: Int?
+    private var cachedEntryHitIndex: Int?
 
     // === Grid spacing target (ô to, thưa) ===
     private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
@@ -530,6 +531,7 @@ class HTKLineView: UIScrollView {
         var hitIndex: Int?
         var winningPredictionIndex: Int?
         
+        
         let currentStartTime = configManager.predictionStartTime
         
         // Use cache if available and data hasn't changed
@@ -537,26 +539,94 @@ class HTKLineView: UIScrollView {
             hitIndex = cachedHitIndex
             winningPredictionIndex = cachedWinningPredictionIndex
         } else {
-            // Re-scan
-            scanLoop: for i in (targetIndex + 1)..<count {
-                let candle = configManager.modelArray[i]
-                for (pIndex, prediction) in configManager.predictionList.enumerated() {
-                    if let val = prediction["value"] as? CGFloat {
-                        // Check for target hit:
-                        if (val > startPrice && candle.high >= val) ||
-                            (val < startPrice && candle.low <= val) {
-                            hitIndex = i
-                            winningPredictionIndex = pIndex
-                            break scanLoop
+            // Re-scan with Entry -> Target logic
+            var computedEntryHitIndex: Int? = nil
+            var computedHitIndex: Int? = nil
+            var computedWinningIndex: Int? = nil
+            
+            let entryVal = configManager.predictionEntry
+            
+            // Phase 1: Scan for Entry (if defined)
+            var scanStartIndex = targetIndex + 1
+            if let entry = entryVal {
+                 entryScan: for i in scanStartIndex..<count {
+                    let candle = configManager.modelArray[i]
+                    // Assume simple touch logic: High >= Entry >= Low
+                    if (candle.high >= CGFloat(entry) && candle.low <= CGFloat(entry)) {
+                        computedEntryHitIndex = i
+                        scanStartIndex = i // Continue target scan from here
+                        break entryScan
+                    }
+                }
+            } else {
+                // No entry defined, assume active immediately
+                computedEntryHitIndex = targetIndex
+            }
+            
+            // Phase 2: Scan for Targets/SL (only if entry hit or no entry required)
+            if computedEntryHitIndex != nil {
+                targetScan: for i in scanStartIndex..<count {
+                    let candle = configManager.modelArray[i]
+                    
+                    // 1. Check Stop Loss
+                    if let sl = configManager.predictionStopLoss {
+                        let slVal = CGFloat(sl)
+                         // Hit if price crosses SL
+                        // Logic depends on Bias? If Long: Low <= SL. If Short: High >= SL.
+                        // Or simple touch? Let's use simple touch for now, or infer from bias if available.
+                        // Ideally: bias should confirm direction.
+                        var slHit = false
+                        if let bias = configManager.predictionBias?.lowercased() {
+                            if bias == "bullish" && candle.low <= slVal { slHit = true }
+                            else if bias == "bearish" && candle.high >= slVal { slHit = true }
+                        } else {
+                             // Fallback: touch
+                             if candle.high >= slVal && candle.low <= slVal { slHit = true }
+                        }
+                        
+                        if slHit {
+                            computedHitIndex = i
+                            // No winning target, just SL hit.
+                            // We might want to indicate SL hit vs Target hit separately?
+                            // For now, hitIndex stops graph. winningIndex nil means SL or failure.
+                            break targetScan
+                        }
+                    }
+                    
+                    // 2. Check Targets
+                    for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                        if let val = prediction["value"] as? CGFloat {
+                            // Check for target hit
+                             // Logic: Long -> High >= Target. Short -> Low <= Target.
+                             // Or simple touch.
+                            var targetHit = false
+                            if let bias = configManager.predictionBias?.lowercased() {
+                                if bias == "bullish" && candle.high >= val { targetHit = true }
+                                else if bias == "bearish" && candle.low <= val { targetHit = true }
+                            } else {
+                                // Fallback: touch
+                                if candle.high >= val && candle.low <= val { targetHit = true }
+                            }
+                            
+                            if targetHit {
+                                computedHitIndex = i
+                                computedWinningIndex = pIndex
+                                break targetScan
+                            }
                         }
                     }
                 }
             }
+            
             // Update cache
             cachedPredictionDataCount = count
             cachedPredictionStartTime = currentStartTime
-            cachedHitIndex = hitIndex
-            cachedWinningPredictionIndex = winningPredictionIndex
+            cachedHitIndex = computedHitIndex
+            cachedWinningPredictionIndex = computedWinningIndex
+            cachedEntryHitIndex = computedEntryHitIndex
+            
+            hitIndex = computedHitIndex
+            winningPredictionIndex = computedWinningIndex
         }
 
         // Calculate Background Extension

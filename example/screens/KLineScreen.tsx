@@ -1691,7 +1691,7 @@ const KLineScreen: React.FC = () => {
             color:
               t.level > currentPrice
                 ? toColorNumber(processColor('#4CAF50')) // Green
-                : toColorNumber(processColor('#F44336')), // Red
+                : toColorNumber(processColor('#4CAF50')), // Red
           }));
         setPredictionList(predictions);
       } else {
