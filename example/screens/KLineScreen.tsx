@@ -1658,6 +1658,7 @@ const KLineScreen: React.FC = () => {
               ? toColorNumber(processColor('#4CAF50')) // Green for bullish targets
               : toColorNumber(processColor('#F44336')), // Red for bearish targets
         }));
+
       setPredictionList(predictions);
     } else {
       setPredictionList([]);

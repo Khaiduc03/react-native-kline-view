@@ -513,16 +513,38 @@ class HTKLineView: UIScrollView {
         
         let targetModel = configManager.modelArray[targetIndex]
         
-        // X position of analysis start candle
+        // Determine active range and hit status
+        let startPrice = targetModel.close
+        var hitIndex: Int?
+        var winningPredictionIndex: Int?
+        
+        scanLoop: for i in (targetIndex + 1)..<count {
+            let candle = configManager.modelArray[i]
+            for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                if let val = prediction["value"] as? CGFloat {
+                    // Check for target hit:
+                    if (val > startPrice && candle.high >= val) ||
+                        (val < startPrice && candle.low <= val) {
+                        hitIndex = i
+                        winningPredictionIndex = pIndex
+                        break scanLoop
+                    }
+                }
+            }
+        }
+
+        // Calculate Background Extension (Always min 10 or follows data)
+        let currentDataLen = (count - 1) - targetIndex
+        let bgExtension = max(currentDataLen, 10)
+
+        // X positions
         let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
-        let startY = yFromValue(targetModel.close)
-
-        // X position for future target (end of prediction area)
-        // Ensure futureX starts from startX
-        let futureX = startX + CGFloat(configManager.rightOffsetCandles) * configManager.itemWidth
-
-        // Draw gradient background
-        let bgRect = CGRect(x: startX, y: mainBaseY, width: futureX - startX, height: mainHeight)
+        let startY = yFromValue(startPrice)
+        let bgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
+        
+        // Draw gradient background (using bgEndX)
+        let bgRect = CGRect(x: startX, y: mainBaseY, width: bgEndX - startX, height: mainHeight)
+        
         context.saveGState()
         context.clip(to: bgRect)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -536,7 +558,12 @@ class HTKLineView: UIScrollView {
         }
         context.restoreGState()
 
-        for prediction in configManager.predictionList {
+        for (pIndex, prediction) in configManager.predictionList.enumerated() {
+            // Winner takes all: If a target was hit, only show that target
+            if let winner = winningPredictionIndex, winner != pIndex {
+                continue
+            }
+
             guard let value = prediction["value"] as? CGFloat,
                   let colorInt = prediction["color"] as? Int,
                   let color = RCTConvert.uiColor(colorInt) else {
@@ -544,18 +571,37 @@ class HTKLineView: UIScrollView {
             }
 
             let targetY = yFromValue(value)
+            
+            // DNA of the line: Ends at Hit or Background End
+            let lineEndX: CGFloat
+            if let hit = hitIndex {
+                let hitExtension = hit - targetIndex
+                lineEndX = startX + CGFloat(hitExtension) * configManager.itemWidth
+            } else {
+                lineEndX = bgEndX
+            }
 
-            // 1. Draw dashed line from last candle to future target
+            // 1. Draw dashed line from start
             context.saveGState()
             context.setStrokeColor(color.cgColor)
             context.setLineWidth(1.5)
             context.setLineDash(phase: 0, lengths: [6, 4])
             context.move(to: CGPoint(x: startX, y: startY))
-            context.addLine(to: CGPoint(x: futureX, y: targetY))
+            context.addLine(to: CGPoint(x: lineEndX, y: targetY))
             context.strokePath()
             context.restoreGState()
 
-            // 2. Draw colored price label on the right Y-axis (pinned to screen edge)
+            // Draw dot if hit (Winner only, implied by loop check)
+            if hitIndex != nil {
+                context.saveGState()
+                context.setFillColor(color.cgColor)
+                let dotRadius: CGFloat = 3.0
+                let dotRect = CGRect(x: lineEndX - dotRadius, y: targetY - dotRadius, width: dotRadius * 2, height: dotRadius * 2)
+                context.fillEllipse(in: dotRect)
+                context.restoreGState()
+            }
+
+            // 2. Draw colored price label at the END of the line (lineEndX)
             let labelText = configManager.precision(value, configManager.price)
             let font = configManager.createFont(configManager.rightTextFontSize)
             let attributes: [NSAttributedString.Key: Any] = [
@@ -568,8 +614,8 @@ class HTKLineView: UIScrollView {
             let labelWidth = labelSize.width + paddingX * 2
             let labelHeight = labelSize.height + paddingY * 2
 
-            // Pin label to right edge of screen
-            let labelX = allWidth - labelWidth - 2
+            // Attach label to the end of the line
+            let labelX = lineEndX + 2
             let labelY = targetY - labelHeight / 2
 
             let labelRect = CGRect(x: labelX, y: labelY, width: labelWidth, height: labelHeight)
