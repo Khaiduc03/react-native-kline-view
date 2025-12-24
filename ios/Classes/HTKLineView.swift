@@ -215,15 +215,22 @@ class HTKLineView: UIScrollView {
         }
 
         calculateBaseHeight()
+        
+        // Draw grid FIRST (before candles) so it appears underneath
+        contextTranslate(context, contentOffset.x, { context in
+            drawGrid(context)
+        })
+        
+        // Draw candles AFTER grid so they appear on top
         contextTranslate(context, CGFloat(visibleRange.lowerBound) * configManager.itemWidth, { context in
             drawCandle(context)
         })
 
+        // Draw other elements (text, labels, etc.)
         contextTranslate(context, contentOffset.x, { context in
             // context.setFillColor(UIColor.red.withAlphaComponent(0.1).cgColor)
             // context.fill(CGRect.init(x: 0, y: mainBaseY, width: allWidth, height: mainHeight))
 
-            drawGrid(context)
             drawText(context)
             drawValue(context)
 

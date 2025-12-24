@@ -30,6 +30,7 @@ import RNKLineView, {
   type DrawPointCompleteEvent,
   type RNKLineViewRef,
 } from 'react-native-kline-view';
+import { runSMCStrategyLux, SMCResult } from './smc-strategy';
 
 // ==================== Type Definitions ====================
 
@@ -1531,6 +1532,32 @@ const KLineScreen: React.FC = () => {
     isWRSelected,
   ]);
 
+  const handleNativeTradingSignal = useCallback(() => {
+    if (!processedKLineData.length) {
+      console.log('No K-line data available for strategy analysis');
+      return;
+    }
+
+    // Convert processedKLineData to the Candle format expected by the strategy
+    const inputCandles = processedKLineData.map(c => ({
+      time: c.time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+
+    const smcResult: SMCResult = runSMCStrategyLux(inputCandles, {
+      generateSignals: true,
+      interval: TimeTypes[selectedTimeType].label,
+    });
+
+    console.log('--- SMC Strategy Result ---');
+    console.log('Interval:', TimeTypes[selectedTimeType].label);
+    console.log('Result:', JSON.stringify(smcResult.tradingSignal, null, 2));
+    console.log('---------------------------');
+  }, [processedKLineData, selectedTimeType]);
+
   // Derive drawList from current draw tool and theme
   const drawList = useMemo(() => {
     const theme = ThemeManager.getCurrentTheme(isDarkTheme);
@@ -1710,6 +1737,15 @@ const KLineScreen: React.FC = () => {
         },
         controlBarScroll: {
           flexGrow: 0, // avoid taking extra space; just wrap content
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          backgroundColor: theme.headerColor,
+          borderTopWidth: 1,
+          borderTopColor: theme.gridColor,
+          flexWrap: 'wrap',
         },
         controlBar: {
           flexDirection: 'row',
@@ -1741,7 +1777,7 @@ const KLineScreen: React.FC = () => {
         realtimeBar: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginLeft: 12,
+          marginTop: 12,
         },
         realtimeButton: {
           paddingHorizontal: 10,
@@ -1865,12 +1901,6 @@ const KLineScreen: React.FC = () => {
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}
-        customIndicatorOffset={500} // Candle index where indicator should appear
-        customIndicatorView={
-          <View style={{ width: 50, height: 200, backgroundColor: 'red' }}>
-            <Text>Custom Indicator</Text>
-          </View>
-        }
       />
     );
     if (
@@ -1891,10 +1921,9 @@ const KLineScreen: React.FC = () => {
   };
 
   const renderControlBar = () => (
-    <ScrollView
-      horizontal
+    <View
       style={styles.controlBarScroll}
-      contentContainerStyle={styles.controlBar}
+      // contentContainerStyle={styles.controlBar}
     >
       <TouchableOpacity
         style={styles.controlButton}
@@ -1969,8 +1998,16 @@ const KLineScreen: React.FC = () => {
         >
           <Text style={styles.realtimeButtonText}>Update Last</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.realtimeButton}
+          onPress={handleNativeTradingSignal}
+          disabled={!isKLineReady}
+        >
+          <Text style={styles.realtimeButtonText}>Trading Signal</Text>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 
   const renderSelectors = () => (
