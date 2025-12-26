@@ -134,7 +134,7 @@ public class KLineEntity implements IKLine {
 
     public List<Map<String, Object>> selectedItemList = new ArrayList<>();
 
-    public float id;
+    public long id;
     public String Date;
     public float Open;
     public float High;

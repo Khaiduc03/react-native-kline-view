@@ -209,7 +209,7 @@ public class HTKLineConfigManager {
 
     public KLineEntity packModel(Map<String, Object> keyValue) {
     	KLineEntity entity = new KLineEntity();
-    	entity.id = ((Number)keyValue.get("id")).intValue();
+    	entity.id = ((Number)keyValue.get("id")).longValue();
         entity.Date = keyValue.get("dateString").toString();
         entity.Open = ((Number)keyValue.get("open")).floatValue();
         entity.High = ((Number)keyValue.get("high")).floatValue();

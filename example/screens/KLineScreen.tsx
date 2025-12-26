@@ -1164,6 +1164,7 @@ const packOptionList = (
   predictionStopLoss?: number,
   predictionBias?: string,
   predictionEntryZones?: any[], // New param
+  shouldScrollToEnd?: boolean, // Control scroll behavior
 ): KLineOptionList => {
   const theme = ThemeManager.getCurrentTheme(isDarkTheme);
 
@@ -1297,7 +1298,7 @@ const packOptionList = (
 
   return {
     modelArray: modelArray,
-    shouldScrollToEnd: true,
+    shouldScrollToEnd: shouldScrollToEnd ?? false,
     targetList: targetList,
     price: 2, // Price precision
     volume: 0, // Volume precision
@@ -1348,6 +1349,7 @@ const KLineScreen: React.FC = () => {
   >();
   const [predictionBias, setPredictionBias] = useState<string | undefined>();
   const [predictionEntryZones, setPredictionEntryZones] = useState<any[]>([]); // New state
+  const [shouldScrollToEnd, setShouldScrollToEnd] = useState(false); // Control scroll timing
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
   const [isKLineReady, setIsKLineReady] = useState(false);
@@ -1763,6 +1765,7 @@ const KLineScreen: React.FC = () => {
       predictionStopLoss,
       predictionBias,
       predictionEntryZones,
+      shouldScrollToEnd,
     );
   }, [
     processedKLineData,
@@ -1778,7 +1781,21 @@ const KLineScreen: React.FC = () => {
     predictionStopLoss,
     predictionBias,
     predictionEntryZones,
+    shouldScrollToEnd,
   ]);
+
+  // Auto-scroll to end when prediction is set (after offset is applied)
+  useEffect(() => {
+    if (predictionEntry !== undefined && !shouldScrollToEnd) {
+      // Short delay to let offset apply first, then trigger scroll
+      const timer = setTimeout(() => {
+        setShouldScrollToEnd(true);
+        // Reset after scroll is triggered
+        setTimeout(() => setShouldScrollToEnd(false), 100);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [predictionEntry]);
 
   // Serialize optionList to JSON string for native component
   const optionListString = useMemo(() => {
