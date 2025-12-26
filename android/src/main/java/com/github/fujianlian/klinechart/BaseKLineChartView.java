@@ -113,6 +113,20 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
     private Paint mClosePriceRightTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    // Prediction paints
+    private Paint mPredictionLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mPredictionLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mPredictionGradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    // Prediction selection state
+    protected String mSelectedPredictionType = null;
+    protected Integer mSelectedPredictionIndex = null;
+    public OnPredictionSelectListener mOnPredictionSelectListener = null;
+
+    public interface OnPredictionSelectListener {
+        void onPredictionSelect(java.util.Map<String, Object> payload);
+    }
+
     private LottieDrawable lottieDrawable = new LottieDrawable();
 
     private String lastLoadLottieSource = "";
@@ -198,6 +212,18 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
         mClosePriceTrianglePaint.setStyle(Paint.Style.FILL);
 
+        // Prediction paint setup
+        mPredictionLinePaint.setStyle(Paint.Style.STROKE);
+        mPredictionLinePaint.setAntiAlias(true);
+        mPredictionLinePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), 1.5f));
+        mPredictionLinePaint.setPathEffect(new DashPathEffect(new float[]{12, 8}, 0));
+
+        mPredictionLabelPaint.setAntiAlias(true);
+        mPredictionLabelPaint.setTextSize(ViewUtil.Dp2Px(getContext(), 10f));
+
+        mPredictionGradientPaint.setStyle(Paint.Style.FILL);
+        mPredictionGradientPaint.setAntiAlias(true);
+
     }
 
     @Override
@@ -280,6 +306,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             drawMaxAndMin(canvas);
             drawValue(canvas, isLongPress ? mSelectedIndex : mStopIndex);
             drawClosePriceLine(canvas);
+            drawPrediction(canvas);
             drawSelector(canvas);
         }
         canvas.restore();
@@ -496,6 +523,173 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         }
 
     }
+
+    /**
+     * Draw prediction visualization (Entry, SL, TP lines with gradients)
+     */
+    private void drawPrediction(Canvas canvas) {
+        if (configManager.predictionEntry == null || configManager.predictionStartTime == null) {
+            return;
+        }
+        if (configManager.modelArray.isEmpty()) {
+            return;
+        }
+
+        // Find target index by predictionStartTime
+        int targetIndex = -1;
+        long startTime = configManager.predictionStartTime.longValue();
+        for (int i = 0; i < configManager.modelArray.size(); i++) {
+            KLineEntity entity = configManager.modelArray.get(i);
+            if (entity.id >= startTime) {
+                targetIndex = i;
+                break;
+            }
+        }
+        if (targetIndex < 0) {
+            targetIndex = configManager.modelArray.size() - 1;
+        }
+
+        int count = configManager.modelArray.size();
+        float entryPrice = configManager.predictionEntry.floatValue();
+        float entryY = yFromValue(entryPrice);
+
+        // Calculate background extension
+        int bgExtension = Math.max(count - 1 - targetIndex, 10);
+        float startX = scrollXtoViewX(getItemMiddleScrollX(targetIndex));
+        float endX = startX + bgExtension * mPointWidth * mScaleX;
+        float paddingRight = configManager.paddingRight;
+        float rightBound = mWidth - paddingRight;
+
+        // Clamp endX
+        endX = Math.min(endX, rightBound);
+
+        // --- Draw Gradient Zones ---
+        String bias = configManager.predictionBias;
+
+        // SL Zone (Red Gradient)
+        if (configManager.predictionStopLoss != null) {
+            float slPrice = configManager.predictionStopLoss.floatValue();
+            float slY = yFromValue(slPrice);
+            float top = Math.min(entryY, slY);
+            float bottom = Math.max(entryY, slY);
+
+            int startColor = Color.argb(50, 230, 50, 50);
+            int endColor = Color.argb(10, 230, 50, 50);
+            LinearGradient gradient = new LinearGradient(startX, entryY, startX, slY,
+                    startColor, endColor, Shader.TileMode.CLAMP);
+            mPredictionGradientPaint.setShader(gradient);
+            canvas.drawRect(startX, top, endX, bottom, mPredictionGradientPaint);
+        }
+
+        // TP Zone (Green Gradient)
+        if (!configManager.predictionList.isEmpty()) {
+            float extremeTarget = entryPrice;
+            for (java.util.Map<String, Object> prediction : configManager.predictionList) {
+                Object valObj = prediction.get("value");
+                if (valObj instanceof Number) {
+                    float val = ((Number) valObj).floatValue();
+                    if (bias != null && bias.equalsIgnoreCase("bullish")) {
+                        extremeTarget = Math.max(extremeTarget, val);
+                    } else if (bias != null && bias.equalsIgnoreCase("bearish")) {
+                        extremeTarget = Math.min(extremeTarget, val);
+                    } else {
+                        // Default: furthest from entry
+                        if (Math.abs(val - entryPrice) > Math.abs(extremeTarget - entryPrice)) {
+                            extremeTarget = val;
+                        }
+                    }
+                }
+            }
+            float targetY = yFromValue(extremeTarget);
+            float top = Math.min(entryY, targetY);
+            float bottom = Math.max(entryY, targetY);
+
+            int startColor = Color.argb(50, 76, 175, 80);
+            int endColor = Color.argb(10, 76, 175, 80);
+            LinearGradient gradient = new LinearGradient(startX, entryY, startX, targetY,
+                    startColor, endColor, Shader.TileMode.CLAMP);
+            mPredictionGradientPaint.setShader(gradient);
+            canvas.drawRect(startX, top, endX, bottom, mPredictionGradientPaint);
+        }
+
+        // --- Draw Entry Line (Yellow) ---
+        boolean isEntrySelected = "entry".equals(mSelectedPredictionType);
+        int entryColor = Color.rgb(255, 204, 0); // Gold/Yellow
+        mPredictionLinePaint.setColor(entryColor);
+        mPredictionLinePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), isEntrySelected ? 3f : 1.5f));
+        canvas.drawLine(startX, entryY, endX, entryY, mPredictionLinePaint);
+        drawPredictionLabel(canvas, "Entry", entryPrice, endX, entryY, entryColor, Color.BLACK);
+
+        // --- Draw SL Line (Red) ---
+        if (configManager.predictionStopLoss != null) {
+            float slPrice = configManager.predictionStopLoss.floatValue();
+            float slY = yFromValue(slPrice);
+            boolean isSlSelected = "sl".equals(mSelectedPredictionType);
+            int slColor = Color.rgb(244, 67, 54); // Red
+            mPredictionLinePaint.setColor(slColor);
+            mPredictionLinePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), isSlSelected ? 3f : 1.5f));
+            canvas.drawLine(startX, slY, endX, slY, mPredictionLinePaint);
+            drawPredictionLabel(canvas, "SL", slPrice, endX, slY, slColor, Color.WHITE);
+        }
+
+        // --- Draw TP Lines (Green) ---
+        for (int i = 0; i < configManager.predictionList.size(); i++) {
+            java.util.Map<String, Object> prediction = configManager.predictionList.get(i);
+            Object valObj = prediction.get("value");
+            Object colorObj = prediction.get("color");
+
+            if (!(valObj instanceof Number)) continue;
+
+            float tpPrice = ((Number) valObj).floatValue();
+            float tpY = yFromValue(tpPrice);
+            int tpColor = Color.rgb(76, 175, 80); // Default green
+            if (colorObj instanceof Number) {
+                tpColor = ((Number) colorObj).intValue();
+            }
+
+            boolean isTpSelected = "tp".equals(mSelectedPredictionType) && mSelectedPredictionIndex != null && mSelectedPredictionIndex == i;
+            mPredictionLinePaint.setColor(tpColor);
+            mPredictionLinePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), isTpSelected ? 3f : 1.5f));
+
+            // Draw diagonal line from entry to target
+            canvas.drawLine(startX, entryY, endX, tpY, mPredictionLinePaint);
+            drawPredictionLabel(canvas, "TP", tpPrice, endX, tpY, tpColor, Color.WHITE);
+        }
+
+        // Draw bias label
+        if (bias != null) {
+            String labelText = bias.equalsIgnoreCase("bullish") ? "LONG" : "SHORT";
+            int labelColor = bias.equalsIgnoreCase("bullish") ? Color.rgb(76, 175, 80) : Color.rgb(244, 67, 54);
+            mPredictionLabelPaint.setColor(labelColor);
+            mPredictionLabelPaint.setTextSize(ViewUtil.Dp2Px(getContext(), 12f));
+            canvas.drawText(labelText, startX + 10, mMainRect.top + 20, mPredictionLabelPaint);
+        }
+    }
+
+    private void drawPredictionLabel(Canvas canvas, String prefix, float price, float x, float y, int bgColor, int textColor) {
+        String text = prefix + " " + formatValue(price);
+        float textWidth = mPredictionLabelPaint.measureText(text);
+        float paddingX = ViewUtil.Dp2Px(getContext(), 4f);
+        float paddingY = ViewUtil.Dp2Px(getContext(), 2f);
+        Paint.FontMetrics fm = mPredictionLabelPaint.getFontMetrics();
+        float textHeight = fm.descent - fm.ascent;
+
+        float labelX = x + ViewUtil.Dp2Px(getContext(), 2f);
+        float labelY = y - textHeight / 2;
+        float labelRight = labelX + textWidth + paddingX * 2;
+        float labelBottom = labelY + textHeight + paddingY * 2;
+
+        // Background
+        mPredictionGradientPaint.setShader(null);
+        mPredictionGradientPaint.setColor(bgColor);
+        RectF rect = new RectF(labelX, labelY, labelRight, labelBottom);
+        canvas.drawRoundRect(rect, ViewUtil.Dp2Px(getContext(), 3f), ViewUtil.Dp2Px(getContext(), 3f), mPredictionGradientPaint);
+
+        // Text
+        mPredictionLabelPaint.setColor(textColor);
+        canvas.drawText(text, labelX + paddingX, labelY + paddingY + textHeight - fm.descent, mPredictionLabelPaint);
+    }
+
 
     /**
      * 画k线图
@@ -890,6 +1084,13 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     @Override
     protected void onScrollChanged(int l, int t, int oldl, int oldt) {
         super.onScrollChanged(l, t, oldl, oldt);
+        if (mSelectedPredictionType != null) {
+            mSelectedPredictionType = null;
+            mSelectedPredictionIndex = null;
+            if (mOnPredictionSelectListener != null) {
+                mOnPredictionSelectListener.onPredictionSelect(new java.util.HashMap<>());
+            }
+        }
     }
 
     @Override
@@ -1014,7 +1215,8 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     }
 
     public int getMaxScrollX() {
-        int contentWidth = (int) Math.max((mDataLen - (mWidth - configManager.paddingRight) / mScaleX), 0);
+        float offsetWidth = configManager.rightOffsetCandles * mPointWidth;
+        int contentWidth = (int) Math.max(((mDataLen + offsetWidth) - (mWidth - configManager.paddingRight) / mScaleX), 0);
         return contentWidth;
     }
 
@@ -1532,5 +1734,117 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     public Paint getBackgroundPaint() {
         return mBackgroundPaint;
     }
+
+    /**
+     * Override to handle tap on prediction lines
+     */
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        // Check if prediction is active
+        if (configManager.predictionEntry == null) {
+            // Clear selection if any
+            if (mSelectedPredictionType != null) {
+                mSelectedPredictionType = null;
+                mSelectedPredictionIndex = null;
+                if (mOnPredictionSelectListener != null) {
+                    mOnPredictionSelectListener.onPredictionSelect(new java.util.HashMap<>());
+                }
+                invalidate();
+            }
+            return super.onSingleTapUp(e);
+        }
+
+        float tapY = e.getY();
+        float hitThreshold = dp2px(30); // 30dp hit zone
+
+        // Build candidates
+        java.util.List<Object[]> candidates = new java.util.ArrayList<>();
+
+        // Entry
+        float entryY = yFromValue(configManager.predictionEntry.floatValue());
+        float entryDist = Math.abs(tapY - entryY);
+        if (entryDist < hitThreshold) {
+            candidates.add(new Object[]{"entry", configManager.predictionEntry.floatValue(), null, entryDist});
+        }
+
+        // SL
+        if (configManager.predictionStopLoss != null) {
+            float slY = yFromValue(configManager.predictionStopLoss.floatValue());
+            float slDist = Math.abs(tapY - slY);
+            if (slDist < hitThreshold) {
+                candidates.add(new Object[]{"sl", configManager.predictionStopLoss.floatValue(), null, slDist});
+            }
+        }
+
+        // TPs
+        for (int i = 0; i < configManager.predictionList.size(); i++) {
+            java.util.Map<String, Object> prediction = configManager.predictionList.get(i);
+            Object valObj = prediction.get("value");
+            if (valObj instanceof Number) {
+                float tpPrice = ((Number) valObj).floatValue();
+                float tpY = yFromValue(tpPrice);
+                float tpDist = Math.abs(tapY - tpY);
+                if (tpDist < hitThreshold) {
+                    candidates.add(new Object[]{"tp", tpPrice, i, tpDist});
+                }
+            }
+        }
+
+        // Find closest
+        if (!candidates.isEmpty()) {
+            Object[] best = candidates.get(0);
+            for (Object[] candidate : candidates) {
+                if ((Float) candidate[3] < (Float) best[3]) {
+                    best = candidate;
+                }
+            }
+
+            mSelectedPredictionType = (String) best[0];
+            mSelectedPredictionIndex = (Integer) best[2];
+
+            // Build payload
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("type", best[0]);
+            payload.put("price", best[1]);
+            if (best[2] != null) {
+                payload.put("index", best[2]);
+            }
+
+            // Enrich with metadata for TP
+            if ("tp".equals(best[0]) && best[2] != null) {
+                int idx = (Integer) best[2];
+                if (idx < configManager.predictionList.size()) {
+                    java.util.Map<String, Object> target = configManager.predictionList.get(idx);
+                    for (java.util.Map.Entry<String, Object> entry : target.entrySet()) {
+                        if (!"value".equals(entry.getKey()) && !"price".equals(entry.getKey())) {
+                            payload.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                }
+            }
+
+            // Invoke callback
+            if (mOnPredictionSelectListener != null) {
+                mOnPredictionSelectListener.onPredictionSelect(payload);
+            }
+
+            invalidate();
+            return true;
+        } else {
+            // Deselect if tapped elsewhere
+            if (mSelectedPredictionType != null) {
+                mSelectedPredictionType = null;
+                mSelectedPredictionIndex = null;
+                if (mOnPredictionSelectListener != null) {
+                    mOnPredictionSelectListener.onPredictionSelect(new java.util.HashMap<>());
+                }
+                invalidate();
+            }
+        }
+
+        return super.onSingleTapUp(e);
+    }
+
+
 
 }

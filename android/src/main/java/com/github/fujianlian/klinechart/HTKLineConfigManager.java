@@ -149,6 +149,15 @@ public class HTKLineConfigManager {
 
     public int[] targetColorList = { Color.RED, Color.RED, Color.RED, Color.RED, Color.RED, Color.RED };
 
+    // Prediction / Live Analyst
+    public int rightOffsetCandles = 0;
+    public List<Map<String, Object>> predictionList = new ArrayList<>();
+    public List<Map<String, Object>> predictionEntryZones = new ArrayList<>();
+    public Double predictionStartTime = null;
+    public Double predictionEntry = null;
+    public Double predictionStopLoss = null;
+    public String predictionBias = null;
+
     public String bollN = "";
     public String bollP = "";
     public String kdjM1 = "";
@@ -429,7 +438,36 @@ public class HTKLineConfigManager {
         this.minuteGradientColorList = parseColorList(configList.get("minuteGradientColorList"));
         this.minuteGradientLocationList = parseLocationList(configList.get("minuteGradientLocationList"));
 
-        
+        // Prediction / Live Analyst
+        Number rightOffsetCandlesVal = (Number) configList.get("rightOffsetCandles");
+        if (rightOffsetCandlesVal != null) {
+            this.rightOffsetCandles = rightOffsetCandlesVal.intValue();
+        }
+
+        if (optionList.get("predictionList") instanceof List) {
+            this.predictionList = (List<Map<String, Object>>) optionList.get("predictionList");
+        } else {
+            this.predictionList = new ArrayList<>();
+        }
+
+        if (optionList.get("predictionStartTime") instanceof Number) {
+            this.predictionStartTime = ((Number) optionList.get("predictionStartTime")).doubleValue();
+        } else {
+            this.predictionStartTime = null;
+        }
+
+        this.predictionEntry = optionList.get("predictionEntry") instanceof Number
+            ? ((Number) optionList.get("predictionEntry")).doubleValue() : null;
+        this.predictionStopLoss = optionList.get("predictionStopLoss") instanceof Number
+            ? ((Number) optionList.get("predictionStopLoss")).doubleValue() : null;
+        this.predictionBias = optionList.get("predictionBias") instanceof String
+            ? (String) optionList.get("predictionBias") : null;
+
+        if (optionList.get("predictionEntryZones") instanceof List) {
+            this.predictionEntryZones = (List<Map<String, Object>>) optionList.get("predictionEntryZones");
+        } else {
+            this.predictionEntryZones = new ArrayList<>();
+        }
     }
 
 }

@@ -10,6 +10,7 @@ import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.github.fujianlian.klinechart.HTKLineConfigManager;
 import com.github.fujianlian.klinechart.KLineChartView;
+import com.github.fujianlian.klinechart.BaseKLineChartView;
 import com.github.fujianlian.klinechart.RNKLineView;
 import com.github.fujianlian.klinechart.formatter.DateFormatter;
 
@@ -66,6 +67,36 @@ public class HTKLineContainerView extends RelativeLayout {
         klineView.setMTextSize(klineView.configManager.candleTextFontSize);
         klineView.setMTextColor(klineView.configManager.candleTextColor);
         klineView.reloadColor();
+
+        // Register prediction select callback
+        final int viewId = this.getId();
+        klineView.mOnPredictionSelectListener = new BaseKLineChartView.OnPredictionSelectListener() {
+            @Override
+            public void onPredictionSelect(java.util.Map<String, Object> payload) {
+                WritableMap map = Arguments.createMap();
+                for (java.util.Map.Entry<String, Object> entry : payload.entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+                    if (value == null) {
+                        map.putNull(key);
+                    } else if (value instanceof String) {
+                        map.putString(key, (String) value);
+                    } else if (value instanceof Number) {
+                        map.putDouble(key, ((Number) value).doubleValue());
+                    } else if (value instanceof Boolean) {
+                        map.putBoolean(key, (Boolean) value);
+                    } else if (value instanceof Integer) {
+                        map.putInt(key, (Integer) value);
+                    }
+                }
+                reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
+                        viewId,
+                        RNKLineView.onPredictionSelectKey,
+                        map
+                );
+            }
+        };
+
         Boolean isEnd = klineView.getScrollOffset() >= klineView.getMaxScrollX();
         // Do not force scroll to end after append/update unless explicitly requested
         klineView.configManager.shouldScrollToEnd = false;
