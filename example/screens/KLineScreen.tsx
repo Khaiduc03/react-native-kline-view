@@ -192,6 +192,7 @@ interface KLineOptionList {
   predictionEntry?: number;
   predictionStopLoss?: number;
   predictionBias?: string;
+  predictionEntryZones?: any[];
 }
 
 interface Theme {
@@ -1162,6 +1163,7 @@ const packOptionList = (
   predictionEntry?: number,
   predictionStopLoss?: number,
   predictionBias?: string,
+  predictionEntryZones?: any[], // New param
 ): KLineOptionList => {
   const theme = ThemeManager.getCurrentTheme(isDarkTheme);
 
@@ -1290,7 +1292,7 @@ const packOptionList = (
         android: '',
       }) || '',
     closePriceRightLightLottieSource: '',
-    rightOffsetCandles: predictionList?.length > 0 ? 12 : 0,
+    rightOffsetCandles: (predictionList?.length ?? 0) > 0 ? 12 : 0,
   };
 
   return {
@@ -1309,6 +1311,7 @@ const packOptionList = (
     predictionEntry: predictionEntry,
     predictionStopLoss: predictionStopLoss,
     predictionBias: predictionBias,
+    predictionEntryZones: predictionEntryZones, // Pass to result
   };
 };
 
@@ -1344,6 +1347,7 @@ const KLineScreen: React.FC = () => {
     number | undefined
   >();
   const [predictionBias, setPredictionBias] = useState<string | undefined>();
+  const [predictionEntryZones, setPredictionEntryZones] = useState<any[]>([]); // New state
 
   const kLineViewRef = useRef<RNKLineViewRef | null>(null);
   const [isKLineReady, setIsKLineReady] = useState(false);
@@ -1541,7 +1545,10 @@ const KLineScreen: React.FC = () => {
       Math.min(nextOpen, nextClose) * (1 - Math.random() * 0.0005);
     const nextVolume = Math.max(
       1,
-      Math.round((last.volume || last.vol || 1) * (0.9 + Math.random() * 0.2)),
+      // Increase variance to 0.5 - 2.0x to make it visible
+      Math.round(
+        (last.volume || last.vol || 100) * (0.5 + Math.random() * 1.5),
+      ),
     );
 
     const next: KLineModel = {
@@ -1672,8 +1679,10 @@ const KLineScreen: React.FC = () => {
         smcResult.tradingSignal.entryZones.length > 0
       ) {
         setPredictionEntry(smcResult.tradingSignal.entryZones[0].price);
+        setPredictionEntryZones(smcResult.tradingSignal.entryZones);
       } else {
         setPredictionEntry(undefined);
+        setPredictionEntryZones([]);
       }
 
       // Stop Loss
@@ -1753,6 +1762,7 @@ const KLineScreen: React.FC = () => {
       predictionEntry,
       predictionStopLoss,
       predictionBias,
+      predictionEntryZones,
     );
   }, [
     processedKLineData,
@@ -1767,6 +1777,7 @@ const KLineScreen: React.FC = () => {
     predictionEntry,
     predictionStopLoss,
     predictionBias,
+    predictionEntryZones,
   ]);
 
   // Serialize optionList to JSON string for native component

@@ -242,6 +242,7 @@ class HTKLineConfigManager: NSObject {
     // Prediction / Live Analyst
     var rightOffsetCandles: Int = 0
     var predictionList = [[String: Any]]()
+    var predictionEntryZones = [[String: Any]]()
     var predictionStartTime: Double? = nil
     var predictionEntry: Double? = nil
     var predictionStopLoss: Double? = nil
@@ -497,6 +498,12 @@ class HTKLineConfigManager: NSObject {
         predictionEntry = optionList["predictionEntry"] as? Double
         predictionStopLoss = optionList["predictionStopLoss"] as? Double
         predictionBias = optionList["predictionBias"] as? String
+        
+        if let entryZones = optionList["predictionEntryZones"] as? [[String: Any]] {
+            predictionEntryZones = entryZones
+        } else {
+            predictionEntryZones = []
+        }
     }
 
 }

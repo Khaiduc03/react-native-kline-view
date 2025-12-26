@@ -684,8 +684,16 @@ class HTKLineView: UIScrollView {
         if progress < 1.0 {
             let fullWidth = bgEndX - startX
             let currentWidth = fullWidth * progress
-            let clipRect = CGRect(x: startX, y: 0, width: currentWidth, height: allHeight)
-            context.clip(to: clipRect)
+            
+            // Safety check for NaN/Inf
+            if startX.isFinite && currentWidth.isFinite && allHeight.isFinite && currentWidth > 0 && allHeight > 0 {
+                let clipRect = CGRect(x: startX, y: 0, width: currentWidth, height: allHeight)
+                context.clip(to: clipRect)
+            } else {
+                // Invalid dimensions, skip clipping (or skip drawing this frame)
+                context.restoreGState() // Restore the outer save
+                return
+            }
         }
         
         // --- GRADIENT DRAWING ---
@@ -703,20 +711,23 @@ class HTKLineView: UIScrollView {
                 // Rect between Entry and SL
                 let rectY = min(entryY, slY)
                 let rectH = abs(entryY - slY)
-                let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
                 
-                context.saveGState()
-                context.clip(to: rect)
-                let colorSpace = CGColorSpaceCreateDeviceRGB()
-                // Red gradient
-                let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
-                let color2 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.05).cgColor
-                let colors = [color1, color2] as CFArray
-                if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
-                    // Draw from Entry towards SL
-                    context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: slY), options: [])
+                if startX.isFinite && rectY.isFinite && bgWidth.isFinite && rectH.isFinite && bgWidth > 0 && rectH > 0 {
+                    let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                    
+                    context.saveGState()
+                    context.clip(to: rect)
+                    let colorSpace = CGColorSpaceCreateDeviceRGB()
+                    // Red gradient
+                    let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
+                    let color2 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.05).cgColor
+                    let colors = [color1, color2] as CFArray
+                    if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                        // Draw from Entry towards SL
+                        context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: slY), options: [])
+                    }
+                    context.restoreGState()
                 }
-                context.restoreGState()
             }
             
             // TP Zone (Green Gradient)
@@ -727,19 +738,22 @@ class HTKLineView: UIScrollView {
                 
                 let rectY = min(entryY, targetY)
                 let rectH = abs(entryY - targetY)
-                let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
                 
-                context.saveGState()
-                context.clip(to: rect)
-                let colorSpace = CGColorSpaceCreateDeviceRGB()
-                // Green gradient
-                let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor
-                let color2 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.05).cgColor
-                let colors = [color1, color2] as CFArray
-                if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
-                    context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: targetY), options: [])
+                if startX.isFinite && rectY.isFinite && bgWidth.isFinite && rectH.isFinite && bgWidth > 0 && rectH > 0 {
+                    let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                    
+                    context.saveGState()
+                    context.clip(to: rect)
+                    let colorSpace = CGColorSpaceCreateDeviceRGB()
+                    // Green gradient
+                    let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor
+                    let color2 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.05).cgColor
+                    let colors = [color1, color2] as CFArray
+                    if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                        context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: targetY), options: [])
+                    }
+                    context.restoreGState()
                 }
-                context.restoreGState()
             }
             context.restoreGState()
             
@@ -1282,6 +1296,43 @@ extension HTKLineView: UIScrollViewDelegate {
                 if let idx = best.index {
                     payload["index"] = idx
                 }
+                
+                // --- Enrich with extra metadata ---
+                if best.type == "tp", let idx = best.index, idx < configManager.predictionList.count {
+                    let target = configManager.predictionList[idx]
+                    // Merge extra fields like type, reason
+                    for (key, value) in target {
+                        if key != "value" && key != "price" { // Avoid overwriting price/value
+                             payload[key] = value
+                        }
+                    }
+                } else if best.type == "entry" {
+                    // Try to find matching entry zone or default to first
+                    // The user usually sends one main entry, but potentially multiple zones
+                    if let zones = configManager.predictionEntryZones as? [[String: Any]], !zones.isEmpty {
+                        // Priority: Match by price, else take first
+                        if let match = zones.first(where: {
+                            if let p = $0["price"] as? Double {
+                                return abs(CGFloat(p) - best.price) < 0.0001
+                            }
+                            return false
+                        }) {
+                            for (key, value) in match {
+                                if key != "price" {
+                                    payload[key] = value
+                                }
+                            }
+                        } else if let first = zones.first {
+                             // Fallback to first zone metadata if price doesn't match exactly (e.g. average)
+                            for (key, value) in first {
+                                if key != "price" {
+                                    payload[key] = value
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 onPredictionSelect?(payload)
             }
             
