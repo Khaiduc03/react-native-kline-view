@@ -133,7 +133,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     private Boolean isShowChild = false;
 
     //当前点的个数
-    private int mItemCount;
+    protected int mItemCount;
     private IChartDraw mChildDraw;
     private List<IChartDraw> mChildDraws = new ArrayList<>();
 
@@ -148,11 +148,11 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
     private OnSelectedChangedListener mOnSelectedChangedListener = null;
 
-    private Rect mMainRect;
+    protected Rect mMainRect;
 
-    private Rect mVolRect;
+    protected Rect mVolRect;
 
-    private Rect mChildRect;
+    protected Rect mChildRect;
 
     private float mLineWidth;
 

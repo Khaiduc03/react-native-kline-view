@@ -162,6 +162,14 @@ public class HTKLineConfigManager {
     public List<HTKLineTargetItem> rsiList = new ArrayList();
     public List<HTKLineTargetItem> wrList = new ArrayList();
 
+    // Prediction Fields
+    public List<Map<String, Object>> predictionList = new ArrayList<>();
+    public List<Map<String, Object>> predictionEntryZones = new ArrayList<>();
+    public Double predictionStartTime = null;
+    public Double predictionEntry = null;
+    public Double predictionStopLoss = null;
+    public String predictionBias = null;
+
     public static Typeface font = null;
 
     public static Typeface findFont(Context context, String fontFamily) {
@@ -429,7 +437,46 @@ public class HTKLineConfigManager {
         this.minuteGradientColorList = parseColorList(configList.get("minuteGradientColorList"));
         this.minuteGradientLocationList = parseLocationList(configList.get("minuteGradientLocationList"));
 
+        // Prediction / Live Analysis
+        this.predictionList = (List<Map<String, Object>>) optionList.get("predictionList");
+        if (this.predictionList == null) {
+            this.predictionList = new ArrayList<>();
+        }
         
+        this.predictionEntryZones = (List<Map<String, Object>>) optionList.get("predictionEntryZones");
+        if (this.predictionEntryZones == null) {
+            this.predictionEntryZones = new ArrayList<>();
+        }
+
+        Object pStartTime = optionList.get("predictionStartTime");
+        if (pStartTime instanceof Number) {
+            this.predictionStartTime = ((Number) pStartTime).doubleValue();
+        } else {
+            this.predictionStartTime = null;
+        }
+
+        Object pEntry = optionList.get("predictionEntry");
+        if (pEntry instanceof Number) {
+            this.predictionEntry = ((Number) pEntry).doubleValue();
+        } else {
+            this.predictionEntry = null;
+        }
+
+        Object pStopLoss = optionList.get("predictionStopLoss");
+        if (pStopLoss instanceof Number) {
+            this.predictionStopLoss = ((Number) pStopLoss).doubleValue();
+        } else {
+            this.predictionStopLoss = null;
+        }
+
+        Object pBias = optionList.get("predictionBias");
+        if (pBias instanceof String) {
+            this.predictionBias = (String) pBias;
+        } else {
+            this.predictionBias = null;
+        }
+
+        android.util.Log.d("HTKLine", "Parsed Prediction: Entry=" + predictionEntry + " SL=" + predictionStopLoss + " ListSize=" + predictionList.size() + " Bias=" + predictionBias);
     }
 
 }

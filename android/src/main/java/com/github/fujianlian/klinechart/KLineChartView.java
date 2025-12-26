@@ -4,6 +4,18 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.DashPathEffect;
+import android.graphics.LinearGradient;
+import android.graphics.Shader;
+import android.animation.ValueAnimator;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 import android.view.GestureDetector;
 import androidx.annotation.ColorRes;
 import androidx.annotation.DimenRes;
@@ -38,6 +50,14 @@ public class KLineChartView extends BaseKLineChartView {
     private KDJDraw mKDJDraw;
     private WRDraw mWRDraw;
     private VolumeDraw mVolumeDraw;
+
+    // Prediction / Live Analysis
+    private Paint mPredictionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mPredictionBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float predictionAnimationProgress = 0f;
+    private ValueAnimator predictionJumpAnimator;
+    private boolean isPredictionAnimating = false;
+    private int mWidth = 0; // Ensure mWidth is accessible or use getWidth()
 
     public KLineChartView(Context context, HTKLineConfigManager configManager) {
         super(context, configManager);
@@ -488,10 +508,309 @@ public class KLineChartView extends BaseKLineChartView {
             default:
         }
         return super.onInterceptTouchEvent(ev);
+    
+    }
+
+    public void startPredictionAnimation() {
+        if (predictionJumpAnimator != null) {
+            predictionJumpAnimator.cancel();
+        }
+        predictionJumpAnimator = ValueAnimator.ofFloat(0f, 1f);
+        predictionJumpAnimator.setDuration(1500); // 1.5s duration
+        predictionJumpAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                predictionAnimationProgress = (float) animation.getAnimatedValue();
+                invalidate();
+            }
+        });
+        isPredictionAnimating = true;
+        predictionJumpAnimator.start();
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        drawPrediction(canvas);
+    }
+
+    private void drawPrediction(Canvas canvas) {
+        if (configManager.predictionList == null || configManager.predictionList.isEmpty()) {
+            // android.util.Log.d("HTKLine", "drawPrediction: Skip - empty list");
+            return;
+        }
+
+        int count = configManager.modelArray.size();
+        if (count == 0 || mItemCount == 0) return;
+
+        // Find target index (timeline index)
+        int targetIndex = count - 1;
+        Double startTimeObj = configManager.predictionStartTime;
+        if (startTimeObj != null) {
+            double startTime = startTimeObj;
+            for (int i = count - 1; i >= 0; i--) {
+                KLineEntity entity = (KLineEntity) getItem(i);
+                if (entity.id <= startTime) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        float startX = scrollXtoViewX(getItemMiddleScrollX(targetIndex));
+        float itemWidth = configManager.itemWidth * mScaleX;
+        int bgExtension = Math.max((count - 1) - targetIndex, 10);
+        float bgEndX = startX + bgExtension * itemWidth;
+        
+        android.util.Log.d("HTKLine", "drawPrediction: Index=" + targetIndex + " StartX=" + startX + " EndX=" + bgEndX + " Progress=" + predictionAnimationProgress + " Bias=" + configManager.predictionBias);
+
+        // Animation Clip
+        float progress = predictionAnimationProgress;
+        canvas.save();
+        
+        // Clip to Main Chart Area to prevent overflow into Volume/Child views
+        canvas.clipRect(mMainRect);
+
+        if (progress < 1.0f) {
+            float totalWidth = bgEndX - startX;
+            float currentWidth = totalWidth * progress;
+            float currentEndX = startX + currentWidth;
+             // We clip the drawing area to wipe from left to right
+            canvas.clipRect(startX, mMainRect.top, currentEndX, mMainRect.bottom);
+        }
+
+        // Draw Bias Label
+        if (configManager.predictionBias != null) {
+            String biasText = configManager.predictionBias.toUpperCase();
+            boolean isBullish = "bullish".equalsIgnoreCase(configManager.predictionBias);
+            mPredictionPaint.setColor(isBullish ? Color.parseColor("#00AA00") : Color.RED);
+            mPredictionPaint.setStyle(Paint.Style.FILL);
+            mPredictionPaint.setTextSize(dp2px(12));
+            mPredictionPaint.setPathEffect(null);
+            
+            // Draw at top-left of prediction area
+            float labelY = mMainRect.top + dp2px(20);
+            // canvas.drawText(biasText, startX + dp2px(5), labelY, mPredictionPaint);
+        }
+
+        // Entry Line
+        if (configManager.predictionEntry != null) {
+            float entryY = yFromValue(configManager.predictionEntry.floatValue());
+            mPredictionPaint.setColor(Color.DKGRAY);
+            mPredictionPaint.setPathEffect(new DashPathEffect(new float[]{10, 5}, 0));
+            mPredictionPaint.setStrokeWidth(dp2px(1));
+            mPredictionPaint.setStyle(Paint.Style.STROKE);
+            Path path = new Path();
+            path.moveTo(startX, entryY);
+            path.lineTo(bgEndX, entryY);
+            canvas.drawPath(path, mPredictionPaint);
+            
+             // SL Zone
+            if (configManager.predictionStopLoss != null) {
+                float slY = yFromValue(configManager.predictionStopLoss.floatValue());
+                float rectY = Math.min(entryY, slY);
+                float rectH = Math.abs(entryY - slY);
+                
+                if (rectH > 0 && bgEndX > startX) {
+                    int slideColor1 = Color.argb(50, 230, 50, 50); // Red alpha 0.2
+                    int slideColor2 = Color.argb(10, 230, 50, 50); // Red alpha 0.05
+                    Shader shader = new LinearGradient(startX, entryY, startX, slY, slideColor1, slideColor2, Shader.TileMode.CLAMP);
+                    mPredictionBgPaint.setShader(shader);
+                    mPredictionBgPaint.setStyle(Paint.Style.FILL);
+                    canvas.drawRect(startX, rectY, bgEndX, rectY + rectH, mPredictionBgPaint);
+                }
+                
+                // SL Line
+                mPredictionPaint.setColor(Color.RED);
+                mPredictionPaint.setPathEffect(null); // Solid
+                Path slPath = new Path();
+                slPath.moveTo(startX, slY);
+                slPath.lineTo(bgEndX, slY);
+                canvas.drawPath(slPath, mPredictionPaint);
+            }
+            
+            // TP Zones
+            if (!configManager.predictionList.isEmpty()) {
+                 // Find extreme target for gradient
+                 float extremeTargetVal = configManager.predictionEntry.floatValue();
+                 boolean isBullish = "bullish".equalsIgnoreCase(configManager.predictionBias);
+                 
+                 for (java.util.Map<String, Object> t : configManager.predictionList) {
+                     Object v = t.get("value");
+                     if (v == null) v = t.get("level"); // Fallback to level
+
+                     if (v instanceof Number) {
+                         float val = ((Number) v).floatValue();
+                         if (isBullish) extremeTargetVal = Math.max(extremeTargetVal, val);
+                         else extremeTargetVal = Math.min(extremeTargetVal, val);
+                         
+                         // Draw TP Line
+                         float tpY = yFromValue(val);
+                         mPredictionPaint.setColor(Color.parseColor("#00AA00")); // Green
+                         mPredictionPaint.setPathEffect(new DashPathEffect(new float[]{10, 10}, 0));
+                         Path tpPath = new Path();
+                         tpPath.moveTo(startX, tpY);
+                         tpPath.lineTo(bgEndX, tpY);
+                         canvas.drawPath(tpPath, mPredictionPaint);
+                     }
+                 }
+                 
+                 float targetY = yFromValue(extremeTargetVal);
+                 float rectY = Math.min(entryY, targetY);
+                 float rectH = Math.abs(entryY - targetY);
+                 
+                 if (rectH > 0 && bgEndX > startX) {
+                    int slideColor1 = Color.argb(50, 50, 200, 50); // Green alpha 0.2
+                    int slideColor2 = Color.argb(10, 50, 200, 50); // Green alpha 0.05
+                    Shader shader = new LinearGradient(startX, entryY, startX, targetY, slideColor1, slideColor2, Shader.TileMode.CLAMP);
+                    mPredictionBgPaint.setShader(shader);
+                    mPredictionBgPaint.setStyle(Paint.Style.FILL);
+                    canvas.drawRect(startX, rectY, bgEndX, rectY + rectH, mPredictionBgPaint);
+                 }
+            }
+        }
+        
+        canvas.restore();
+    }
+
+    public interface OnPredictionSelectListener {
+        void onPredictionSelect(java.util.Map<String, Object> details);
+    }
+
+    private OnPredictionSelectListener mOnPredictionSelectListener;
+
+    public void setOnPredictionSelectListener(OnPredictionSelectListener listener) {
+        this.mOnPredictionSelectListener = listener;
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        if (checkPredictionClick(e.getX(), e.getY())) {
+            return true;
+        }
+        return super.onSingleTapUp(e);
+    }
+
+    private boolean checkPredictionClick(float x, float y) {
+        if (configManager.predictionList == null || configManager.predictionList.isEmpty()) {
+            return false;
+        }
+        
+        int count = configManager.modelArray.size();
+        if (count == 0) return false;
+        
+        int targetIndex = count - 1;
+        if (configManager.predictionStartTime != null) {
+            double startTime = configManager.predictionStartTime;
+            for (int i = count - 1; i >= 0; i--) {
+                KLineEntity entity = (KLineEntity) getItem(i);
+                if (entity.id <= startTime) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        float startX = scrollXtoViewX(getItemMiddleScrollX(targetIndex));
+        float itemWidth = configManager.itemWidth * mScaleX;
+        int bgExtension = Math.max((count - 1) - targetIndex, 10);
+        float bgEndX = startX + bgExtension * itemWidth;
+        
+        if (x < startX || x > bgEndX) return false;
+        
+        // Find candidates
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        
+        // Entry
+        if (configManager.predictionEntry != null) {
+            float entryY = yFromValue(configManager.predictionEntry.floatValue());
+            if (Math.abs(y - entryY) < 60) { // 60px threshold
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("type", "entry");
+                map.put("price", configManager.predictionEntry);
+                map.put("dist", Math.abs(y - entryY));
+                
+                // Enrich with Entry Zone metadata
+                if (configManager.predictionEntryZones != null) {
+                    for (Map<String, Object> zone : configManager.predictionEntryZones) {
+                        // Logic: if price matches or is close? 
+                        // For simplicity, take first or match ID if available. 
+                        // The user wanted ALL metadata passed through.
+                        // We merge them.
+                        for (Map.Entry<String, Object> entry : zone.entrySet()) {
+                             if (!entry.getKey().equals("price") && !entry.getKey().equals("value")) {
+                                 map.put(entry.getKey(), entry.getValue());
+                             }
+                        }
+                        break; // Just match the first one for now as per iOS logic approx
+                    }
+                }
+                candidates.add(map);
+            }
+        }
+        
+        // SL
+        if (configManager.predictionStopLoss != null) {
+            float slY = yFromValue(configManager.predictionStopLoss.floatValue());
+            if (Math.abs(y - slY) < 60) {
+                 Map<String, Object> map = new java.util.HashMap<>();
+                map.put("type", "sl");
+                map.put("price", configManager.predictionStopLoss);
+                map.put("dist", Math.abs(y - slY));
+                candidates.add(map);
+            }
+        }
+        
+        // Targets
+        for (int i = 0; i < configManager.predictionList.size(); i++) {
+             Map<String, Object> t = configManager.predictionList.get(i);
+             Object v = t.get("value");
+             if (v == null) v = t.get("level"); // Fallback to level
+
+             if (v instanceof Number) {
+                 float val = ((Number) v).floatValue();
+                 float tpY = yFromValue(val);
+                 if (Math.abs(y - tpY) < 60) {
+                     Map<String, Object> map = new java.util.HashMap<>();
+                     map.put("type", "tp");
+                     map.put("price", val);
+                     map.put("index", i);
+                     map.put("dist", Math.abs(y - tpY));
+                      // Merge metadata
+                     for (Map.Entry<String, Object> entry : t.entrySet()) {
+                         if (!entry.getKey().equals("value") && !entry.getKey().equals("level")) {
+                             map.put(entry.getKey(), entry.getValue());
+                         }
+                     }
+                     candidates.add(map);
+                 }
+             }
+        }
+        
+        if (!candidates.isEmpty()) {
+            // Sort by distance
+            Map<String, Object> best = candidates.get(0);
+            float minDist = ((Number)best.get("dist")).floatValue();
+            for (Map<String, Object> c : candidates) {
+                float d = ((Number)c.get("dist")).floatValue();
+                if (d < minDist) {
+                    minDist = d;
+                    best = c;
+                }
+            }
+            
+            if (mOnPredictionSelectListener != null) {
+                mOnPredictionSelectListener.onPredictionSelect(best);
+                return true; // Consumed
+            }
+        }
+        
+        return false;
     }
 
     @Override
     public void onLongPress(MotionEvent e) {
+
         if (!isRefreshing) {
             super.onLongPress(e);
         }

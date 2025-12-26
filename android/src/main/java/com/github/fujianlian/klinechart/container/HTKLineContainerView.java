@@ -161,6 +161,35 @@ public class HTKLineContainerView extends RelativeLayout {
             configManager.shouldClearDraw = false;
             klineView.drawContext.clearDrawItemList();
         }
+        
+        // Prediction Animation Trigger
+        if (configManager.predictionList != null && !configManager.predictionList.isEmpty()) {
+             // Always animate for now to match iOS "wipe" effect on update
+             klineView.startPredictionAnimation();
+        }
+
+        klineView.setOnPredictionSelectListener(new KLineChartView.OnPredictionSelectListener() {
+            @Override
+            public void onPredictionSelect(java.util.Map<String, Object> details) {
+                WritableMap map = Arguments.createMap();
+                for (java.util.Map.Entry<String, Object> entry : details.entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+                    if (value instanceof String) {
+                        map.putString(key, (String) value);
+                    } else if (value instanceof Number) {
+                        map.putDouble(key, ((Number) value).doubleValue());
+                    } else if (value instanceof Boolean) {
+                        map.putBoolean(key, (Boolean) value);
+                    }
+                }
+                reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
+                        id,
+                        RNKLineView.onPredictionSelectKey,
+                        map
+                );
+            }
+        });
 
     }
 
