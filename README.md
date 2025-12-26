@@ -130,7 +130,6 @@ If you fork/customize this library, keep the example updated first — it double
 | `onDrawItemComplete`  | `{}`                                                                                                 | Triggered when user completes creating a new drawing item                                    |
 | `onDrawPointComplete` | `{ pointCount }`                                                                                     | Triggered when user completes adding points to a drawing (useful for multi-point drawings)   |
 
-
 ## ⚡ Imperative Data Updates (Phase 1)
 
 If you stream real-time candles, you usually **don't want to rebuild the whole `optionList` JSON** on every tick.
@@ -142,7 +141,10 @@ This library exposes an **imperative API** through `ref`:
 
 ```tsx
 import React, { useRef } from "react";
-import RNKLineView, { type Candle, type RNKLineViewRef } from "react-native-kline-view";
+import RNKLineView, {
+  type Candle,
+  type RNKLineViewRef,
+} from "react-native-kline-view";
 
 const klineRef = useRef<RNKLineViewRef>(null);
 
@@ -160,7 +162,6 @@ klineRef.current?.updateLastCandle(updatedLastCandle);
 
 **No.** If you've already called `appendCandle(...)`, the native dataset is updated.
 Only call `setData(...)` when you want to fully resync/reset (e.g. you changed timeframe, edited historical candles, or detected drift).
-
 
 ## 🔧 OptionList Configuration
 
@@ -264,6 +265,80 @@ Contains parameter settings for various technical indicators:
 - `wrList`: WR configuration array
 
 **For complete configuration examples, see [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**
+
+## 🔮 Price Prediction Visualization
+
+Display trading signals with Entry, Stop Loss, and Take Profit zones directly on the chart.
+
+### Configuration Properties
+
+Add these to your `configList`:
+
+| Property              | Type                                    | Description                                                |
+| --------------------- | --------------------------------------- | ---------------------------------------------------------- |
+| `predictionEntry`     | `number`                                | Entry price level                                          |
+| `predictionStopLoss`  | `number`                                | Stop Loss price level                                      |
+| `predictionList`      | `Array<{value: number, label: string}>` | Take Profit targets array                                  |
+| `predictionBias`      | `string`                                | `"bullish"` (Long) or `"bearish"` (Short)                  |
+| `predictionStartTime` | `number`                                | Timestamp (ms) where prediction zone starts                |
+| `rightOffsetCandles`  | `number`                                | Extra space on the right for prediction display (e.g., 15) |
+
+### Usage Example
+
+```typescript
+const configList = {
+  // ... other config options
+
+  // Price Prediction
+  predictionEntry: 88500.0,
+  predictionStopLoss: 86500.0,
+  predictionList: [
+    { value: 89500.0, label: "TP1" },
+    { value: 91000.0, label: "TP2" },
+    { value: 93000.0, label: "TP3" },
+  ],
+  predictionBias: "bullish", // or 'bearish'
+  predictionStartTime: 1735200000000, // Unix timestamp in milliseconds
+  rightOffsetCandles: 15, // Extra scroll space for prediction zone
+};
+```
+
+### Event Handling
+
+Listen for prediction zone taps:
+
+```tsx
+<RNKLineView
+  optionList={optionList}
+  onPredictionSelect={(event) => {
+    const { type, value, label } = event.nativeEvent;
+    // type: 'entry' | 'stopLoss' | 'target'
+    // value: price value
+    // label: 'Entry 88500' | 'SL 86500' | 'TP1 89500'
+    console.log("Selected:", type, value, label);
+  }}
+/>
+```
+
+### Visual Features
+
+- **Entry Zone**: Green/Red dashed line with label
+- **Stop Loss Zone**: Red gradient area below/above entry
+- **Take Profit Zones**: Green gradient area with multiple TP labels
+- **LONG/SHORT Label**: Displayed at the start of the prediction zone
+- **Animation**: Smooth wipe transition when prediction appears
+- **Auto-scroll**: Chart scrolls to show prediction when set
+- **Clipping**: Prediction clips to visible area when scrolling
+
+### Clear Prediction
+
+To remove prediction, set all values to `undefined` or `null`:
+
+```typescript
+setPredictionEntry(undefined);
+setPredictionStopLoss(undefined);
+setPredictionList([]);
+```
 
 ## 📄 License
 
