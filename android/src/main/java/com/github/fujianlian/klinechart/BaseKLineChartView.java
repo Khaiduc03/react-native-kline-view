@@ -1198,6 +1198,37 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             if (Math.abs(mChildMinValue) < 0.01)
                 mChildMinValue = -10.00f;
         }
+
+        // Expand Y-axis range to include prediction elements (Entry, SL, TPs)
+        if (configManager.predictionEntry != null) {
+            float entry = configManager.predictionEntry.floatValue();
+            mMainMaxValue = Math.max(mMainMaxValue, entry);
+            mMainMinValue = Math.min(mMainMinValue, entry);
+
+            if (configManager.predictionStopLoss != null) {
+                float sl = configManager.predictionStopLoss.floatValue();
+                mMainMaxValue = Math.max(mMainMaxValue, sl);
+                mMainMinValue = Math.min(mMainMinValue, sl);
+            }
+
+            for (java.util.Map<String, Object> prediction : configManager.predictionList) {
+                Object valObj = prediction.get("value");
+                if (valObj instanceof Number) {
+                    float tp = ((Number) valObj).floatValue();
+                    mMainMaxValue = Math.max(mMainMaxValue, tp);
+                    mMainMinValue = Math.min(mMainMinValue, tp);
+                }
+            }
+
+            // Add padding (5%) for better visibility
+            float range = mMainMaxValue - mMainMinValue;
+            if (range > 0) {
+                float padding = range * 0.05f;
+                mMainMaxValue += padding;
+                mMainMinValue -= padding;
+            }
+        }
+
         mMainScaleY = mMainRect.height() * 1f / (mMainMaxValue - mMainMinValue);
         mVolScaleY = mVolRect.height() * 1f / (mVolMaxValue - mVolMinValue);
         if (mChildRect != null)

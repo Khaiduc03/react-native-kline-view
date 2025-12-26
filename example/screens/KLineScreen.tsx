@@ -1939,6 +1939,7 @@ const KLineScreen: React.FC = () => {
           paddingVertical: 8,
           borderRadius: 20,
           backgroundColor: theme.buttonColor,
+          flexWrap: 'wrap',
         },
         activeButton: {
           backgroundColor: theme.increaseColor,
@@ -1955,6 +1956,7 @@ const KLineScreen: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           marginTop: 12,
+          flexWrap: 'wrap',
         },
         realtimeButton: {
           paddingHorizontal: 10,
