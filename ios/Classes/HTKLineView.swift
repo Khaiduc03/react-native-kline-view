@@ -67,7 +67,10 @@ class HTKLineView: UIScrollView {
     
     func startPredictionAnimation() {
         // print("[HTKLineView] startPredictionAnimation called")
-        stopPredictionAnimation()
+        // Guard: Don't restart if already animating
+        if predictionDisplayLink != nil {
+            return
+        }
         predictionAnimationProgress = 0.0
         predictionAnimationStartTime = CACurrentMediaTime()
         
@@ -671,7 +674,11 @@ class HTKLineView: UIScrollView {
 
         // Calculate X positions
         let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
-        let bgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
+        let rawBgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
+        
+        // Clamp bgEndX to visible view bounds (sync with Android behavior)
+        let rightBound = self.bounds.width - configManager.paddingRight
+        let bgEndX = min(rawBgEndX, rightBound)
         
         // --- ANIMATION: Wipe Transition ---
         let progress = predictionAnimationProgress
@@ -712,11 +719,15 @@ class HTKLineView: UIScrollView {
                 let rectY = min(entryY, slY)
                 let rectH = abs(entryY - slY)
                 
-                if startX.isFinite && rectY.isFinite && bgWidth.isFinite && rectH.isFinite && bgWidth > 0 && rectH > 0 {
-                    let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                // Intersect with visible area to clip at right edge when scrolling
+                let visibleRect = CGRect(x: 0, y: 0, width: rightBound, height: allHeight)
+                let gradientRect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                let clippedRect = gradientRect.intersection(visibleRect)
+                
+                if clippedRect.width > 0 && clippedRect.height > 0 {
                     
                     context.saveGState()
-                    context.clip(to: rect)
+                    context.clip(to: clippedRect)
                     let colorSpace = CGColorSpaceCreateDeviceRGB()
                     // Red gradient
                     let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
@@ -739,11 +750,15 @@ class HTKLineView: UIScrollView {
                 let rectY = min(entryY, targetY)
                 let rectH = abs(entryY - targetY)
                 
-                if startX.isFinite && rectY.isFinite && bgWidth.isFinite && rectH.isFinite && bgWidth > 0 && rectH > 0 {
-                    let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                // Intersect with visible area to clip at right edge when scrolling
+                let tpVisibleRect = CGRect(x: 0, y: 0, width: rightBound, height: allHeight)
+                let tpGradientRect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                let tpClippedRect = tpGradientRect.intersection(tpVisibleRect)
+                
+                if tpClippedRect.width > 0 && tpClippedRect.height > 0 {
                     
                     context.saveGState()
-                    context.clip(to: rect)
+                    context.clip(to: tpClippedRect)
                     let colorSpace = CGColorSpaceCreateDeviceRGB()
                     // Green gradient
                     let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor

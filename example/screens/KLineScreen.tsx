@@ -1293,7 +1293,7 @@ const packOptionList = (
         android: '',
       }) || '',
     closePriceRightLightLottieSource: '',
-    rightOffsetCandles: (predictionList?.length ?? 0) > 0 ? 12 : 0,
+    rightOffsetCandles: (predictionList?.length ?? 0) > 0 ? 15 : 0,
   };
 
   return {
