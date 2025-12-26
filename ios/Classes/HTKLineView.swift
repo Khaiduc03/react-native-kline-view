@@ -59,6 +59,47 @@ class HTKLineView: UIScrollView {
     private var cachedWinningPredictionIndex: Int?
     private var cachedEntryHitIndex: Int?
     
+    // Animation
+    private var predictionDisplayLink: CADisplayLink?
+    private var predictionAnimationStartTime: CFTimeInterval = 0
+    private var predictionAnimationDuration: CFTimeInterval = 1.5 // 1.5s wipe
+    var predictionAnimationProgress: CGFloat = 1.0 // Default to 1 (fully visible)
+    
+    func startPredictionAnimation() {
+        // print("[HTKLineView] startPredictionAnimation called")
+        stopPredictionAnimation()
+        predictionAnimationProgress = 0.0
+        predictionAnimationStartTime = CACurrentMediaTime()
+        
+        let displayLink = CADisplayLink(target: self, selector: #selector(handlePredictionAnimation))
+        displayLink.add(to: .main, forMode: .commonModes)
+        predictionDisplayLink = displayLink
+    }
+    
+    func stopPredictionAnimation() {
+        predictionDisplayLink?.invalidate()
+        predictionDisplayLink = nil
+        predictionAnimationProgress = 1.0
+        setNeedsDisplay()
+    }
+    
+    @objc func handlePredictionAnimation(_ displayLink: CADisplayLink) {
+        let elapsed = CACurrentMediaTime() - predictionAnimationStartTime
+        let progress = CGFloat(elapsed / predictionAnimationDuration)
+        
+        // print("[HTKLineView] Animation progress: \(progress)")
+        
+        if progress >= 1.0 {
+            predictionAnimationProgress = 1.0
+            stopPredictionAnimation()
+        } else {
+            // Ease out cubic
+            let t = progress - 1
+            predictionAnimationProgress = t * t * t + 1
+            setNeedsDisplay()
+        }
+    }
+    
     // Prediction Selection
     var onPredictionSelect: ((_ details: [String: Any]?) -> Void)?
     var selectedPredictionType: String? = nil // "entry", "sl", "tp"
@@ -515,7 +556,7 @@ class HTKLineView: UIScrollView {
               !configManager.predictionList.isEmpty else {
             return
         }
-
+        
         let count = configManager.modelArray.count
         
         var targetIndex = count - 1
@@ -532,10 +573,8 @@ class HTKLineView: UIScrollView {
         let targetModel = configManager.modelArray[targetIndex]
         
         // Determine active range and hit status
-        let startPrice = targetModel.close
         var hitIndex: Int?
         var winningPredictionIndex: Int?
-        
         
         let currentStartTime = configManager.predictionStartTime
         
@@ -556,19 +595,17 @@ class HTKLineView: UIScrollView {
             if let entry = entryVal {
                  entryScan: for i in scanStartIndex..<count {
                     let candle = configManager.modelArray[i]
-                    // Assume simple touch logic: High >= Entry >= Low
                     if (candle.high >= CGFloat(entry) && candle.low <= CGFloat(entry)) {
                         computedEntryHitIndex = i
-                        scanStartIndex = i // Continue target scan from here
+                        scanStartIndex = i
                         break entryScan
                     }
                 }
             } else {
-                // No entry defined, assume active immediately
                 computedEntryHitIndex = targetIndex
             }
             
-            // Phase 2: Scan for Targets/SL (only if entry hit or no entry required)
+            // Phase 2: Scan for Targets/SL
             if computedEntryHitIndex != nil {
                 targetScan: for i in scanStartIndex..<count {
                     let candle = configManager.modelArray[i]
@@ -576,24 +613,16 @@ class HTKLineView: UIScrollView {
                     // 1. Check Stop Loss
                     if let sl = configManager.predictionStopLoss {
                         let slVal = CGFloat(sl)
-                         // Hit if price crosses SL
-                        // Logic depends on Bias? If Long: Low <= SL. If Short: High >= SL.
-                        // Or simple touch? Let's use simple touch for now, or infer from bias if available.
-                        // Ideally: bias should confirm direction.
                         var slHit = false
                         if let bias = configManager.predictionBias?.lowercased() {
                             if bias == "bullish" && candle.low <= slVal { slHit = true }
                             else if bias == "bearish" && candle.high >= slVal { slHit = true }
                         } else {
-                             // Fallback: touch
                              if candle.high >= slVal && candle.low <= slVal { slHit = true }
                         }
                         
                         if slHit {
                             computedHitIndex = i
-                            // No winning target, just SL hit.
-                            // We might want to indicate SL hit vs Target hit separately?
-                            // For now, hitIndex stops graph. winningIndex nil means SL or failure.
                             break targetScan
                         }
                     }
@@ -601,15 +630,11 @@ class HTKLineView: UIScrollView {
                     // 2. Check Targets
                     for (pIndex, prediction) in configManager.predictionList.enumerated() {
                         if let val = prediction["value"] as? CGFloat {
-                            // Check for target hit
-                             // Logic: Long -> High >= Target. Short -> Low <= Target.
-                             // Or simple touch.
                             var targetHit = false
                             if let bias = configManager.predictionBias?.lowercased() {
                                 if bias == "bullish" && candle.high >= val { targetHit = true }
                                 else if bias == "bearish" && candle.low <= val { targetHit = true }
                             } else {
-                                // Fallback: touch
                                 if candle.high >= val && candle.low <= val { targetHit = true }
                             }
                             
@@ -635,8 +660,6 @@ class HTKLineView: UIScrollView {
         }
 
         // Calculate Background Extension
-        // If hit: stop at hit (but min 10).
-        // If not hit: extend with data (min 10).
         let bgExtension: Int
         if let hit = hitIndex {
             let hitExtension = hit - targetIndex
@@ -646,9 +669,24 @@ class HTKLineView: UIScrollView {
             bgExtension = max(currentDataLen, 10)
         }
 
-        // X positions
+        // Calculate X positions
         let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
         let bgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
+        
+        // --- ANIMATION: Wipe Transition ---
+        let progress = predictionAnimationProgress
+        // print("[HTKLineView] Drawing with progress: \(progress)")
+        
+        context.saveGState()
+        // Ensure we restore at the very end of drawPrediction to keep clip active
+        defer { context.restoreGState() }
+        
+        if progress < 1.0 {
+            let fullWidth = bgEndX - startX
+            let currentWidth = fullWidth * progress
+            let clipRect = CGRect(x: startX, y: 0, width: currentWidth, height: allHeight)
+            context.clip(to: clipRect)
+        }
         
         // --- GRADIENT DRAWING ---
         let entryVal = configManager.predictionEntry

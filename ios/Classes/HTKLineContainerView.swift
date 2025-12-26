@@ -31,9 +31,17 @@ class HTKLineContainerView: UIView {
                           let optionListDict = try JSONSerialization.jsonObject(with: optionListData, options: .allowFragments) as? [String: Any] else {
                         return
                     }
+                    
                     self?.configManager.reloadOptionList(optionListDict)
+                    
                     DispatchQueue.main.async {
                         guard let self = self else { return }
+                        // Check empty state here on main thread (safe)
+                        // Forced animation for now to ensure user sees it
+                        let isEmpty = self.configManager.predictionList.isEmpty
+                        if !isEmpty {
+                            self.klineView.startPredictionAnimation()
+                        }
                         self.reloadConfigManager(self.configManager)
                     }
                 } catch {
