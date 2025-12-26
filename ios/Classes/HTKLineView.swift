@@ -269,6 +269,12 @@ class HTKLineView: UIScrollView {
         }
 
         calculateBaseHeight()
+        
+        // Draw grid FIRST (behind candles)
+        contextTranslate(context, contentOffset.x, { context in
+            drawGrid(context)
+        })
+        
         contextTranslate(context, CGFloat(visibleRange.lowerBound) * configManager.itemWidth, { context in
             drawCandle(context)
         })
@@ -277,7 +283,6 @@ class HTKLineView: UIScrollView {
             // context.setFillColor(UIColor.red.withAlphaComponent(0.1).cgColor)
             // context.fill(CGRect.init(x: 0, y: mainBaseY, width: allWidth, height: mainHeight))
 
-            drawGrid(context)
             drawText(context)
             drawValue(context)
 
@@ -405,8 +410,8 @@ class HTKLineView: UIScrollView {
             while i <= visibleRange.upperBound {
                 let xCenter = (CGFloat(i) + 0.5) * configManager.itemWidth - contentOffset.x
                 let x = alignToPixel(xCenter)
-                let startY = mainBaseY
-                let endY = childBaseY + childHeight
+                let startY: CGFloat = 0  // Start from top
+                let endY = allHeight  // End at bottom (extend past horizontal grid)
                 context.move(to: CGPoint(x: x, y: startY))
                 context.addLine(to: CGPoint(x: x, y: endY))
                 context.strokePath()

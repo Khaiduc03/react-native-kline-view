@@ -67,6 +67,7 @@ public class HTKLineContainerView extends RelativeLayout {
         klineView.setMTextSize(klineView.configManager.candleTextFontSize);
         klineView.setMTextColor(klineView.configManager.candleTextColor);
         klineView.reloadColor();
+        klineView.setGridLineColor(klineView.configManager.gridColor);
 
         // Register prediction select callback
         final int viewId = this.getId();

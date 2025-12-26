@@ -101,6 +101,8 @@ public class HTKLineConfigManager {
 
     public int textColor = Color.WHITE;
 
+    public int gridColor = Color.GRAY;  // Grid line color, configurable
+
     public float headerTextFontSize = 9;
 
     public float rightTextFontSize = 10;
@@ -136,9 +138,9 @@ public class HTKLineConfigManager {
 
     public int panelBorderColor = Color.WHITE;
 
-    public int selectedPointContainerColor = Color.WHITE;
+    public int selectedPointContainerColor = Color.BLACK;
 
-    public int selectedPointContentColor = Color.WHITE;
+    public int selectedPointContentColor = Color.BLACK;
 
     public float panelTextFontSize = 9;
 
@@ -404,6 +406,9 @@ public class HTKLineConfigManager {
 
         this.fontFamily = (configList.get("fontFamily")).toString();
         this.textColor = ((Number) configList.get("textColor")).intValue();
+        if (configList.containsKey("gridColor")) {
+            this.gridColor = ((Number) configList.get("gridColor")).intValue();
+        }
         this.headerTextFontSize = ((Number)configList.get("headerTextFontSize")).floatValue();
         this.rightTextFontSize = ((Number)configList.get("rightTextFontSize")).floatValue();
         this.candleTextFontSize = ((Number)configList.get("candleTextFontSize")).floatValue();

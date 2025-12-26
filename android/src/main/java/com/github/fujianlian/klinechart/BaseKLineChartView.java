@@ -448,7 +448,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         for (int i = firstIndex; i <= mStopIndex; i += step) {
             float centerScrollX = getItemMiddleScrollX(i);
             float x = scrollXtoViewX(centerScrollX);
-            canvas.drawLine(x, mMainRect.top, x, bottom, verticalPaint);
+            canvas.drawLine(x, 0, x, mHeight, verticalPaint);  // Extend full height
         }
     }
 

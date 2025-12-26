@@ -1215,10 +1215,8 @@ const packOptionList = (
     ),
     panelBorderColor: toColorNumber(processColor(theme.detailColor)),
     panelTextColor: toColorNumber(processColor(theme.titleColor)),
-    selectedPointContainerColor: toColorNumber(processColor('transparent')),
-    selectedPointContentColor: toColorNumber(
-      processColor(isDarkTheme ? theme.titleColor : 'white'),
-    ),
+    selectedPointContainerColor: toColorNumber(processColor('#000000')),
+    selectedPointContentColor: toColorNumber(processColor('#000000')),
     closePriceCenterBackgroundColor: toColorNumber(
       processColor(theme.backgroundColor9703),
     ),
