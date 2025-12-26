@@ -239,6 +239,15 @@ class HTKLineConfigManager: NSObject {
 
     var closePriceRightLightLottieSource = ""
 
+    // Prediction / Live Analyst
+    var rightOffsetCandles: Int = 0
+    var predictionList = [[String: Any]]()
+    var predictionEntryZones = [[String: Any]]()
+    var predictionStartTime: Double? = nil
+    var predictionEntry: Double? = nil
+    var predictionStopLoss: Double? = nil
+    var predictionBias: String? = nil
+
     // grid draw
     // Đậm rõ: màu đen, nét 1.2pt để dễ thấy
     var gridColor = UIColor.black
@@ -471,6 +480,30 @@ class HTKLineConfigManager: NSObject {
         closePriceRightLightLottieFloder = configList["closePriceRightLightLottieFloder"] as? String ?? ""
         closePriceRightLightLottieScale = configList["closePriceRightLightLottieScale"] as? CGFloat ?? 0
         closePriceRightLightLottieSource = configList["closePriceRightLightLottieSource"] as? String ?? ""
+
+        // Prediction / Live Analyst
+        rightOffsetCandles = configList["rightOffsetCandles"] as? Int ?? 0
+        if let predictions = optionList["predictionList"] as? [[String: Any]] {
+            predictionList = predictions
+        } else {
+            predictionList = []
+        }
+        
+        if let startTime = optionList["predictionStartTime"] as? Double {
+            predictionStartTime = startTime
+        } else {
+            predictionStartTime = nil
+        }
+        
+        predictionEntry = optionList["predictionEntry"] as? Double
+        predictionStopLoss = optionList["predictionStopLoss"] as? Double
+        predictionBias = optionList["predictionBias"] as? String
+        
+        if let entryZones = optionList["predictionEntryZones"] as? [[String: Any]] {
+            predictionEntryZones = entryZones
+        } else {
+            predictionEntryZones = []
+        }
     }
 
 }

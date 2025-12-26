@@ -51,6 +51,59 @@ class HTKLineView: UIScrollView {
     var childMinMaxRange = Range<CGFloat>.init(uncheckedBounds: (lower: 0, upper: 0))
     var childBaseY: CGFloat  = 0
     var childHeight: CGFloat  = 0
+    
+    // Cache for prediction logic
+    private var cachedPredictionDataCount: Int = 0
+    private var cachedPredictionStartTime: Double? = nil
+    private var cachedHitIndex: Int?
+    private var cachedWinningPredictionIndex: Int?
+    private var cachedEntryHitIndex: Int?
+    
+    // Animation
+    private var predictionDisplayLink: CADisplayLink?
+    private var predictionAnimationStartTime: CFTimeInterval = 0
+    private var predictionAnimationDuration: CFTimeInterval = 1.5 // 1.5s wipe
+    var predictionAnimationProgress: CGFloat = 1.0 // Default to 1 (fully visible)
+    
+    func startPredictionAnimation() {
+        // print("[HTKLineView] startPredictionAnimation called")
+        stopPredictionAnimation()
+        predictionAnimationProgress = 0.0
+        predictionAnimationStartTime = CACurrentMediaTime()
+        
+        let displayLink = CADisplayLink(target: self, selector: #selector(handlePredictionAnimation))
+        displayLink.add(to: .main, forMode: .commonModes)
+        predictionDisplayLink = displayLink
+    }
+    
+    func stopPredictionAnimation() {
+        predictionDisplayLink?.invalidate()
+        predictionDisplayLink = nil
+        predictionAnimationProgress = 1.0
+        setNeedsDisplay()
+    }
+    
+    @objc func handlePredictionAnimation(_ displayLink: CADisplayLink) {
+        let elapsed = CACurrentMediaTime() - predictionAnimationStartTime
+        let progress = CGFloat(elapsed / predictionAnimationDuration)
+        
+        // print("[HTKLineView] Animation progress: \(progress)")
+        
+        if progress >= 1.0 {
+            predictionAnimationProgress = 1.0
+            stopPredictionAnimation()
+        } else {
+            // Ease out cubic
+            let t = progress - 1
+            predictionAnimationProgress = t * t * t + 1
+            setNeedsDisplay()
+        }
+    }
+    
+    // Prediction Selection
+    var onPredictionSelect: ((_ details: [String: Any]?) -> Void)?
+    var selectedPredictionType: String? = nil // "entry", "sl", "tp"
+    var selectedPredictionIndex: Int? = nil // Index for TP list
 
     // === Grid spacing target (ô to, thưa) ===
     private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
@@ -190,7 +243,8 @@ class HTKLineView: UIScrollView {
 
     func reloadContentSize() {
         configManager.reloadScrollViewScale(scale)
-        let contentWidth = configManager.itemWidth * CGFloat(configManager.modelArray.count) + configManager.paddingRight
+        let rightOffset = CGFloat(configManager.rightOffsetCandles)
+        let contentWidth = configManager.itemWidth * (CGFloat(configManager.modelArray.count) + rightOffset) + configManager.paddingRight
         contentSize = CGSize.init(width: contentWidth, height: frame.size.height)
     }
 
@@ -226,6 +280,7 @@ class HTKLineView: UIScrollView {
 
             drawHighLow(context)
             drawTime(context)
+            drawPrediction(context)
             drawClosePrice(context)
             drawSelectedLine(context)
             drawSelectedBoard(context)
@@ -242,7 +297,21 @@ class HTKLineView: UIScrollView {
         self.allHeight = self.bounds.size.height - configManager.paddingBottom
         self.allWidth = self.bounds.size.width
 
-        self.mainMinMaxRange = mainDraw.minMaxRange(visibleModelArray, configManager)
+        var mainMinMax = mainDraw.minMaxRange(visibleModelArray, configManager)
+        // Include prediction targets in min/max range
+        if let entry = configManager.predictionEntry {
+            mainMinMax = min(mainMinMax.lowerBound, CGFloat(entry))..<max(mainMinMax.upperBound, CGFloat(entry))
+        }
+        if let sl = configManager.predictionStopLoss {
+            mainMinMax = min(mainMinMax.lowerBound, CGFloat(sl))..<max(mainMinMax.upperBound, CGFloat(sl))
+        }
+        for prediction in configManager.predictionList {
+            if let value = prediction["value"] as? CGFloat {
+                mainMinMax = min(mainMinMax.lowerBound, value)..<max(mainMinMax.upperBound, value)
+            }
+        }
+        self.mainMinMaxRange = mainMinMax
+
         self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
         self.mainBaseY = configManager.paddingTop - textHeight
         self.mainHeight = allHeight * volumeRange.lowerBound - mainBaseY - textHeight
@@ -479,6 +548,386 @@ class HTKLineView: UIScrollView {
         }
         drawValue(highIndex, visibleModelArray[highIndex].high)
         drawValue(lowIndex, visibleModelArray[lowIndex].low)
+    }
+
+    // MARK: - Prediction / Live Analyst
+    func drawPrediction(_ context: CGContext) {
+        guard let lastModel = configManager.modelArray.last,
+              !configManager.predictionList.isEmpty else {
+            return
+        }
+        
+        let count = configManager.modelArray.count
+        
+        var targetIndex = count - 1
+        if let startTime = configManager.predictionStartTime {
+            // Find index matching startTime
+            for i in (0..<count).reversed() {
+                if configManager.modelArray[i].id <= startTime {
+                    targetIndex = i
+                    break
+                }
+            }
+        }
+        
+        let targetModel = configManager.modelArray[targetIndex]
+        
+        // Determine active range and hit status
+        var hitIndex: Int?
+        var winningPredictionIndex: Int?
+        
+        let currentStartTime = configManager.predictionStartTime
+        
+        // Use cache if available and data hasn't changed
+        if cachedPredictionDataCount == count && cachedPredictionStartTime == currentStartTime {
+            hitIndex = cachedHitIndex
+            winningPredictionIndex = cachedWinningPredictionIndex
+        } else {
+            // Re-scan with Entry -> Target logic
+            var computedEntryHitIndex: Int? = nil
+            var computedHitIndex: Int? = nil
+            var computedWinningIndex: Int? = nil
+            
+            let entryVal = configManager.predictionEntry
+            
+            // Phase 1: Scan for Entry (if defined)
+            var scanStartIndex = targetIndex + 1
+            if let entry = entryVal {
+                 entryScan: for i in scanStartIndex..<count {
+                    let candle = configManager.modelArray[i]
+                    if (candle.high >= CGFloat(entry) && candle.low <= CGFloat(entry)) {
+                        computedEntryHitIndex = i
+                        scanStartIndex = i
+                        break entryScan
+                    }
+                }
+            } else {
+                computedEntryHitIndex = targetIndex
+            }
+            
+            // Phase 2: Scan for Targets/SL
+            if computedEntryHitIndex != nil {
+                targetScan: for i in scanStartIndex..<count {
+                    let candle = configManager.modelArray[i]
+                    
+                    // 1. Check Stop Loss
+                    if let sl = configManager.predictionStopLoss {
+                        let slVal = CGFloat(sl)
+                        var slHit = false
+                        if let bias = configManager.predictionBias?.lowercased() {
+                            if bias == "bullish" && candle.low <= slVal { slHit = true }
+                            else if bias == "bearish" && candle.high >= slVal { slHit = true }
+                        } else {
+                             if candle.high >= slVal && candle.low <= slVal { slHit = true }
+                        }
+                        
+                        if slHit {
+                            computedHitIndex = i
+                            break targetScan
+                        }
+                    }
+                    
+                    // 2. Check Targets
+                    for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                        if let val = prediction["value"] as? CGFloat {
+                            var targetHit = false
+                            if let bias = configManager.predictionBias?.lowercased() {
+                                if bias == "bullish" && candle.high >= val { targetHit = true }
+                                else if bias == "bearish" && candle.low <= val { targetHit = true }
+                            } else {
+                                if candle.high >= val && candle.low <= val { targetHit = true }
+                            }
+                            
+                            if targetHit {
+                                computedHitIndex = i
+                                computedWinningIndex = pIndex
+                                break targetScan
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Update cache
+            cachedPredictionDataCount = count
+            cachedPredictionStartTime = currentStartTime
+            cachedHitIndex = computedHitIndex
+            cachedWinningPredictionIndex = computedWinningIndex
+            cachedEntryHitIndex = computedEntryHitIndex
+            
+            hitIndex = computedHitIndex
+            winningPredictionIndex = computedWinningIndex
+        }
+
+        // Calculate Background Extension
+        let bgExtension: Int
+        if let hit = hitIndex {
+            let hitExtension = hit - targetIndex
+            bgExtension = max(hitExtension, 10)
+        } else {
+            let currentDataLen = (count - 1) - targetIndex
+            bgExtension = max(currentDataLen, 10)
+        }
+
+        // Calculate X positions
+        let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
+        let bgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
+        
+        // --- ANIMATION: Wipe Transition ---
+        let progress = predictionAnimationProgress
+        // print("[HTKLineView] Drawing with progress: \(progress)")
+        
+        context.saveGState()
+        // Ensure we restore at the very end of drawPrediction to keep clip active
+        defer { context.restoreGState() }
+        
+        if progress < 1.0 {
+            let fullWidth = bgEndX - startX
+            let currentWidth = fullWidth * progress
+            
+            // Safety check for NaN/Inf
+            if startX.isFinite && currentWidth.isFinite && allHeight.isFinite && currentWidth > 0 && allHeight > 0 {
+                let clipRect = CGRect(x: startX, y: 0, width: currentWidth, height: allHeight)
+                context.clip(to: clipRect)
+            } else {
+                // Invalid dimensions, skip clipping (or skip drawing this frame)
+                context.restoreGState() // Restore the outer save
+                return
+            }
+        }
+        
+        // --- GRADIENT DRAWING ---
+        let entryVal = configManager.predictionEntry
+        if let bias = configManager.predictionBias, let entry = entryVal {
+            let entryY = yFromValue(CGFloat(entry))
+            
+            // 1. Valid Bias Logic
+            context.saveGState()
+            let bgWidth = bgEndX - startX
+            
+            // SL Zone (Red Gradient)
+            if let sl = configManager.predictionStopLoss {
+                let slY = yFromValue(CGFloat(sl))
+                // Rect between Entry and SL
+                let rectY = min(entryY, slY)
+                let rectH = abs(entryY - slY)
+                
+                if startX.isFinite && rectY.isFinite && bgWidth.isFinite && rectH.isFinite && bgWidth > 0 && rectH > 0 {
+                    let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                    
+                    context.saveGState()
+                    context.clip(to: rect)
+                    let colorSpace = CGColorSpaceCreateDeviceRGB()
+                    // Red gradient
+                    let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
+                    let color2 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.05).cgColor
+                    let colors = [color1, color2] as CFArray
+                    if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                        // Draw from Entry towards SL
+                        context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: slY), options: [])
+                    }
+                    context.restoreGState()
+                }
+            }
+            
+            // TP Zone (Green Gradient)
+            let targets = configManager.predictionList.compactMap { $0["value"] as? CGFloat }
+            if !targets.isEmpty {
+                let extremeTarget = (bias.lowercased() == "bullish") ? (targets.max() ?? CGFloat(entry)) : (targets.min() ?? CGFloat(entry))
+                let targetY = yFromValue(extremeTarget)
+                
+                let rectY = min(entryY, targetY)
+                let rectH = abs(entryY - targetY)
+                
+                if startX.isFinite && rectY.isFinite && bgWidth.isFinite && rectH.isFinite && bgWidth > 0 && rectH > 0 {
+                    let rect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                    
+                    context.saveGState()
+                    context.clip(to: rect)
+                    let colorSpace = CGColorSpaceCreateDeviceRGB()
+                    // Green gradient
+                    let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor
+                    let color2 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.05).cgColor
+                    let colors = [color1, color2] as CFArray
+                    if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                        context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: targetY), options: [])
+                    }
+                    context.restoreGState()
+                }
+            }
+            context.restoreGState()
+            
+            // Draw "Long" / "Short" Label
+            // Draw "Long" / "Short" Label at Top-Left of Analysis Zone
+            let labelText = (bias.lowercased() == "bullish") ? "LONG" : "SHORT"
+            let labelFont = configManager.createFont(configManager.rightTextFontSize + 2) // Slightly larger
+            let labelAttrs: [NSAttributedString.Key: Any] = [
+                .font: labelFont,
+                .foregroundColor: (bias.lowercased() == "bullish") ? UIColor.green : UIColor.red
+            ]
+            let labelSize = (labelText as NSString).size(withAttributes: labelAttrs)
+            // Position at top of the gradient stripe (mainBaseY) at startX
+            (labelText as NSString).draw(at: CGPoint(x: startX + 6, y: mainBaseY + 4), withAttributes: labelAttrs)
+
+        } else {
+            // Fallback: Old Blueish Gradient across full height
+            let bgRect = CGRect(x: startX, y: mainBaseY, width: bgEndX - startX, height: mainHeight)
+            context.saveGState()
+            context.clip(to: bgRect)
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            let startColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.15).cgColor
+            let endColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 0.02).cgColor
+            let colors = [startColor, endColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: mainBaseY), end: CGPoint(x: startX, y: mainBaseY + mainHeight), options: [])
+            }
+            context.restoreGState()
+        }
+
+        // --- DRAW LINES ---
+        
+        let entryY = (entryVal != nil) ? yFromValue(CGFloat(entryVal!)) : yFromValue(targetModel.close)
+        
+        // 1. Entry Line (if present) - Yellow dashed + Label
+        if let val = entryVal {
+            let isSelected = (selectedPredictionType == "entry")
+            let color = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: isSelected ? 1.0 : 0.8) // Gold/Yellow
+            context.saveGState()
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(isSelected ? 4.0 : 1.0)
+            context.setLineDash(phase: 0, lengths: [4, 4])
+            context.move(to: CGPoint(x: startX, y: entryY))
+            context.addLine(to: CGPoint(x: bgEndX, y: entryY))
+            context.strokePath()
+            
+            // Entry Label
+            let priceText = configManager.precision(CGFloat(val), configManager.price)
+            let labelText = "Entry \(priceText)"
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black] // Black text on yellow
+            let labelSize = (labelText as NSString).size(withAttributes: attributes)
+            let labelRect = CGRect(x: bgEndX + 2, y: entryY - labelSize.height/2, width: labelSize.width + 8, height: labelSize.height + 4)
+            
+            context.setFillColor(color.cgColor)
+            let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (labelText as NSString).draw(at: CGPoint(x: bgEndX + 6, y: entryY - labelSize.height/2 + 2), withAttributes: attributes)
+            context.restoreGState()
+        }
+        
+        // 2. Stop Loss Line (if present) - Red dashed + Label
+        if let sl = configManager.predictionStopLoss {
+            let isSelected = (selectedPredictionType == "sl")
+            let val = CGFloat(sl)
+            let slY = yFromValue(val)
+            let color = UIColor.red
+            
+            context.saveGState()
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(isSelected ? 4.0 : 1.0)
+            context.setLineDash(phase: 0, lengths: [4, 4])
+            context.move(to: CGPoint(x: startX, y: slY))
+            context.addLine(to: CGPoint(x: bgEndX, y: slY))
+            context.strokePath()
+            
+            // SL Label
+            let priceText = configManager.precision(val, configManager.price)
+            let labelText = "SL \(priceText)"
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
+            let labelSize = (labelText as NSString).size(withAttributes: attributes)
+            let labelRect = CGRect(x: bgEndX + 2, y: slY - labelSize.height/2, width: labelSize.width + 8, height: labelSize.height + 4)
+            
+            context.setFillColor(color.cgColor)
+            let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (labelText as NSString).draw(at: CGPoint(x: bgEndX + 6, y: slY - labelSize.height/2 + 2), withAttributes: attributes)
+            context.restoreGState()
+        }
+
+        // 3. Targets (Prediction Lines)
+        for (pIndex, prediction) in configManager.predictionList.enumerated() {
+            // Winner takes all
+            if let winner = winningPredictionIndex, winner != pIndex {
+                continue
+            }
+
+            guard let value = prediction["value"] as? CGFloat,
+                  let colorInt = prediction["color"] as? Int,
+                  let color = RCTConvert.uiColor(colorInt) else {
+                continue
+            }
+            
+            // Note: Use entryY as start Y for aesthetic connection? 
+            // Previous code used 'yFromValue(startPrice)'. Since entry != startPrice potentially, 
+            // lines should originate from Entry Price if we are visualizing a Trade Setup.
+            // I'll stick to 'entryY' as the origin source Y if available.
+            let originY = entryY 
+            let targetY = yFromValue(value)
+
+            // DNA of the line: Ends at Hit or Background End
+            let lineEndX: CGFloat
+            if let hit = hitIndex {
+                let hitExtension = hit - targetIndex
+                lineEndX = startX + CGFloat(hitExtension) * configManager.itemWidth
+            } else {
+                lineEndX = bgEndX
+            }
+
+            // Draw dashed line
+            let isSelected = (selectedPredictionType == "tp" && selectedPredictionIndex == pIndex)
+            context.saveGState()
+            context.setStrokeColor(color.withAlphaComponent(isSelected ? 1.0 : 0.8).cgColor)
+            context.setLineWidth(isSelected ? 4.0 : 1.5)
+            context.setLineDash(phase: 0, lengths: [6, 4])
+            context.move(to: CGPoint(x: startX, y: originY))
+            context.addLine(to: CGPoint(x: lineEndX, y: targetY))
+            context.strokePath()
+            context.restoreGState()
+
+            // Draw dot if hit
+            if hitIndex != nil {
+                context.saveGState()
+                context.setFillColor(color.cgColor)
+                let dotRadius: CGFloat = 3.0
+                let dotRect = CGRect(x: lineEndX - dotRadius, y: targetY - dotRadius, width: dotRadius * 2, height: dotRadius * 2)
+                context.fillEllipse(in: dotRect)
+                context.restoreGState()
+            }
+
+            // Label
+            let priceText = configManager.precision(value, configManager.price)
+            let labelText = "TP \(priceText)"
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: UIColor.white
+            ]
+            let labelSize = (labelText as NSString).size(withAttributes: attributes)
+            let paddingX: CGFloat = 4
+            let paddingY: CGFloat = 2
+            let labelWidth = labelSize.width + paddingX * 2
+            let labelHeight = labelSize.height + paddingY * 2
+
+            let labelX = lineEndX + 2
+            let labelY = targetY - labelHeight / 2
+
+            let labelRect = CGRect(x: labelX, y: labelY, width: labelWidth, height: labelHeight)
+
+            context.saveGState()
+            context.setFillColor(color.cgColor)
+            let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            context.restoreGState()
+
+            (labelText as NSString).draw(
+                at: CGPoint(x: labelX + paddingX, y: labelY + paddingY),
+                withAttributes: attributes
+            )
+        }
     }
 
     func drawClosePrice(_ context: CGContext) {
@@ -774,6 +1223,12 @@ extension HTKLineView: UIScrollViewDelegate {
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         selectedIndex = -1
         selectedLocation = nil
+        // Deselect prediction on scroll
+        if selectedPredictionType != nil {
+            selectedPredictionType = nil
+            selectedPredictionIndex = nil
+            onPredictionSelect?([:])
+        }
         self.setNeedsDisplay()
     }
 
@@ -791,8 +1246,116 @@ extension HTKLineView: UIScrollViewDelegate {
 
     @objc
     func tapSelector(_ gesture: UITapGestureRecognizer) {
-        selectedIndex = -1
-        selectedLocation = nil
+        let point = gesture.location(in: self)
+        var didSelectPrediction = false
+        
+        // Only check if prediction exists
+        if let _ = configManager.predictionEntry {
+            let hitThreshold: CGFloat = 60.0
+            var candidates: [(type: String, price: CGFloat, index: Int?, dist: CGFloat)] = []
+            
+            // 1. Check Entry
+            if let entry = configManager.predictionEntry {
+                let entryY = yFromValue(CGFloat(entry))
+                let dist = abs(point.y - entryY)
+                if dist < hitThreshold {
+                    candidates.append(("entry", CGFloat(entry), nil, dist))
+                }
+            }
+            
+            // 2. Check SL
+            if let sl = configManager.predictionStopLoss {
+                let slY = yFromValue(CGFloat(sl))
+                let dist = abs(point.y - slY)
+                if dist < hitThreshold {
+                    candidates.append(("sl", CGFloat(sl), nil, dist))
+                }
+            }
+            
+            // 3. Check Targets
+            for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                if let val = prediction["value"] as? CGFloat {
+                    let tY = yFromValue(val)
+                    let dist = abs(point.y - tY)
+                    if dist < hitThreshold {
+                        candidates.append(("tp", val, pIndex, dist))
+                    }
+                }
+            }
+            
+            // Find closest candidate
+            if let best = candidates.min(by: { $0.dist < $1.dist }) {
+                selectedPredictionType = best.type
+                selectedPredictionIndex = best.index
+                didSelectPrediction = true
+                
+                var payload: [String: Any] = [
+                    "type": best.type,
+                    "price": Double(best.price)
+                ]
+                if let idx = best.index {
+                    payload["index"] = idx
+                }
+                
+                // --- Enrich with extra metadata ---
+                if best.type == "tp", let idx = best.index, idx < configManager.predictionList.count {
+                    let target = configManager.predictionList[idx]
+                    // Merge extra fields like type, reason
+                    for (key, value) in target {
+                        if key != "value" && key != "price" { // Avoid overwriting price/value
+                             payload[key] = value
+                        }
+                    }
+                } else if best.type == "entry" {
+                    // Try to find matching entry zone or default to first
+                    // The user usually sends one main entry, but potentially multiple zones
+                    if let zones = configManager.predictionEntryZones as? [[String: Any]], !zones.isEmpty {
+                        // Priority: Match by price, else take first
+                        if let match = zones.first(where: {
+                            if let p = $0["price"] as? Double {
+                                return abs(CGFloat(p) - best.price) < 0.0001
+                            }
+                            return false
+                        }) {
+                            for (key, value) in match {
+                                if key != "price" {
+                                    payload[key] = value
+                                }
+                            }
+                        } else if let first = zones.first {
+                             // Fallback to first zone metadata if price doesn't match exactly (e.g. average)
+                            for (key, value) in first {
+                                if key != "price" {
+                                    payload[key] = value
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                onPredictionSelect?(payload)
+            }
+            
+
+        }
+        
+        if didSelectPrediction {
+            // Clear candle selection context
+            selectedIndex = -1
+            selectedLocation = nil
+        } else {
+            // Tapped empty space -> Deselect prediction
+             if selectedPredictionType != nil {
+                 selectedPredictionType = nil
+                 selectedPredictionIndex = nil
+                 onPredictionSelect?([:]) // Empty dict or nil to indicate deselect
+             }
+             
+            // Normal behavior: Clear selected Index
+            selectedIndex = -1
+            selectedLocation = nil
+        }
+        
         self.setNeedsDisplay()
     }
 

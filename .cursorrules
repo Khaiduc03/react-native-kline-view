@@ -1,0 +1,31 @@
+# Live Analyst / Prediction Visualization Rules
+
+When modifying the Prediction/Live Analyst feature in `HTKLineView.swift` and `KLineScreen.tsx`, you MUST adhere to the following logic:
+
+## 1. Dynamic Scaling & Width
+-   **Minimum Width**: The prediction area (gradient) must ALWAYs be at least **10 candles** wide.
+-   **Expansion**: The area expands as new data comes in, up to the current latest candle.
+-   **Stop on Hit**: If a price target is hit, the area STOPS expanding at that hit point (effectively "freezing" the analysis result).
+
+## 2. Winner Takes All & Entry Logic
+-   **Entry Trigger**: Target conditions (Hits/Stop Loss) ONLY begin effectively **AFTER** the price candle touches/crosses the Entry Zone.
+-   If multiple prediction targets exist (e.g., Bullish and Bearish scenarios):
+    -   The system scans to find which target is hit **FIRST** (after Entry).
+    -   The first hit target is the "**WINNER**".
+    -   **Only the WINNER** logic is drawn. All other prediction lines are hidden/removed.
+
+## 3. Visual Components
+-   **Entry Line**: Dashed **YELLOW/GOLD** line at the entry price.
+-   **Stop Loss Line**: Dashed RED line at the Stop Loss price.
+-   **Target Line**: Dashed line (Green/Red) ending at the hit point (or background edge).
+-   **Hit Indicator**: A small **filled circle (dot)** MUST be drawn at the end of the line if the target is hit.
+-   **Bias Label**: "LONG" or "SHORT" label drawn at the **Top-Left** of the analysis gradient/zone.
+-   **Price Labels**: All lines must have descriptive labels: "Entry <price>", "SL <price>", "TP <price>".
+
+## 4. Gradients (Risk/Reward)
+-   **Profit Zone**: Gradient fill from **Entry Price** to **Target Price**. Color: Greenish.
+-   **Risk Zone**: Gradient fill from **Entry Price** to **Stop Loss Price**. Color: Reddish.
+-   **Legacy Fallback**: If no Entry/SL/Bias is provided, default to the blue analysis gradient.
+
+## 5. Performance
+-   **Caching**: The "Hit Detection" scan loop MUST be cached (`cachedHitIndex`, `cachedWinningPredictionIndex`) to prevent O(N) lag during scrolling. Only re-calculate when data count changes or analysis start time changes.
