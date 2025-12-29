@@ -17,7 +17,7 @@ const NativeRNKLineView = requireNativeComponent(COMPONENT_NAME);
  */
 function runCommand(nativeRef, commandName, payload) {
   const nodeHandle = findNodeHandle(nativeRef.current);
-  console.log("runCommand", commandName, payload);
+  //console.log("runCommand", commandName, payload);
   if (!nodeHandle) return;
 
   // iOS: call NativeModules.RNKLineView methods directly
