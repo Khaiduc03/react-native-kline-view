@@ -519,7 +519,7 @@ class HTKLineView: UIScrollView {
     }
 
     func drawHighLow(_ context: CGContext) {
-        guard !configManager.isMinute else {
+        guard !configManager.isMinute, !visibleModelArray.isEmpty else {
             return
         }
         var highIndex = 0
@@ -532,6 +532,9 @@ class HTKLineView: UIScrollView {
                 lowIndex = i
             }
         }
+        
+        // Safety check indices
+        guard highIndex < visibleModelArray.count, lowIndex < visibleModelArray.count else { return }
 
         let drawValue: (Int, CGFloat) -> Void = { [weak self] (index, value) in
             guard let this = self else { return }
@@ -577,6 +580,8 @@ class HTKLineView: UIScrollView {
                 }
             }
         }
+        
+        guard targetIndex >= 0 && targetIndex < count else { return }
         
         let targetModel = configManager.modelArray[targetIndex]
         
