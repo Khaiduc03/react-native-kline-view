@@ -101,6 +101,13 @@ class HTKLineContainerView: UIView {
         }
     }
 
+    func unPredictionSelect() {
+        RNKLineView.queue.async { [weak self] in
+             DispatchQueue.main.async { [weak self] in
+                 self?.klineView.unPredictionSelect()
+             }
+        }
+    }
 
     lazy var klineView: HTKLineView = {
         let klineView = HTKLineView.init(CGRect.zero, configManager)

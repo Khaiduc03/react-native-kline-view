@@ -38,8 +38,14 @@ class RNKLineViewCommands: NSObject, RCTBridgeModule {
     @objc func updateLastCandle(_ reactTag: NSNumber, candle: NSDictionary) {
         bridge.uiManager.addUIBlock { (_, viewRegistry) in
             guard let view = viewRegistry?[reactTag] as? HTKLineContainerView else { return }
-            let dict = candle as? [String: Any] ?? [:]
             view.updateLastCandle(dict)
+        }
+    }
+
+    @objc func unPredictionSelect(_ reactTag: NSNumber, _ unused: Any?) {
+        bridge.uiManager.addUIBlock { (_, viewRegistry) in
+            guard let view = viewRegistry?[reactTag] as? HTKLineContainerView else { return }
+            view.unPredictionSelect()
         }
     }
 }

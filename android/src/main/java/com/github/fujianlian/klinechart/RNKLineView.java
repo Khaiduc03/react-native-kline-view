@@ -69,6 +69,7 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
     private static final int COMMAND_SET_DATA = 1;
     private static final int COMMAND_APPEND_CANDLE = 2;
     private static final int COMMAND_UPDATE_LAST_CANDLE = 3;
+    private static final int COMMAND_UN_PREDICTION_SELECT = 4;
 
   private static final String COMMAND_SET_DATA_NAME = "setData";
   private static final String COMMAND_APPEND_CANDLE_NAME = "appendCandle";
@@ -78,6 +79,7 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
         map.put("setData", COMMAND_SET_DATA);
         map.put("appendCandle", COMMAND_APPEND_CANDLE);
         map.put("updateLastCandle", COMMAND_UPDATE_LAST_CANDLE);
+        map.put("unPredictionSelect", COMMAND_UN_PREDICTION_SELECT);
         return map;
     }
 public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, @androidx.annotation.Nullable final ReadableArray args) {
@@ -189,6 +191,17 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 }).start();
                 return;
             }
+
+            case COMMAND_UN_PREDICTION_SELECT: {
+                Log.i(TAG, "unPredictionSelect called");
+                root.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        root.unPredictionSelect();
+                    }
+                });
+                return;
+            }
         }
     }
 
@@ -204,6 +217,9 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 return;
             case "updateLastCandle":
                 receiveCommand(root, COMMAND_UPDATE_LAST_CANDLE, args);
+                return;
+            case "unPredictionSelect":
+                receiveCommand(root, COMMAND_UN_PREDICTION_SELECT, args);
                 return;
             default:
                 return;

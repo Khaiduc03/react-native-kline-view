@@ -44,6 +44,10 @@ export interface RNKLineViewRef {
    * Replace the last candle (or append if the dataset is empty).
    */
   updateLastCandle: (candle: Candle) => void;
+  /**
+   * Clear any selected prediction state (Entry/SL/TP).
+   */
+  unPredictionSelect: () => void;
 }
 
 declare const RNKLineView: React.ForwardRefExoticComponent<

@@ -52,6 +52,13 @@ public class KLineChartView extends BaseKLineChartView {
         this.mVolumeDraw.reloadColor(this);
     }
 
+    public void unPredictionSelect() {
+        this.mSelectedPredictionType = null;
+        this.mSelectedPredictionIndex = null;
+        notifyChanged();
+    }
+
+
     public void changeSecondDrawType(SecondStatus secondStatus) {
         switch (secondStatus) {
             case MACD: {

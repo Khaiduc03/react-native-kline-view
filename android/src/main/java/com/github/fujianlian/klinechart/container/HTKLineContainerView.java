@@ -205,6 +205,13 @@ public class HTKLineContainerView extends RelativeLayout {
         return reloadLocation;
     }
 
+    public void unPredictionSelect() {
+        if (klineView != null) {
+            klineView.unPredictionSelect();
+        }
+    }
+
+
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {

@@ -108,6 +108,12 @@ class HTKLineView: UIScrollView {
     var selectedPredictionType: String? = nil // "entry", "sl", "tp"
     var selectedPredictionIndex: Int? = nil // Index for TP list
 
+    func unPredictionSelect() {
+        self.selectedPredictionType = nil
+        self.selectedPredictionIndex = nil
+        self.setNeedsDisplay()
+    }
+
     // === Grid spacing target (ô to, thưa) ===
     private let GRID_MIN_V_SPACING_PX: CGFloat = 84   // dọc: 96–128 để ô to hơn
     private let GRID_MIN_H_SPACING_PX: CGFloat = 64   // ngang: 56–72 là vừa mắt
