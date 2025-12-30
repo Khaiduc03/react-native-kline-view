@@ -819,7 +819,7 @@ class HTKLineView: UIScrollView {
             let color = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: isSelected ? 1.0 : 0.8) // Gold/Yellow
             context.saveGState()
             context.setStrokeColor(color.cgColor)
-            context.setLineWidth(isSelected ? 4.0 : 1.0)
+            context.setLineWidth(isSelected ? 2.5 : 1.0)
             context.setLineDash(phase: 0, lengths: [4, 4])
             context.move(to: CGPoint(x: startX, y: entryY))
             context.addLine(to: CGPoint(x: bgEndX, y: entryY))
@@ -850,7 +850,7 @@ class HTKLineView: UIScrollView {
             
             context.saveGState()
             context.setStrokeColor(color.cgColor)
-            context.setLineWidth(isSelected ? 4.0 : 1.0)
+            context.setLineWidth(isSelected ? 2.5 : 1.0)
             context.setLineDash(phase: 0, lengths: [4, 4])
             context.move(to: CGPoint(x: startX, y: slY))
             context.addLine(to: CGPoint(x: bgEndX, y: slY))
@@ -904,9 +904,16 @@ class HTKLineView: UIScrollView {
             // Draw dashed line
             let isSelected = (selectedPredictionType == "tp" && selectedPredictionIndex == pIndex)
             context.saveGState()
-            context.setStrokeColor(color.withAlphaComponent(isSelected ? 1.0 : 0.8).cgColor)
-            context.setLineWidth(isSelected ? 4.0 : 1.5)
+            context.setStrokeColor(color.cgColor)
+            //context.setStrokeColor(color.withAlphaComponent(isSelected ? 1.0 : 0.).cgColor)
+            context.setLineWidth(isSelected ? 2.5 : 1.0)
             context.setLineDash(phase: 0, lengths: [6, 4])
+            context.setLineCap(.round)
+            context.setLineJoin(.round)
+            
+            // Glow Effect: blurred shadow in same color
+
+            
             context.move(to: CGPoint(x: startX, y: originY))
             context.addLine(to: CGPoint(x: lineEndX, y: targetY))
             context.strokePath()
@@ -1276,34 +1283,119 @@ extension HTKLineView: UIScrollViewDelegate {
         
         // Only check if prediction exists
         if let _ = configManager.predictionEntry {
-            let hitThreshold: CGFloat = 60.0
+            // Thresholds
+            let hitThresholdY: CGFloat = 30.0 // Moderate vertical tolerance
+            let hitThresholdX_Start: CGFloat = 20.0
+            let hitThresholdX_End: CGFloat = 80.0 // Allow for labels
+            
             var candidates: [(type: String, price: CGFloat, index: Int?, dist: CGFloat)] = []
             
-            // 1. Check Entry
-            if let entry = configManager.predictionEntry {
-                let entryY = yFromValue(CGFloat(entry))
-                let dist = abs(point.y - entryY)
-                if dist < hitThreshold {
-                    candidates.append(("entry", CGFloat(entry), nil, dist))
+            // --- Coordinate System: Use Content Coordinates (ScrollView space) ---
+            // 'point' is in Content Coordinates.
+            // We must calculate line positions in Content Coordinates too.
+            
+            // Use same targetIndex selection logic (inlined)
+            let count = configManager.modelArray.count
+            var targetIndex = count - 1
+            if let startTime = configManager.predictionStartTime {
+                for i in (0..<count).reversed() {
+                    if configManager.modelArray[i].id <= startTime {
+                        targetIndex = i
+                        break
+                    }
                 }
             }
             
-            // 2. Check SL
-            if let sl = configManager.predictionStopLoss {
-                let slY = yFromValue(CGFloat(sl))
-                let dist = abs(point.y - slY)
-                if dist < hitThreshold {
-                    candidates.append(("sl", CGFloat(sl), nil, dist))
+            if targetIndex >= 0 && targetIndex < count {
+                // Start X in Content Space (Do NOT subtract contentOffset.x)
+                let lineStartContentX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2
+                
+                // Calculate Extension in Logic Units
+                let hitIndex = cachedHitIndex
+                let bgExtension: Int
+                if let hit = hitIndex {
+                    let hitExtension = hit - targetIndex
+                    bgExtension = max(hitExtension, 10)
+                } else {
+                    let currentDataLen = (count - 1) - targetIndex
+                    bgExtension = max(currentDataLen, 10)
                 }
-            }
-            
-            // 3. Check Targets
-            for (pIndex, prediction) in configManager.predictionList.enumerated() {
-                if let val = prediction["value"] as? CGFloat {
-                    let tY = yFromValue(val)
-                    let dist = abs(point.y - tY)
-                    if dist < hitThreshold {
-                        candidates.append(("tp", val, pIndex, dist))
+                
+                // Calculate Raw End X in Content Space
+                let rawBgEndContentX = lineStartContentX + CGFloat(bgExtension) * configManager.itemWidth
+                
+                // Clamp to Visible Area (in Content Space)
+                // The drawing logic clamps to 'self.bounds.width'.
+                // In Content Space, this corresponds to 'contentOffset.x + self.bounds.width'
+                let visibleRightContentX = contentOffset.x + self.bounds.width - configManager.paddingRight
+                let bgEndContentX = min(rawBgEndContentX, visibleRightContentX)
+                
+                // Bounds for specific lines
+                let maxX_EntrySL = bgEndContentX
+                
+                let maxX_TP: CGFloat
+                if let hit = hitIndex {
+                     let hitExtension = hit - targetIndex
+                     maxX_TP = lineStartContentX + CGFloat(hitExtension) * configManager.itemWidth
+                } else {
+                     maxX_TP = bgEndContentX
+                }
+                
+                // Helper
+                func isWithinX(_ pX: CGFloat, minX: CGFloat, maxX: CGFloat) -> Bool {
+                    return pX >= (minX - hitThresholdX_Start) && pX <= (maxX + hitThresholdX_End)
+                }
+                
+                // 1. Check Entry (Horizontal)
+                if let entry = configManager.predictionEntry {
+                    let entryY = yFromValue(CGFloat(entry))
+                    // Entry is horizontal, so simple Y distance
+                    if isWithinX(point.x, minX: lineStartContentX, maxX: maxX_EntrySL) {
+                        let dist = abs(point.y - entryY)
+                        if dist < hitThresholdY {
+                            candidates.append(("entry", CGFloat(entry), nil, dist))
+                        }
+                    }
+                    
+                    // 2. Check SL (Horizontal)
+                    if let sl = configManager.predictionStopLoss {
+                        let slY = yFromValue(CGFloat(sl))
+                        if isWithinX(point.x, minX: lineStartContentX, maxX: maxX_EntrySL) {
+                            let dist = abs(point.y - slY)
+                            if dist < hitThresholdY {
+                                candidates.append(("sl", CGFloat(sl), nil, dist))
+                            }
+                        }
+                    }
+                    
+                    // 3. Check Targets (Diagonal: Entry -> Target)
+                    for (pIndex, prediction) in configManager.predictionList.enumerated() {
+                        if let val = prediction["value"] as? CGFloat {
+                            let targetY = yFromValue(val)
+                            
+                            // Check X bounds first
+                            if isWithinX(point.x, minX: lineStartContentX, maxX: maxX_TP) {
+                                // Calculate expected Y on the diagonal line at point.x
+                                // Line defined by (lineStartContentX, entryY) to (maxX_TP, targetY)
+                                // Only calculate slope if length > 0
+                                let dx = maxX_TP - lineStartContentX
+                                var dist: CGFloat = 9999
+                                
+                                if abs(dx) > 1.0 {
+                                    let slope = (targetY - entryY) / dx
+                                    let currentDx = point.x - lineStartContentX
+                                    let expectedY = entryY + slope * currentDx
+                                    dist = abs(point.y - expectedY)
+                                } else {
+                                    // Vertical line case (rare/impossible here but safe)
+                                    dist = abs(point.y - targetY)
+                                }
+                                
+                                if dist < hitThresholdY {
+                                     candidates.append(("tp", val, pIndex, dist))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1322,20 +1414,16 @@ extension HTKLineView: UIScrollViewDelegate {
                     payload["index"] = idx
                 }
                 
-                // --- Enrich with extra metadata ---
+                // --- Enrich ---
                 if best.type == "tp", let idx = best.index, idx < configManager.predictionList.count {
                     let target = configManager.predictionList[idx]
-                    // Merge extra fields like type, reason
                     for (key, value) in target {
-                        if key != "value" && key != "price" { // Avoid overwriting price/value
+                        if key != "value" && key != "price" {
                              payload[key] = value
                         }
                     }
                 } else if best.type == "entry" {
-                    // Try to find matching entry zone or default to first
-                    // The user usually sends one main entry, but potentially multiple zones
                     if let zones = configManager.predictionEntryZones as? [[String: Any]], !zones.isEmpty {
-                        // Priority: Match by price, else take first
                         if let match = zones.first(where: {
                             if let p = $0["price"] as? Double {
                                 return abs(CGFloat(p) - best.price) < 0.0001
@@ -1343,16 +1431,11 @@ extension HTKLineView: UIScrollViewDelegate {
                             return false
                         }) {
                             for (key, value) in match {
-                                if key != "price" {
-                                    payload[key] = value
-                                }
+                                if key != "price" { payload[key] = value }
                             }
                         } else if let first = zones.first {
-                             // Fallback to first zone metadata if price doesn't match exactly (e.g. average)
                             for (key, value) in first {
-                                if key != "price" {
-                                    payload[key] = value
-                                }
+                                if key != "price" { payload[key] = value }
                             }
                         }
                     }
@@ -1360,8 +1443,6 @@ extension HTKLineView: UIScrollViewDelegate {
                 
                 onPredictionSelect?(payload)
             }
-            
-
         }
         
         if didSelectPrediction {
