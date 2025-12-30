@@ -1284,9 +1284,9 @@ extension HTKLineView: UIScrollViewDelegate {
         // Only check if prediction exists
         if let _ = configManager.predictionEntry {
             // Thresholds
-            let hitThresholdY: CGFloat = 30.0 // Moderate vertical tolerance
-            let hitThresholdX_Start: CGFloat = 20.0
-            let hitThresholdX_End: CGFloat = 80.0 // Allow for labels
+            let hitThresholdY: CGFloat = 15.0 // Decreased vertical tolerance
+            let hitThresholdX_Start: CGFloat = 15.0
+            let hitThresholdX_End: CGFloat = 50.0 // Allow for labels
             
             var candidates: [(type: String, price: CGFloat, index: Int?, dist: CGFloat)] = []
             
