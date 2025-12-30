@@ -116,7 +116,7 @@ class RNKLineView: RCTViewManager {
     }
 
     // Called from JS: NativeModules.RNKLineView.unPredictionSelect(reactTag, null)
-    @objc func unPredictionSelect(_ reactTag: NSNumber, _ unused: Any?) {
+    @objc func unPredictionSelect(_ reactTag: NSNumber, unused: Any?) {
         print("🚀 [Pods RNKLineView] unPredictionSelect called")
         let uiManager = bridge.uiManager
         uiManager?.addUIBlock { [weak self] (_, viewRegistry) in

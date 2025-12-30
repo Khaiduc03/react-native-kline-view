@@ -50,6 +50,13 @@ interface SelectedItem {
   color?: number;
 }
 
+interface PredictionDetails {
+  price?: number;
+  type?: string;
+  index?: number;
+  color?: number | string;
+}
+
 interface MAItem {
   value: number;
   title: string;
@@ -221,6 +228,8 @@ interface Theme {
   gridColor: string;
   separatorColor: string;
   textColor: string;
+  popupBackgroundColor: string;
+  popupTextColor: string;
 }
 
 // ==================== Helper Functions ====================
@@ -413,6 +422,10 @@ class ThemeManager {
       detailColor: COLOR(0.55, 0.62, 0.68),
       textColor7724: COLOR(0.77, 0.81, 0.84),
 
+      // Popup colors
+      popupBackgroundColor: 'white',
+      popupTextColor: COLOR(0.08, 0.09, 0.12),
+
       // Special background colors
       headerColor: COLOR(0.97, 0.97, 0.98),
       tabBarBackgroundColor: 'white',
@@ -450,6 +463,10 @@ class ThemeManager {
       titleColor: COLOR(0.81, 0.83, 0.91),
       detailColor: COLOR(0.43, 0.53, 0.66),
       textColor7724: COLOR(0.24, 0.33, 0.42),
+
+      // Popup colors
+      popupBackgroundColor: COLOR(0.13, 0.2, 0.29),
+      popupTextColor: COLOR(0.81, 0.83, 0.91),
 
       // Special background colors
       headerColor: COLOR(0.09, 0.16, 0.25),
@@ -1332,11 +1349,16 @@ const KLineScreen: React.FC = () => {
   const [klineData, setKlineData] = useState<KLineRawPoint[]>(
     [], // Start with empty data, fetch from API
   );
-  const [drawShouldContinue, setDrawShouldContinue] = useState(true);
+  const [drawShouldContinue, setDrawShouldContinue] = useState(false);
   const [drawReloadIndex, setDrawReloadIndex] = useState(
     DrawStateConstants.none,
   );
   const [drawClearFlag, setDrawClearFlag] = useState(false);
+
+  // Prediction selection state
+  const [selectedPrediction, setSelectedPrediction] =
+    useState<PredictionDetails | null>(null);
+
   const [predictionList, setPredictionList] = useState<PredictionTarget[]>([]);
   const [predictionStartTime, setPredictionStartTime] = useState<
     number | undefined
@@ -2097,6 +2119,10 @@ const KLineScreen: React.FC = () => {
         onDrawPointComplete={handleDrawPointComplete}
         onPredictionSelect={event => {
           console.log('Prediction Selected:', event.nativeEvent);
+          const details = event.nativeEvent as unknown as PredictionDetails; // Assuming native event structure matches
+          if (details) {
+            setSelectedPrediction(details);
+          }
         }}
       />
     );
@@ -2252,6 +2278,74 @@ const KLineScreen: React.FC = () => {
               onPress={() => setShowTimeSelector(false)}
             >
               <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Prediction Details Modal */}
+      {selectedPrediction && (
+        <View style={styles.selectorOverlay}>
+          <View
+            style={[
+              styles.selectorModal,
+              {
+                backgroundColor: isDarkTheme
+                  ? theme.popupBackgroundColor
+                  : theme.backgroundColor,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.selectorTitle,
+                { color: isDarkTheme ? theme.popupTextColor : theme.textColor },
+              ]}
+            >
+              Prediction Details
+            </Text>
+
+            <View style={{ padding: 16 }}>
+              {Object.entries(selectedPrediction).map(([key, value]) => (
+                <View
+                  key={key}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontWeight: 'bold',
+                      color: isDarkTheme
+                        ? theme.popupTextColor
+                        : theme.textColor,
+                    }}
+                  >
+                    {key}:{' '}
+                  </Text>
+                  <Text
+                    style={{
+                      color: isDarkTheme
+                        ? theme.popupTextColor
+                        : theme.textColor,
+                    }}
+                  >
+                    {String(value)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setSelectedPrediction(null);
+                kLineViewRef.current?.unPredictionSelect?.();
+              }}
+            >
+              <Text style={styles.closeButtonText}>Close & Unselect</Text>
             </TouchableOpacity>
           </View>
         </View>
