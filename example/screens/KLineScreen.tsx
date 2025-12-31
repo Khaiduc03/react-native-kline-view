@@ -200,6 +200,7 @@ interface KLineOptionList {
   predictionStopLoss?: number;
   predictionBias?: string;
   predictionEntryZones?: any[];
+  predictionMinCandles?: number; // Minimum candles width for prediction zone (default: 20)
 }
 
 interface Theme {
@@ -1182,6 +1183,7 @@ const packOptionList = (
   predictionBias?: string,
   predictionEntryZones?: any[], // New param
   shouldScrollToEnd?: boolean, // Control scroll behavior
+  predictionMinCandles?: number, // Minimum candles for prediction zone
 ): KLineOptionList => {
   const theme = ThemeManager.getCurrentTheme(isDarkTheme);
 
@@ -1328,6 +1330,7 @@ const packOptionList = (
     predictionStopLoss: predictionStopLoss,
     predictionBias: predictionBias,
     predictionEntryZones: predictionEntryZones, // Pass to result
+    predictionMinCandles: predictionMinCandles, // Minimum candles for prediction zone
   };
 };
 
@@ -1786,6 +1789,7 @@ const KLineScreen: React.FC = () => {
       predictionBias,
       predictionEntryZones,
       shouldScrollToEnd,
+      20, // predictionMinCandles - minimum candles for prediction zone
     );
   }, [
     processedKLineData,

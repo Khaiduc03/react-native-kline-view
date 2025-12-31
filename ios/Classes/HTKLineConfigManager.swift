@@ -247,6 +247,7 @@ class HTKLineConfigManager: NSObject {
     var predictionEntry: Double? = nil
     var predictionStopLoss: Double? = nil
     var predictionBias: String? = nil
+    var predictionMinCandles: Int = 20 // Minimum candles width for prediction zone
 
     // grid draw
     // Đậm rõ: màu đen, nét 1.2pt để dễ thấy
@@ -504,6 +505,8 @@ class HTKLineConfigManager: NSObject {
         } else {
             predictionEntryZones = []
         }
+        
+        predictionMinCandles = optionList["predictionMinCandles"] as? Int ?? 20
     }
 
 }

@@ -678,14 +678,15 @@ class HTKLineView: UIScrollView {
             winningPredictionIndex = computedWinningIndex
         }
 
-        // Calculate Background Extension
+        // Calculate Background Extension (minimum from config)
+        let minCandles = configManager.predictionMinCandles
         let bgExtension: Int
         if let hit = hitIndex {
             let hitExtension = hit - targetIndex
-            bgExtension = max(hitExtension, 10)
+            bgExtension = max(hitExtension, minCandles)
         } else {
             let currentDataLen = (count - 1) - targetIndex
-            bgExtension = max(currentDataLen, 10)
+            bgExtension = max(currentDataLen, minCandles)
         }
 
         // Calculate X positions
@@ -721,7 +722,7 @@ class HTKLineView: UIScrollView {
         
         // --- GRADIENT DRAWING ---
         let entryVal = configManager.predictionEntry
-        let stickyGradientWidth: CGFloat = 60 // Sticky strip width when scrolled off
+        let stickyGradientWidth: CGFloat = configManager.itemWidth * 10 // Sticky strip width = 20 candles
         
         if let bias = configManager.predictionBias, let entry = entryVal {
             let entryY = yFromValue(CGFloat(entry))
@@ -1367,13 +1368,14 @@ extension HTKLineView: UIScrollViewDelegate {
                 
                 // Calculate Extension in Logic Units
                 let hitIndex = cachedHitIndex
+                let minCandles = configManager.predictionMinCandles
                 let bgExtension: Int
                 if let hit = hitIndex {
                     let hitExtension = hit - targetIndex
-                    bgExtension = max(hitExtension, 10)
+                    bgExtension = max(hitExtension, minCandles)
                 } else {
                     let currentDataLen = (count - 1) - targetIndex
-                    bgExtension = max(currentDataLen, 10)
+                    bgExtension = max(currentDataLen, minCandles)
                 }
                 
                 // Calculate Raw End X in Content Space
