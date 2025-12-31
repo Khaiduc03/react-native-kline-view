@@ -692,8 +692,8 @@ class HTKLineView: UIScrollView {
         let startX = CGFloat(targetIndex) * configManager.itemWidth + configManager.itemWidth / 2 - contentOffset.x
         let rawBgEndX = startX + CGFloat(bgExtension) * configManager.itemWidth
         
-        // Clamp bgEndX to visible view bounds (sync with Android behavior)
-        let rightBound = self.bounds.width - configManager.paddingRight
+        // Clamp bgEndX to visible view bounds - use full width for prediction zone
+        let rightBound = self.bounds.width
         let bgEndX = min(rawBgEndX, rightBound)
         
         // --- ANIMATION: Wipe Transition ---
@@ -721,12 +721,17 @@ class HTKLineView: UIScrollView {
         
         // --- GRADIENT DRAWING ---
         let entryVal = configManager.predictionEntry
+        let stickyGradientWidth: CGFloat = 60 // Sticky strip width when scrolled off
+        
         if let bias = configManager.predictionBias, let entry = entryVal {
             let entryY = yFromValue(CGFloat(entry))
             
             // 1. Valid Bias Logic
             context.saveGState()
             let bgWidth = bgEndX - startX
+            
+            // Check if prediction zone is scrolled off to the right
+            let isScrolledOff = startX > rightBound
             
             // SL Zone (Red Gradient)
             if let sl = configManager.predictionStopLoss {
@@ -735,25 +740,37 @@ class HTKLineView: UIScrollView {
                 let rectY = min(entryY, slY)
                 let rectH = abs(entryY - slY)
                 
-                // Intersect with visible area to clip at right edge when scrolling
-                let visibleRect = CGRect(x: 0, y: 0, width: rightBound, height: allHeight)
-                let gradientRect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
-                let clippedRect = gradientRect.intersection(visibleRect)
-                
-                if clippedRect.width > 0 && clippedRect.height > 0 {
-                    
+                if isScrolledOff {
+                    // Draw sticky gradient strip at right edge
+                    let stickyRect = CGRect(x: rightBound - stickyGradientWidth, y: rectY, width: stickyGradientWidth, height: rectH)
                     context.saveGState()
-                    context.clip(to: clippedRect)
+                    context.clip(to: stickyRect)
                     let colorSpace = CGColorSpaceCreateDeviceRGB()
-                    // Red gradient
-                    let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
+                    let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.15).cgColor
                     let color2 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.05).cgColor
                     let colors = [color1, color2] as CFArray
                     if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
-                        // Draw from Entry towards SL
-                        context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: slY), options: [])
+                        context.drawLinearGradient(gradient, start: CGPoint(x: rightBound - stickyGradientWidth, y: entryY), end: CGPoint(x: rightBound - stickyGradientWidth, y: slY), options: [])
                     }
                     context.restoreGState()
+                } else {
+                    // Normal gradient drawing
+                    let visibleRect = CGRect(x: 0, y: 0, width: rightBound, height: allHeight)
+                    let gradientRect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                    let clippedRect = gradientRect.intersection(visibleRect)
+                    
+                    if clippedRect.width > 0 && clippedRect.height > 0 {
+                        context.saveGState()
+                        context.clip(to: clippedRect)
+                        let colorSpace = CGColorSpaceCreateDeviceRGB()
+                        let color1 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.2).cgColor
+                        let color2 = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.05).cgColor
+                        let colors = [color1, color2] as CFArray
+                        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                            context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: slY), options: [])
+                        }
+                        context.restoreGState()
+                    }
                 }
             }
             
@@ -766,24 +783,37 @@ class HTKLineView: UIScrollView {
                 let rectY = min(entryY, targetY)
                 let rectH = abs(entryY - targetY)
                 
-                // Intersect with visible area to clip at right edge when scrolling
-                let tpVisibleRect = CGRect(x: 0, y: 0, width: rightBound, height: allHeight)
-                let tpGradientRect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
-                let tpClippedRect = tpGradientRect.intersection(tpVisibleRect)
-                
-                if tpClippedRect.width > 0 && tpClippedRect.height > 0 {
-                    
+                if isScrolledOff {
+                    // Draw sticky gradient strip at right edge
+                    let stickyRect = CGRect(x: rightBound - stickyGradientWidth, y: rectY, width: stickyGradientWidth, height: rectH)
                     context.saveGState()
-                    context.clip(to: tpClippedRect)
+                    context.clip(to: stickyRect)
                     let colorSpace = CGColorSpaceCreateDeviceRGB()
-                    // Green gradient
-                    let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor
+                    let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.15).cgColor
                     let color2 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.05).cgColor
                     let colors = [color1, color2] as CFArray
                     if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
-                        context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: targetY), options: [])
+                        context.drawLinearGradient(gradient, start: CGPoint(x: rightBound - stickyGradientWidth, y: entryY), end: CGPoint(x: rightBound - stickyGradientWidth, y: targetY), options: [])
                     }
                     context.restoreGState()
+                } else {
+                    // Normal gradient drawing
+                    let tpVisibleRect = CGRect(x: 0, y: 0, width: rightBound, height: allHeight)
+                    let tpGradientRect = CGRect(x: startX, y: rectY, width: bgWidth, height: rectH)
+                    let tpClippedRect = tpGradientRect.intersection(tpVisibleRect)
+                    
+                    if tpClippedRect.width > 0 && tpClippedRect.height > 0 {
+                        context.saveGState()
+                        context.clip(to: tpClippedRect)
+                        let colorSpace = CGColorSpaceCreateDeviceRGB()
+                        let color1 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.2).cgColor
+                        let color2 = UIColor(red: 0.3, green: 0.7, blue: 0.3, alpha: 0.05).cgColor
+                        let colors = [color1, color2] as CFArray
+                        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+                            context.drawLinearGradient(gradient, start: CGPoint(x: startX, y: entryY), end: CGPoint(x: startX, y: targetY), options: [])
+                        }
+                        context.restoreGState()
+                    }
                 }
             }
             context.restoreGState()
@@ -831,19 +861,27 @@ class HTKLineView: UIScrollView {
             context.addLine(to: CGPoint(x: bgEndX, y: entryY))
             context.strokePath()
             
-            // Entry Label
+            // Entry Label - with sticky behavior
             let priceText = configManager.precision(CGFloat(val), configManager.price)
             let labelText = "Entry \(priceText)"
             let font = configManager.createFont(configManager.rightTextFontSize)
             let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black] // Black text on yellow
             let labelSize = (labelText as NSString).size(withAttributes: attributes)
-            let labelRect = CGRect(x: bgEndX + 2, y: entryY - labelSize.height/2, width: labelSize.width + 8, height: labelSize.height + 4)
+            let entryLabelWidth = labelSize.width + 8
+            let entryLabelHeight = labelSize.height + 4
+            
+            // Sticky label: if label would go off-screen right, lock to right edge
+            let normalLabelX = bgEndX + 2
+            let maxLabelX = self.bounds.width - entryLabelWidth - 2
+            let entryLabelX = min(normalLabelX, maxLabelX)
+            
+            let labelRect = CGRect(x: entryLabelX, y: entryY - labelSize.height/2, width: entryLabelWidth, height: entryLabelHeight)
             
             context.setFillColor(color.cgColor)
             let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
             context.addPath(path.cgPath)
             context.fillPath()
-            (labelText as NSString).draw(at: CGPoint(x: bgEndX + 6, y: entryY - labelSize.height/2 + 2), withAttributes: attributes)
+            (labelText as NSString).draw(at: CGPoint(x: entryLabelX + 4, y: entryY - labelSize.height/2 + 2), withAttributes: attributes)
             context.restoreGState()
         }
         
@@ -862,19 +900,27 @@ class HTKLineView: UIScrollView {
             context.addLine(to: CGPoint(x: bgEndX, y: slY))
             context.strokePath()
             
-            // SL Label
+            // SL Label - with sticky behavior
             let priceText = configManager.precision(val, configManager.price)
             let labelText = "SL \(priceText)"
             let font = configManager.createFont(configManager.rightTextFontSize)
             let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
             let labelSize = (labelText as NSString).size(withAttributes: attributes)
-            let labelRect = CGRect(x: bgEndX + 2, y: slY - labelSize.height/2, width: labelSize.width + 8, height: labelSize.height + 4)
+            let slLabelWidth = labelSize.width + 8
+            let slLabelHeight = labelSize.height + 4
+            
+            // Sticky label: if label would go off-screen right, lock to right edge
+            let normalSlLabelX = bgEndX + 2
+            let maxSlLabelX = self.bounds.width - slLabelWidth - 2
+            let slLabelX = min(normalSlLabelX, maxSlLabelX)
+            
+            let labelRect = CGRect(x: slLabelX, y: slY - labelSize.height/2, width: slLabelWidth, height: slLabelHeight)
             
             context.setFillColor(color.cgColor)
             let path = UIBezierPath(roundedRect: labelRect, cornerRadius: 3)
             context.addPath(path.cgPath)
             context.fillPath()
-            (labelText as NSString).draw(at: CGPoint(x: bgEndX + 6, y: slY - labelSize.height/2 + 2), withAttributes: attributes)
+            (labelText as NSString).draw(at: CGPoint(x: slLabelX + 4, y: slY - labelSize.height/2 + 2), withAttributes: attributes)
             context.restoreGState()
         }
 
@@ -935,7 +981,7 @@ class HTKLineView: UIScrollView {
                 context.restoreGState()
             }
 
-            // Label
+            // Label - with sticky behavior
             let priceText = configManager.precision(value, configManager.price)
             let labelText = "TP \(priceText)"
             let font = configManager.createFont(configManager.rightTextFontSize)
@@ -949,7 +995,10 @@ class HTKLineView: UIScrollView {
             let labelWidth = labelSize.width + paddingX * 2
             let labelHeight = labelSize.height + paddingY * 2
 
-            let labelX = lineEndX + 2
+            // Sticky label: if label would go off-screen right, lock to right edge
+            let normalTpLabelX = lineEndX + 2
+            let maxTpLabelX = self.bounds.width - labelWidth - 2
+            let labelX = min(normalTpLabelX, maxTpLabelX)
             let labelY = targetY - labelHeight / 2
 
             let labelRect = CGRect(x: labelX, y: labelY, width: labelWidth, height: labelHeight)
