@@ -55,16 +55,112 @@ public class ValueFormatter implements IValueFormatter {
     }
 
     public String _format(float value, boolean isPrice, boolean fillzero) {
-        // Giá: nhận bao nhiêu thập phân trả bấy nhiêu, cắt số 0 vô nghĩa ở cuối.
+        // Price logic: custom logic for tiny/large numbers
         if (isPrice) {
-            BigDecimal bd = new BigDecimal(String.valueOf(value));
-            bd = bd.stripTrailingZeros();
-            return bd.toPlainString();
+            return formatPrice(value);
         }
 
-        // Volume (và các giá trị khác): giữ nguyên logic cũ theo rightLength.
-        Integer rightLength = isPrice ? this.priceRightLength : this.volumeRightLength;
+        // Volume (and others): legacy logic
+        Integer rightLength = this.volumeRightLength; // Fixed: was using class field directly in mixed context? No, just standard logic
         return format(value, rightLength, fillzero);
+    }
+
+    private String formatPrice(float value) {
+        if (value == 0) {
+            return "0.00";
+        }
+
+        float absValue = Math.abs(value);
+
+        // 1. Tiny numbers (< 1)
+        if (absValue < 1 && absValue > 0) {
+            String formatted = formatTinyNumber(absValue, 4, 4); // Default minZeros=4, sigDigits=4 from requirements
+            return value < 0 ? "-$" + formatted : "$" + formatted;
+        }
+
+        // 2. Large numbers (>= 1,000,000)
+        if (absValue >= 1000000) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                android.icu.text.CompactDecimalFormat compactDecimalFormat =
+                        android.icu.text.CompactDecimalFormat.getInstance(
+                                java.util.Locale.US,
+                                android.icu.text.CompactDecimalFormat.CompactStyle.SHORT
+                        );
+                compactDecimalFormat.setMaximumFractionDigits(2);
+                compactDecimalFormat.setMinimumFractionDigits(2);
+                return compactDecimalFormat.format(value);
+            } else {
+                // Fallback for extremely old devices if sdk < 24 (though project min is 24)
+                return String.format(java.util.Locale.US, "%.2fM", value / 1000000);
+            }
+        }
+
+        // 3. Standard numbers
+        int significantDigits = 4;
+        NumberFormat format = NumberFormat.getInstance(java.util.Locale.US);
+        format.setMinimumFractionDigits(2);
+        format.setMaximumFractionDigits(value > 100 ? 2 : significantDigits);
+        format.setGroupingUsed(true); // Add commas
+
+        String priceString = format.format(Math.abs(value));
+        return value < 0 ? "-$" + priceString : "$" + priceString;
+    }
+
+    private String formatTinyNumber(float value, int minZeros, int significantDigits) {
+        // Convert to plain string to avoid scientific notation
+        BigDecimal bd = new BigDecimal(String.valueOf(value));
+        String str = bd.toPlainString();
+
+        // Match pattern: 0.0+ followed by digits
+        if (!str.contains(".")) {
+             return String.format(java.util.Locale.US, "%." + significantDigits + "f", value);
+        }
+
+        int dotIndex = str.indexOf(".");
+        String allDigits = str.substring(dotIndex + 1);
+
+        // Count zeros
+        int zeroCount = 0;
+        for (int i = 0; i < allDigits.length(); i++) {
+            if (allDigits.charAt(i) == '0') {
+                zeroCount++;
+            } else {
+                break;
+            }
+        }
+
+        String zeros = allDigits.substring(0, zeroCount);
+        String significant = allDigits.substring(zeroCount);
+
+        // Round significant digits
+        if (significant.length() > significantDigits) {
+            String toRoundStr = significant.substring(0, significantDigits + 1);
+             long toRound = Long.parseLong(toRoundStr);
+             long rounded = Math.round(toRound / 10.0);
+             significant = String.valueOf(rounded);
+             // Pad start if needed?
+             while (significant.length() < significantDigits) {
+                 significant = "0" + significant;
+             }
+        }
+
+        // Check threshold
+        if (zeroCount < minZeros) {
+            return "0." + zeros + significant;
+        }
+
+        // Subscript mapping
+        String[] subscripts = {"₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"};
+        StringBuilder subscriptCount = new StringBuilder();
+        String countStr = String.valueOf(zeroCount);
+        for (int i = 0; i < countStr.length(); i++) {
+            int digit = Character.getNumericValue(countStr.charAt(i));
+            if (digit >= 0 && digit <= 9) {
+                subscriptCount.append(subscripts[digit]);
+            }
+        }
+
+        return "0.0" + subscriptCount.toString() + significant;
     }
 
 }

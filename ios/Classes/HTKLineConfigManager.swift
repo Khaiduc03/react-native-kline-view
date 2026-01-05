@@ -140,25 +140,123 @@ class HTKLineConfigManager: NSObject {
         macdCandleWidth = _macdCandleWidth * scale
     }
 
-    /// Format số theo đúng lượng phần thập phân thực tế (nhận bao nhiêu trả bấy nhiêu).
-    /// - Không còn ép về 2/4 số sau dấu phẩy.
-    /// - In ra tối đa 10 chữ số thập phân, cắt bớt số 0 vô nghĩa ở cuối.
+    /// Format số theo đúng logic: tiny numbers, large numbers, standard numbers
     func precision(_ value: CGFloat, _ precision: Int) -> String {
-        // Format với độ chính xác cao, sau đó tự cắt bớt số 0 cuối
-        let raw = String(format: "%.10f", Double(value))
+        return formatPrice(value, 4, precision)
+    }
 
-        // Cắt các số 0 vô nghĩa và dấu chấm nếu ở cuối
-        var trimmed = raw
-        while trimmed.contains("."),
-              let last = trimmed.last,
-              (last == "0" || last == ".") {
-            trimmed.removeLast()
-            if last == "." {
+    func formatPrice(_ value: CGFloat, _ minZeros: Int = 4, _ significantDigits: Int = 4) -> String {
+        // Handle zero
+        if value == 0 { return "0.00" }
+
+        let absValue = abs(value)
+        
+        // Very small numbers (< 1)
+        if absValue < 1 && absValue > 0 {
+            let formatted = formatTinyNumber(absValue, minZeros, significantDigits)
+            return value < 0 ? "-$\(formatted)" : "\(formatted)"
+        }
+        
+        // Large numbers (>= 1M)
+        if absValue >= 1_000_000 {
+            // Using NumberFormatter for compact notation
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency // We want compact, but Apple's compact is simplified in .scientific or custom.
+            // Actually, for "1.25M" style, .scientific is not it.
+            // On iOS 14+, NumberFormatter has specific compact support, but let's stick to a manual robust approach or standard one if reliable.
+            // To match "en-US" "compact" from JS:
+            
+            // Manual Compact Implementation to ensure cross-version compatibility for "M", "B", etc.
+            // Or use ByteCountFormatter? No, that's bytes.
+            
+            let num = Double(absValue)
+            let sign = value < 0 ? "-" : ""
+            
+            let units = ["", "K", "M", "B", "T", "P", "E"]
+            var mag = 0
+            var temp = num
+            while temp >= 1000 && mag < units.count - 1 {
+                temp /= 1000
+                mag += 1
+            }
+            
+            let formattedNum = String(format: "%.2f", temp)
+            return "\(sign)$\(formattedNum)\(units[mag])"
+        }
+        
+        // Standard numbers
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = value > 100 ? 2 : significantDigits
+        formatter.locale = Locale(identifier: "en_US")
+        
+        if let string = formatter.string(from: NSNumber(value: Double(absValue))) {
+            return value < 0 ? "-$\(string)" : "\(string)"
+        }
+        
+        return String(format: "%.2f", value)
+    }
+
+    func formatTinyNumber(_ value: CGFloat, _ minZeros: Int, _ significantDigits: Int) -> String {
+        // Convert to decimal string with high precision to avoid scientific notation
+        let str = String(format: "%.20f", value)
+        
+        // Match pattern: 0.0+ followed by significant digits
+        // Regex: ^0\.(\d+)
+        guard let decimalSeparatorRange = str.range(of: ".") else {
+            return String(format: "%.\(significantDigits)f", value)
+        }
+        
+        let allDigits = String(str[decimalSeparatorRange.upperBound...])
+        
+        // Find leading zeros
+        var zeroCount = 0
+        for char in allDigits {
+            if char == "0" {
+                zeroCount += 1
+            } else {
                 break
             }
         }
-
-        return trimmed
+        
+        let zeros = String(repeating: "0", count: zeroCount)
+        var significant = String(allDigits.dropFirst(zeroCount))
+        
+        // Round significant digits
+        if significant.count > significantDigits {
+             let index = significant.index(significant.startIndex, offsetBy: significantDigits + 1)
+             let toRoundStr = significant.prefix(upTo: index)
+             if let toRound = Int(String(toRoundStr)) {
+                 let rounded = Int(round(Double(toRound) / 10.0))
+                 significant = String(rounded)
+                 // Pad start if rounding reduced digits (e.g. 05 -> 5, need 05? No, standard integer math)
+                 // Actually padStart is to ensure we keep the length correct if we want fixed length.
+                 // JS logic: significant = rounded.toString().padStart(significantDigits, "0")
+                 while significant.count < significantDigits {
+                     significant = "0" + significant
+                 }
+             }
+        } else {
+             // If fewer digits than significant, pad with 0? usually we just take what is there or pad.
+             // But for tiny numbers often we have trailing noise or just ends.
+             // JS logic didn't explicitly pad end, it handled length > significantDigits.
+        }
+        
+        // Only use subscript if zero count meets threshold
+        if zeroCount < minZeros {
+            return "0.\(zeros)\(significant)"
+        }
+        
+        // Subscript mapping
+        let subscriptDigits: [Character: String] = [
+            "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
+            "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉"
+        ]
+        
+        let subscriptCount = String(zeroCount).compactMap { subscriptDigits[$0] }.joined()
+        
+        return "0.0\(subscriptCount)\(significant)"
     }
 
 
