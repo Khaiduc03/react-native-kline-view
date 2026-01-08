@@ -40,6 +40,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     private int mChildDrawPosition = -1;
 
     private int mWidth = 0;
+    private int mHeight = 0;
 
     private int mTopPadding;
 
@@ -262,6 +263,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         this.mWidth = w;
+        this.mHeight = h;
         notifyChanged();
     }
 
