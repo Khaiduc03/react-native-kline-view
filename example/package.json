@@ -8,12 +8,12 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "postinstall": "rm -rf ./node_modules/react-native-kline-view/example"
+    "postinstall": "node -e \"const fs=require('fs');const pkg='./node_modules/react-native-kline-view';const nested=pkg+'/example';try{if(fs.existsSync(pkg)&&fs.lstatSync(pkg).isSymbolicLink()){process.exit(0);}if(fs.existsSync(nested)){fs.rmSync(nested,{recursive:true,force:true});}}catch(e){process.exit(0);}\""
   },
   "dependencies": {
     "react": "19.1.0",
     "react-native": "0.80.0",
-    "react-native-kline-view": "../"
+    "react-native-kline-view": "link:.."
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

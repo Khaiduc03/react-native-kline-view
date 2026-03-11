@@ -142,6 +142,18 @@ public class HTKLineConfigManager {
 
     public int selectedPointContentColor = Color.BLACK;
 
+    // Cursor style (configurable from JS configList)
+    public boolean cursorStyleEnabled = true;
+    public float cursorInnerRadiusPx = 1f;
+    public float cursorOuterRadiusPx = 5f;
+    public int cursorInnerColor = Color.BLACK;
+    public int cursorOuterColor = Color.BLACK;
+    public float cursorOuterBlurRadiusPx = 6f;
+    public float cursorBorderWidthPx = 0f;
+    public int cursorBorderColor = Color.BLACK;
+    public float cursorInnerBorderWidthPx = 0f;
+    public int cursorInnerBorderColor = Color.WHITE;
+
     public float panelTextFontSize = 9;
 
     public float panelMinWidth = 130;
@@ -159,6 +171,7 @@ public class HTKLineConfigManager {
     public Double predictionEntry = null;
     public Double predictionStopLoss = null;
     public String predictionBias = null;
+    public int predictionMinCandles = 12;
 
     public String bollN = "";
     public String bollP = "";
@@ -207,6 +220,33 @@ public class HTKLineConfigManager {
     public Object getOrDefault(Map map, String key, Object defaultValue) {
         Object object = map.get(key);
         return object != null ? object : defaultValue;
+    }
+
+    private static float readFloat(Map map, String key, float defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).floatValue();
+        }
+        return defaultValue;
+    }
+
+    private static int readColor(Map map, String key, int defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        return defaultValue;
+    }
+
+    private static boolean readBoolean(Map map, String key, boolean defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() != 0;
+        }
+        return defaultValue;
     }
 
     public KLineEntity packModel(Map<String, Object> keyValue) {
@@ -427,8 +467,18 @@ public class HTKLineConfigManager {
         this.panelGradientLocationList = parseLocationList(configList.get("panelGradientLocationList"));
         this.panelBackgroundColor = ((Number) configList.get("panelBackgroundColor")).intValue();
         this.panelBorderColor = ((Number) configList.get("panelBorderColor")).intValue();
-        this.selectedPointContainerColor = ((Number) configList.get("selectedPointContainerColor")).intValue();
-        this.selectedPointContentColor = ((Number) configList.get("selectedPointContentColor")).intValue();
+        this.selectedPointContainerColor = readColor(configList, "selectedPointContainerColor", Color.BLACK);
+        this.selectedPointContentColor = readColor(configList, "selectedPointContentColor", Color.BLACK);
+        this.cursorStyleEnabled = readBoolean(configList, "cursorStyleEnabled", true);
+        this.cursorInnerRadiusPx = readFloat(configList, "cursorInnerRadiusPx", 1f);
+        this.cursorOuterRadiusPx = readFloat(configList, "cursorOuterRadiusPx", 5f);
+        this.cursorOuterBlurRadiusPx = readFloat(configList, "cursorOuterBlurRadiusPx", 6f);
+        this.cursorBorderWidthPx = readFloat(configList, "cursorBorderWidthPx", 0f);
+        this.cursorInnerBorderWidthPx = readFloat(configList, "cursorInnerBorderWidthPx", 0f);
+        this.cursorInnerColor = readColor(configList, "cursorInnerColor", this.selectedPointContentColor);
+        this.cursorOuterColor = readColor(configList, "cursorOuterColor", this.selectedPointContainerColor);
+        this.cursorBorderColor = readColor(configList, "cursorBorderColor", this.cursorOuterColor);
+        this.cursorInnerBorderColor = readColor(configList, "cursorInnerBorderColor", Color.WHITE);
         this.panelMinWidth = ((Number)configList.get("panelMinWidth")).floatValue();
         this.panelTextFontSize = ((Number)configList.get("panelTextFontSize")).floatValue();
 
@@ -472,6 +522,13 @@ public class HTKLineConfigManager {
             this.predictionEntryZones = (List<Map<String, Object>>) optionList.get("predictionEntryZones");
         } else {
             this.predictionEntryZones = new ArrayList<>();
+        }
+
+        Object predictionMinCandlesObj = optionList.get("predictionMinCandles");
+        if (predictionMinCandlesObj instanceof Number) {
+            this.predictionMinCandles = ((Number) predictionMinCandlesObj).intValue();
+        } else {
+            this.predictionMinCandles = 12;
         }
     }
 

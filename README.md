@@ -221,6 +221,23 @@ Each data point should contain the following fields:
 | `candleTextFontSize`         | Number | Candle value text size                                |
 | `panelTextFontSize`          | Number | Info panel text size                                  |
 | `panelMinWidth`              | Number | Minimum info panel width                              |
+| `selectedPointContainerColor`| Color  | Legacy outer cursor color (fallback for `cursorOuterColor`) |
+| `selectedPointContentColor`  | Color  | Legacy inner cursor color (fallback for `cursorInnerColor`) |
+| `cursorStyleEnabled`         | Bool   | Enable fixed-size cursor style (default `true`)      |
+| `cursorInnerRadiusPx`        | Number | Inner circle radius in logical px (default `1`)      |
+| `cursorOuterRadiusPx`        | Number | Outer circle radius in logical px (default `5`)      |
+| `cursorInnerColor`           | Color  | Cursor inner circle color (fallback to `selectedPointContentColor`) |
+| `cursorOuterColor`           | Color  | Cursor outer circle color (fallback to `selectedPointContainerColor`) |
+| `cursorOuterBlurRadiusPx`    | Number | Outer halo blur radius in logical px (default `6`)   |
+| `cursorBorderWidthPx`        | Number | Cursor outer border width in logical px (default `0`) |
+| `cursorBorderColor`          | Color  | Cursor outer border color (fallback to `cursorOuterColor`) |
+| `cursorInnerBorderWidthPx`   | Number | Cursor inner-dot border width in logical px (default `0`) |
+| `cursorInnerBorderColor`     | Color  | Cursor inner-dot border color (default `white`)      |
+
+Cursor notes:
+- Cursor size is fixed in px and does not scale when pinch-zooming the chart.
+- If new cursor keys are omitted, defaults are: inner `1`, outer `5`, inner/outer color `black`, blur `6`, border width `0`.
+- Legacy keys `selectedPointContentColor` and `selectedPointContainerColor` remain supported.
 
 ### Drawing Configuration (drawList)
 

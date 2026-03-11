@@ -1145,22 +1145,109 @@ class HTKLineView: UIScrollView {
 
         context.restoreGState() // reset dash để các phần vẽ khác không bị đứt đoạn
 
-        // === 2) Vẽ 2 vòng tròn ở điểm giao (giữ như cũ) ===
+        // === 2) Cursor marker: fixed-size style from config (independent from zoom scale) ===
+        let useNewCursorStyle = configManager.cursorStyleEnabled
+        let outerColor = useNewCursorStyle ? configManager.cursorOuterColor : configManager.selectedPointContainerColor
+        let innerColor = useNewCursorStyle ? configManager.cursorInnerColor : configManager.selectedPointContentColor
+        let innerRadius: CGFloat = useNewCursorStyle
+            ? max(0.5, configManager.cursorInnerRadiusPx)
+            : 2
+        let outerRadius: CGFloat = useNewCursorStyle
+            ? max(0.5, configManager.cursorOuterRadiusPx)
+            : 5
+        let resolvedOuterRadius = max(outerRadius, innerRadius)
+        let blurRadius: CGFloat = useNewCursorStyle
+            ? max(0, configManager.cursorOuterBlurRadiusPx)
+            : 0
+        let borderWidth: CGFloat = useNewCursorStyle
+            ? max(0, configManager.cursorBorderWidthPx)
+            : 0
+        let borderColor = useNewCursorStyle ? configManager.cursorBorderColor : outerColor
+        let innerBorderWidth: CGFloat = useNewCursorStyle
+            ? max(0, configManager.cursorInnerBorderWidthPx)
+            : 0
+        let innerBorderColor = useNewCursorStyle ? configManager.cursorInnerBorderColor : UIColor.white
+        let outerFillColor: UIColor = {
+            guard useNewCursorStyle else { return outerColor }
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 1
+            if outerColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+                return UIColor(red: red, green: green, blue: blue, alpha: max(0.16, alpha * 0.35))
+            }
+            var white: CGFloat = 0
+            outerColor.getWhite(&white, alpha: &alpha)
+            return UIColor(white: white, alpha: max(0.16, alpha * 0.35))
+        }()
+
+        if blurRadius > 0 {
+            // Multi-ring halo for a stable, strong blur effect without changing blend modes.
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 1
+            if !outerColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+                var white: CGFloat = 0
+                outerColor.getWhite(&white, alpha: &alpha)
+                red = white
+                green = white
+                blue = white
+            }
+
+            // Decouple halo visibility from outerColor alpha, so rgba(..., 0.1) still has visible blur.
+            let baseHaloAlpha = max(alpha, 0.75)
+            let ringCount = 10
+            for step in 1...ringCount {
+                let t = CGFloat(step) / CGFloat(ringCount)
+                let ringRadius = resolvedOuterRadius + blurRadius * (0.5 + 2.5 * t)
+                let ringAlpha = baseHaloAlpha * (1 - t) * 0.38
+                let ringColor = UIColor(red: red, green: green, blue: blue, alpha: ringAlpha)
+                context.addArc(center: CGPoint(x: x, y: y),
+                               radius: ringRadius,
+                               startAngle: 0,
+                               endAngle: CGFloat(Double.pi * 2),
+                               clockwise: true)
+                context.setFillColor(ringColor.cgColor)
+                context.fillPath()
+            }
+        }
+
         context.addArc(center: CGPoint(x: x, y: y),
-                       radius: configManager.candleWidth * 2 / 2,
+                       radius: resolvedOuterRadius,
                        startAngle: 0,
                        endAngle: CGFloat(Double.pi * 2),
                        clockwise: true)
-        context.setFillColor(configManager.selectedPointContainerColor.cgColor)
+        context.setFillColor(outerFillColor.cgColor)
         context.fillPath()
 
         context.addArc(center: CGPoint(x: x, y: y),
-                       radius: configManager.candleWidth / 1.5 / 2,
+                       radius: innerRadius,
                        startAngle: 0,
                        endAngle: CGFloat(Double.pi * 2),
                        clockwise: true)
-        context.setFillColor(configManager.selectedPointContentColor.cgColor)
+        context.setFillColor(innerColor.cgColor)
         context.fillPath()
+        if innerBorderWidth > 0 {
+            context.addArc(center: CGPoint(x: x, y: y),
+                           radius: innerRadius,
+                           startAngle: 0,
+                           endAngle: CGFloat(Double.pi * 2),
+                           clockwise: true)
+            context.setStrokeColor(innerBorderColor.cgColor)
+            context.setLineWidth(innerBorderWidth)
+            context.strokePath()
+        }
+        if borderWidth > 0 {
+            context.addArc(center: CGPoint(x: x, y: y),
+                           radius: resolvedOuterRadius,
+                           startAngle: 0,
+                           endAngle: CGFloat(Double.pi * 2),
+                           clockwise: true)
+            context.setStrokeColor(borderColor.cgColor)
+            context.setLineWidth(borderWidth)
+            context.strokePath()
+        }
 
         // === 3) ĐÃ BỎ gradient bar dọc: không còn addRect + clip + drawLinearGradient ===
 

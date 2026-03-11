@@ -315,6 +315,18 @@ class HTKLineConfigManager: NSObject {
 
     var selectedPointContentColor = UIColor.black
 
+    // Cursor style (configurable from JS configList)
+    var cursorStyleEnabled: Bool = true
+    var cursorInnerRadiusPx: CGFloat = 1
+    var cursorOuterRadiusPx: CGFloat = 5
+    var cursorInnerColor = UIColor.black
+    var cursorOuterColor = UIColor.black
+    var cursorOuterBlurRadiusPx: CGFloat = 6
+    var cursorBorderWidthPx: CGFloat = 0
+    var cursorBorderColor = UIColor.black
+    var cursorInnerBorderWidthPx: CGFloat = 0
+    var cursorInnerBorderColor = UIColor.white
+
     var panelMinWidth: CGFloat = 0
 
     var panelTextFontSize: CGFloat = 10
@@ -345,7 +357,7 @@ class HTKLineConfigManager: NSObject {
     var predictionEntry: Double? = nil
     var predictionStopLoss: Double? = nil
     var predictionBias: String? = nil
-    var predictionMinCandles: Int = 20 // Minimum candles width for prediction zone
+    var predictionMinCandles: Int = 12 // Minimum candles width for prediction zone
 
     // grid draw
     // Đậm rõ: màu đen, nét 1.2pt để dễ thấy
@@ -559,6 +571,34 @@ class HTKLineConfigManager: NSObject {
         panelBorderColor = RCTConvert.uiColor(configList["panelBorderColor"])
         selectedPointContainerColor = RCTConvert.uiColor(configList["selectedPointContainerColor"])
         selectedPointContentColor = RCTConvert.uiColor(configList["selectedPointContentColor"])
+        cursorStyleEnabled = configList["cursorStyleEnabled"] as? Bool ?? true
+        cursorInnerRadiusPx = (configList["cursorInnerRadiusPx"] as? NSNumber).map { CGFloat($0.doubleValue) } ?? 1
+        cursorOuterRadiusPx = (configList["cursorOuterRadiusPx"] as? NSNumber).map { CGFloat($0.doubleValue) } ?? 5
+        cursorOuterBlurRadiusPx = (configList["cursorOuterBlurRadiusPx"] as? NSNumber).map { CGFloat($0.doubleValue) } ?? 6
+        cursorBorderWidthPx = (configList["cursorBorderWidthPx"] as? NSNumber).map { CGFloat($0.doubleValue) } ?? 0
+        cursorInnerBorderWidthPx = (configList["cursorInnerBorderWidthPx"] as? NSNumber).map { CGFloat($0.doubleValue) } ?? 0
+        if configList["cursorInnerColor"] != nil {
+            cursorInnerColor = RCTConvert.uiColor(configList["cursorInnerColor"])
+        } else {
+            // Backward-compatible fallback
+            cursorInnerColor = selectedPointContentColor
+        }
+        if configList["cursorOuterColor"] != nil {
+            cursorOuterColor = RCTConvert.uiColor(configList["cursorOuterColor"])
+        } else {
+            // Backward-compatible fallback
+            cursorOuterColor = selectedPointContainerColor
+        }
+        if configList["cursorBorderColor"] != nil {
+            cursorBorderColor = RCTConvert.uiColor(configList["cursorBorderColor"])
+        } else {
+            cursorBorderColor = cursorOuterColor
+        }
+        if configList["cursorInnerBorderColor"] != nil {
+            cursorInnerBorderColor = RCTConvert.uiColor(configList["cursorInnerBorderColor"])
+        } else {
+            cursorInnerBorderColor = UIColor.white
+        }
         panelMinWidth = configList["panelMinWidth"] as? CGFloat ?? 0
         panelTextFontSize = configList["panelTextFontSize"] as? CGFloat ?? 0
         closePriceCenterSeparatorColor = RCTConvert.uiColor(configList["closePriceCenterSeparatorColor"])
@@ -604,7 +644,7 @@ class HTKLineConfigManager: NSObject {
             predictionEntryZones = []
         }
         
-        predictionMinCandles = optionList["predictionMinCandles"] as? Int ?? 20
+        predictionMinCandles = optionList["predictionMinCandles"] as? Int ?? 12
     }
 
 }

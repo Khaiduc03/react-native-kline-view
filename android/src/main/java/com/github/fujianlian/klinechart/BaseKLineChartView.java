@@ -103,6 +103,8 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     private Paint mSelectCenterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Paint mSelectCenterBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mSelectCenterBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mSelectCenterInnerBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Paint mSelectorFramePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -224,6 +226,11 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
         mPredictionGradientPaint.setStyle(Paint.Style.FILL);
         mPredictionGradientPaint.setAntiAlias(true);
+
+        mSelectCenterBorderPaint.setStyle(Paint.Style.STROKE);
+        mSelectCenterBorderPaint.setAntiAlias(true);
+        mSelectCenterInnerBorderPaint.setStyle(Paint.Style.STROKE);
+        mSelectCenterInnerBorderPaint.setAntiAlias(true);
 
     }
 
@@ -556,7 +563,8 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         float entryY = yFromValue(entryPrice);
 
         // Calculate background extension
-        int bgExtension = Math.max(count - 1 - targetIndex, 10);
+        int minCandles = Math.max(configManager.predictionMinCandles, 0);
+        int bgExtension = Math.max(count - 1 - targetIndex, minCandles);
         float startX = scrollXtoViewX(getItemMiddleScrollX(targetIndex));
         float endX = startX + bgExtension * mPointWidth * mScaleX;
         float paddingRight = configManager.paddingRight;
@@ -888,22 +896,84 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         mSelectedYLinePaint.setShader(linearGradient);
 
         float pointX = scrollXtoViewX(getItemMiddleScrollX(mSelectedIndex));
-        mSelectedYLinePaint.setStrokeWidth(mScaleX * configManager.candleWidth);
+        // Keep crosshair style stable when pinch-zooming.
+        mSelectedYLinePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), 1f));
         canvas.drawLine(pointX, 0, pointX, mChildRect.bottom, mSelectedYLinePaint);
 
 
 
-        mSelectCenterPaint.setColor(configManager.selectedPointContentColor);
-        mSelectCenterBackgroundPaint.setColor(configManager.selectedPointContainerColor);
-        float radiusX = 6 * this.mScaleX;
-        float radiusY = 6 * this.mScaleX;
-        RectF rect = new RectF(pointX - radiusX, y - radiusY, pointX + radiusX, y + radiusY);
-        radiusX *= 3;
-        radiusY *= 3;
-        RectF backgroundRect = new RectF(pointX - radiusX, y - radiusY, pointX + radiusX, y + radiusY);
+        final boolean useNewCursorStyle = configManager.cursorStyleEnabled;
+        final float innerRadius = ViewUtil.Dp2Px(
+            getContext(),
+            Math.max(0.5f, useNewCursorStyle ? configManager.cursorInnerRadiusPx : 2f)
+        );
+        final float outerRadius = ViewUtil.Dp2Px(
+            getContext(),
+            Math.max(0.5f, useNewCursorStyle ? configManager.cursorOuterRadiusPx : 5f)
+        );
+        final float resolvedOuterRadius = Math.max(outerRadius, innerRadius);
+        final float blurRadius = ViewUtil.Dp2Px(
+            getContext(),
+            Math.max(0f, useNewCursorStyle ? configManager.cursorOuterBlurRadiusPx : 0f)
+        );
+        final int outerColor = useNewCursorStyle ? configManager.cursorOuterColor : configManager.selectedPointContainerColor;
+        final int innerColor = useNewCursorStyle ? configManager.cursorInnerColor : configManager.selectedPointContentColor;
+        final int outerFillColor = useNewCursorStyle ? withAlpha(outerColor, 72) : outerColor;
+        final float borderWidth = ViewUtil.Dp2Px(
+            getContext(),
+            Math.max(0f, useNewCursorStyle ? configManager.cursorBorderWidthPx : 0f)
+        );
+        final int borderColor = useNewCursorStyle ? configManager.cursorBorderColor : outerColor;
+        final float innerBorderWidth = ViewUtil.Dp2Px(
+            getContext(),
+            Math.max(0f, useNewCursorStyle ? configManager.cursorInnerBorderWidthPx : 0f)
+        );
+        final int innerBorderColor = useNewCursorStyle ? configManager.cursorInnerBorderColor : Color.WHITE;
+
+        mSelectCenterPaint.setColor(innerColor);
+        mSelectCenterBackgroundPaint.setColor(outerFillColor);
+        mSelectCenterBackgroundPaint.setShader(null);
+
         if (pointX > startX && pointX < endX) {
-            canvas.drawOval(backgroundRect, mSelectCenterBackgroundPaint);
-            canvas.drawOval(rect, mSelectCenterPaint);
+            if (blurRadius > 0) {
+                float haloRadius = resolvedOuterRadius + (blurRadius * 2.8f);
+                float innerHaloStop = Math.min(0.985f, resolvedOuterRadius / haloRadius);
+                float midHaloStop = Math.min(0.995f, (resolvedOuterRadius + blurRadius * 1.6f) / haloRadius);
+                RadialGradient haloShader = new RadialGradient(
+                    pointX,
+                    y,
+                    haloRadius,
+                    new int[] {
+                        withAlpha(outerColor, 180),
+                        withAlpha(outerColor, 120),
+                        withAlpha(outerColor, 45),
+                        withAlpha(outerColor, 0)
+                    },
+                    new float[] {
+                        0f,
+                        innerHaloStop,
+                        midHaloStop,
+                        1f
+                    },
+                    Shader.TileMode.CLAMP
+                );
+                mSelectCenterBackgroundPaint.setShader(haloShader);
+                canvas.drawCircle(pointX, y, haloRadius, mSelectCenterBackgroundPaint);
+                mSelectCenterBackgroundPaint.setShader(null);
+            }
+
+            canvas.drawCircle(pointX, y, resolvedOuterRadius, mSelectCenterBackgroundPaint);
+            canvas.drawCircle(pointX, y, innerRadius, mSelectCenterPaint);
+            if (innerBorderWidth > 0) {
+                mSelectCenterInnerBorderPaint.setStrokeWidth(innerBorderWidth);
+                mSelectCenterInnerBorderPaint.setColor(innerBorderColor);
+                canvas.drawCircle(pointX, y, innerRadius, mSelectCenterInnerBorderPaint);
+            }
+            if (borderWidth > 0) {
+                mSelectCenterBorderPaint.setStrokeWidth(borderWidth);
+                mSelectCenterBorderPaint.setColor(borderColor);
+                canvas.drawCircle(pointX, y, resolvedOuterRadius, mSelectCenterBorderPaint);
+            }
         }
 
 
@@ -925,6 +995,15 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         canvas.drawRect(x - textWidth / 2 - w1, y, x + textWidth / 2 + w1, y + mBottomPadding, mSelectorFramePaint);
         canvas.drawText(date, x - textWidth / 2, fixTextY1(y + (mBottomPadding / 2)), mMaxMinPaint);
         mainDraw.drawSelector(this, canvas);
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return Color.argb(
+            Math.max(0, Math.min(255, alpha)),
+            Color.red(color),
+            Color.green(color),
+            Color.blue(color)
+        );
     }
 
     private void drawMaxMinValue(Canvas canvas, float value, float x, float y) {
@@ -1664,6 +1743,9 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         mSelectCenterPaint.setTypeface(typeface);
 
         mSelectCenterBackgroundPaint.setTypeface(typeface);
+
+        mSelectCenterBorderPaint.setTypeface(typeface);
+        mSelectCenterInnerBorderPaint.setTypeface(typeface);
 
         mSelectorFramePaint.setTypeface(typeface);
 

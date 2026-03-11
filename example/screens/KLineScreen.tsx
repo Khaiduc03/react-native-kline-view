@@ -153,6 +153,16 @@ interface ConfigList {
   panelTextColor: number;
   selectedPointContainerColor: number;
   selectedPointContentColor: number;
+  cursorStyleEnabled?: boolean;
+  cursorInnerRadiusPx?: number;
+  cursorOuterRadiusPx?: number;
+  cursorInnerColor?: number;
+  cursorOuterColor?: number;
+  cursorOuterBlurRadiusPx?: number;
+  cursorBorderWidthPx?: number;
+  cursorBorderColor?: number;
+  cursorInnerBorderWidthPx?: number;
+  cursorInnerBorderColor?: number;
   closePriceCenterBackgroundColor: number;
   closePriceCenterBorderColor: number;
   closePriceCenterTriangleColor: number;
@@ -200,7 +210,7 @@ interface KLineOptionList {
   predictionStopLoss?: number;
   predictionBias?: string;
   predictionEntryZones?: any[];
-  predictionMinCandles?: number; // Minimum candles width for prediction zone (default: 20)
+  predictionMinCandles?: number; // Minimum candles width for prediction zone (default: 12)
 }
 
 interface Theme {
@@ -1236,6 +1246,24 @@ const packOptionList = (
     panelTextColor: toColorNumber(processColor(theme.titleColor)),
     selectedPointContainerColor: toColorNumber(processColor('#000000')),
     selectedPointContentColor: toColorNumber(processColor('#000000')),
+    cursorStyleEnabled: true,
+    cursorInnerRadiusPx: 5,
+    cursorOuterRadiusPx: 14,
+    cursorInnerColor: toColorNumber(processColor('#FF783E')),
+    cursorOuterColor: toColorNumber(
+      processColor(
+        isDarkTheme ? 'rgba(255,255,255,0.12)' : 'rgba(48, 48, 48, 0.1)',
+      ),
+    ),
+    cursorOuterBlurRadiusPx: isDarkTheme ? 3 : 4,
+    cursorBorderWidthPx: 0,
+    cursorBorderColor: toColorNumber(
+      processColor(isDarkTheme ? '#FFFFFF' : '#1F2937'),
+    ),
+    cursorInnerBorderWidthPx: 1,
+    cursorInnerBorderColor: toColorNumber(
+      processColor(isDarkTheme ? '#FFFFFF' : '#F8FAFC'),
+    ),
     closePriceCenterBackgroundColor: toColorNumber(
       processColor(theme.backgroundColor9703),
     ),
@@ -1789,7 +1817,7 @@ const KLineScreen: React.FC = () => {
       predictionBias,
       predictionEntryZones,
       shouldScrollToEnd,
-      20, // predictionMinCandles - minimum candles for prediction zone
+      12, // predictionMinCandles - minimum candles for prediction zone
     );
   }, [
     processedKLineData,

@@ -20,7 +20,28 @@ export type DrawItemCompleteEvent = NativeSyntheticEvent<Record<string, any>>;
 export type DrawPointCompleteEvent = NativeSyntheticEvent<Record<string, any>>;
 export type PredictionSelectEvent = NativeSyntheticEvent<Record<string, any>>;
 
+export type CursorStyleConfig = {
+  cursorStyleEnabled?: boolean;
+  cursorInnerRadiusPx?: number;
+  cursorOuterRadiusPx?: number;
+  cursorInnerColor?: number;
+  cursorOuterColor?: number;
+  cursorOuterBlurRadiusPx?: number;
+  cursorBorderWidthPx?: number;
+  cursorBorderColor?: number;
+  cursorInnerBorderWidthPx?: number;
+  cursorInnerBorderColor?: number;
+};
+
 export interface RNKLineViewProps extends ViewProps {
+  /**
+   * JSON string for optionList config.
+   * Cursor style keys inside configList:
+   * cursorStyleEnabled, cursorInnerRadiusPx, cursorOuterRadiusPx,
+   * cursorInnerColor, cursorOuterColor, cursorOuterBlurRadiusPx,
+   * cursorBorderWidthPx, cursorBorderColor,
+   * cursorInnerBorderWidthPx, cursorInnerBorderColor.
+   */
   optionList?: string;
 
   onDrawItemDidTouch?: (event: DrawItemTouchEvent) => void;
