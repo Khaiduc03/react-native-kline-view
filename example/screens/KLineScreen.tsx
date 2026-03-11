@@ -1247,20 +1247,20 @@ const packOptionList = (
     selectedPointContainerColor: toColorNumber(processColor('#000000')),
     selectedPointContentColor: toColorNumber(processColor('#000000')),
     cursorStyleEnabled: true,
-    cursorInnerRadiusPx: 5,
-    cursorOuterRadiusPx: 14,
+    cursorInnerRadiusPx: 3,
+    cursorOuterRadiusPx: 8,
     cursorInnerColor: toColorNumber(processColor('#FF783E')),
     cursorOuterColor: toColorNumber(
       processColor(
-        isDarkTheme ? 'rgba(255,255,255,0.12)' : 'rgba(48, 48, 48, 0.1)',
+        isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(48, 48, 48, 0.07)',
       ),
     ),
-    cursorOuterBlurRadiusPx: isDarkTheme ? 3 : 4,
+    cursorOuterBlurRadiusPx: 0,
     cursorBorderWidthPx: 0,
     cursorBorderColor: toColorNumber(
       processColor(isDarkTheme ? '#FFFFFF' : '#1F2937'),
     ),
-    cursorInnerBorderWidthPx: 1,
+    cursorInnerBorderWidthPx: 0.5,
     cursorInnerBorderColor: toColorNumber(
       processColor(isDarkTheme ? '#FFFFFF' : '#F8FAFC'),
     ),

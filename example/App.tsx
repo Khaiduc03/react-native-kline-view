@@ -1,15 +1,11 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import KLineScreen from './screens/KLineScreen';
+import { NavigationContainer } from '@react-navigation/native';
+import RootNavigator from './navigation/RootNavigator';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <KLineScreen />
-    </View>
+    <NavigationContainer>
+      <RootNavigator />
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-});
