@@ -662,6 +662,25 @@ function shouldUseInputValue(value) {
   return false;
 }
 
+function isFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function targetItemKey(item, fallbackIndex = 0) {
+  const period = toPeriod(item?.period ?? item?.title, 0);
+  if (period > 0) {
+    return `p:${period}`;
+  }
+  const index = toIndex(item?.index, -1);
+  if (index >= 0) {
+    return `i:${index}`;
+  }
+  if (typeof item?.title === "string" && item.title.length > 0) {
+    return `t:${item.title}`;
+  }
+  return `f:${fallbackIndex}`;
+}
+
 function mainLineKey(item) {
   const kind = String(item?.kind ?? "ma").toLowerCase() === "ema" ? "ema" : "ma";
   const period = toPeriod(item?.period ?? item?.title, 0);
@@ -691,12 +710,40 @@ function mergeMainLinePreferInput(inputList, computedList) {
     if (!existing) {
       return item;
     }
+    const nextValue = isFiniteNumber(existing.value) ? existing.value : item.value;
     return {
       ...item,
       ...existing,
+      value: nextValue,
       title: String(item.period),
       period: item.period,
       kind: item.kind,
+      index: item.index,
+    };
+  });
+}
+
+function mergeTargetListPreferInput(inputList, computedList) {
+  if (!Array.isArray(inputList) || inputList.length === 0) {
+    return computedList;
+  }
+  const map = new Map();
+  inputList.forEach((item, index) => {
+    const key = targetItemKey(item, index);
+    map.set(key, item);
+  });
+  return computedList.map((item, index) => {
+    const key = targetItemKey(item, index);
+    const existing = map.get(key);
+    if (!existing) {
+      return item;
+    }
+    const nextValue = isFiniteNumber(existing.value) ? existing.value : item.value;
+    return {
+      ...item,
+      ...existing,
+      value: nextValue,
+      title: String(item.title),
       index: item.index,
     };
   });
@@ -803,12 +850,8 @@ function computeIndicators(candles, indicatorConfig, targetList) {
 
     const nextItem = {
       ...item,
-      maList:
-        preferInput && shouldUseInputValue(item.maList) ? item.maList : maList,
-      maVolumeList:
-        preferInput && shouldUseInputValue(item.maVolumeList)
-          ? item.maVolumeList
-          : maVolumeList,
+      maList: maList,
+      maVolumeList: maVolumeList,
       bollMb:
         preferInput && shouldUseInputValue(item.bollMb) ? item.bollMb : bollMb,
       bollUp:
@@ -839,16 +882,65 @@ function computeIndicators(candles, indicatorConfig, targetList) {
         preferInput && shouldUseInputValue(item.kdjJ)
           ? item.kdjJ
           : kdj.j[index] ?? 0,
-      rsiList:
-        preferInput && shouldUseInputValue(item.rsiList) ? item.rsiList : rsiList,
-      wrList:
-        preferInput && shouldUseInputValue(item.wrList) ? item.wrList : wrList,
+      rsiList: rsiList,
+      wrList: wrList,
     };
     if (preferInput) {
       nextItem.maList = mergeMainLinePreferInput(item.maList, maList);
+      nextItem.maVolumeList = mergeTargetListPreferInput(
+        item.maVolumeList,
+        maVolumeList
+      );
+      nextItem.rsiList = mergeTargetListPreferInput(item.rsiList, rsiList);
+      nextItem.wrList = mergeTargetListPreferInput(item.wrList, wrList);
     }
     return nextItem;
   });
+}
+
+function computeTailWindowSize(indicatorConfig, targetList) {
+  const periods = extractIndicatorPeriods(targetList, indicatorConfig);
+  const maxMainPeriod = Math.max(0, ...periods.mainLineDefs.map((item) => item.period));
+  const maxRsi = Math.max(0, ...periods.rsiPeriods);
+  const maxWr = Math.max(0, ...periods.wrPeriods);
+  const maxPeriod = Math.max(
+    periods.bollN,
+    periods.macdL + periods.macdM,
+    periods.kdjN,
+    maxMainPeriod,
+    maxRsi,
+    maxWr,
+    20
+  );
+  return Math.max(120, maxPeriod * 3 + 40);
+}
+
+function computeRuntimeCandles({
+  rawCandles,
+  currentComputed,
+  indicatorConfig,
+  targetList,
+  autoCompute,
+  forceFull = false,
+}) {
+  const normalizedRaw = Array.isArray(rawCandles) ? rawCandles : [];
+  if (!autoCompute) {
+    return normalizedRaw;
+  }
+  if (forceFull || normalizedRaw.length === 0 || !Array.isArray(currentComputed)) {
+    return computeIndicators(normalizedRaw, indicatorConfig, targetList);
+  }
+
+  const tailSize = computeTailWindowSize(indicatorConfig, targetList);
+  const start = Math.max(0, normalizedRaw.length - tailSize);
+  if (start === 0 || currentComputed.length < start) {
+    return computeIndicators(normalizedRaw, indicatorConfig, targetList);
+  }
+
+  const prefix = currentComputed.slice(0, start);
+  const tailRaw = normalizedRaw.slice(start);
+  const tailComputed = computeIndicators(tailRaw, indicatorConfig, targetList);
+  return [...prefix, ...tailComputed];
 }
 
 function composeOptionList({
@@ -884,9 +976,12 @@ function composeOptionList({
     resolvedIndicator
   );
   const targetList = resolveTargetList(resolvedIndicator?.targetList, periods, autoCompute);
-  let modelArray = normalizeCandles(candles);
-  if (autoCompute) {
-    modelArray = computeIndicators(modelArray, resolvedIndicator, targetList);
+  let modelArray = [];
+  if (preserveModelArray !== true) {
+    modelArray = normalizeCandles(candles);
+    if (autoCompute) {
+      modelArray = computeIndicators(modelArray, resolvedIndicator, targetList);
+    }
   }
   const themeIndicatorColors = theme?.indicatorColors ?? {};
   const presetIndicatorColors = presetConfig.indicatorColors ?? {};
@@ -1118,13 +1213,15 @@ const RNKLineView = forwardRef((props, ref) => {
   onLoadMoreRef.current = onLoadMore;
   onErrorRef.current = onError;
   const dataCacheRef = useRef([]);
+  const computedCacheRef = useRef([]);
+  const lastComputeSignatureRef = useRef("");
   const lastPropsDataSignatureRef = useRef(null);
   const loadingMoreRef = useRef(false);
   const emitError = useCallback((error) => {
     if (typeof onErrorRef.current !== "function") return;
     onErrorRef.current(error);
   }, []);
-  const resolvedConfig = useMemo(() => {
+  const runtimeConfig = useMemo(() => {
     if (typeof optionList === "string" && optionList.trim().length > 0) {
       emitError({
         code: "E_DEPRECATED_OPTION_LIST",
@@ -1160,7 +1257,27 @@ const RNKLineView = forwardRef((props, ref) => {
       volume,
       interaction,
     });
-    return composeOptionList({
+    const presetConfig = PRESET_OVERRIDES[preset] ?? {};
+    const resolvedIndicator = deepMerge(
+      presetConfig.indicator ?? {},
+      legacy.indicator ?? {}
+    );
+    const autoCompute = resolvedIndicator?.autoCompute !== false;
+    const periods = extractIndicatorPeriods(
+      resolvedIndicator?.targetList ?? {},
+      resolvedIndicator
+    );
+    const targetList = resolveTargetList(
+      resolvedIndicator?.targetList,
+      periods,
+      autoCompute
+    );
+    const computeSignature = JSON.stringify({
+      indicator: resolvedIndicator,
+      targetList,
+      preset,
+    });
+    const resolvedConfig = composeOptionList({
       candles: dataCacheRef.current,
       preserveModelArray: true,
       preset,
@@ -1175,6 +1292,13 @@ const RNKLineView = forwardRef((props, ref) => {
         loadMoreThreshold: interaction?.loadMoreThreshold ?? 48,
       },
     });
+    return {
+      autoCompute,
+      resolvedIndicator,
+      targetList,
+      computeSignature,
+      resolvedConfig,
+    };
   }, [
     indicator,
     theme,
@@ -1190,6 +1314,21 @@ const RNKLineView = forwardRef((props, ref) => {
     prediction,
     emitError,
   ]);
+  const computeCandlesForRuntime = useCallback(
+    (rawCandles, forceFull = false) => {
+      const nextComputed = computeRuntimeCandles({
+        rawCandles,
+        currentComputed: computedCacheRef.current,
+        indicatorConfig: runtimeConfig.resolvedIndicator,
+        targetList: runtimeConfig.targetList,
+        autoCompute: runtimeConfig.autoCompute,
+        forceFull,
+      });
+      computedCacheRef.current = nextComputed;
+      return nextComputed;
+    },
+    [runtimeConfig]
+  );
 
   const handleLoadMore = useCallback(
     async (event) => {
@@ -1202,7 +1341,9 @@ const RNKLineView = forwardRef((props, ref) => {
         if (Array.isArray(candles) && candles.length > 0) {
           const normalized = normalizeCandles(candles);
           dataCacheRef.current = [...normalized, ...dataCacheRef.current];
-          runCommand(nativeRef, "prependData", normalized);
+          const computed = computeCandlesForRuntime(dataCacheRef.current, true);
+          const prependItems = computed.slice(0, normalized.length);
+          runCommand(nativeRef, "prependData", prependItems);
         }
       } catch (err) {
         emitError({
@@ -1215,7 +1356,7 @@ const RNKLineView = forwardRef((props, ref) => {
         loadingMoreRef.current = false;
       }
     },
-    [emitError]
+    [emitError, computeCandlesForRuntime]
   );
 
   useImperativeHandle(ref, () => ({
@@ -1223,7 +1364,8 @@ const RNKLineView = forwardRef((props, ref) => {
       const normalized = normalizeCandles(Array.isArray(nextCandles) ? nextCandles : []);
       dataCacheRef.current = normalized;
       lastPropsDataSignatureRef.current = candlesSignature(normalized);
-      runCommand(nativeRef, "setData", normalized);
+      const computed = computeCandlesForRuntime(normalized, true);
+      runCommand(nativeRef, "setData", computed);
     },
     appendCandle: (candle) => {
       const previousId =
@@ -1233,7 +1375,11 @@ const RNKLineView = forwardRef((props, ref) => {
       const normalized = normalizeOneCandle(candle, previousId);
       dataCacheRef.current = [...dataCacheRef.current, normalized];
       lastPropsDataSignatureRef.current = candlesSignature(dataCacheRef.current);
-      runCommand(nativeRef, "appendCandle", normalized);
+      const computed = computeCandlesForRuntime(dataCacheRef.current, false);
+      const appendItem = computed[computed.length - 1];
+      if (appendItem) {
+        runCommand(nativeRef, "appendCandle", appendItem);
+      }
     },
     updateLastCandle: (candle) => {
       const previousId =
@@ -1249,14 +1395,20 @@ const RNKLineView = forwardRef((props, ref) => {
         dataCacheRef.current = next;
       }
       lastPropsDataSignatureRef.current = candlesSignature(dataCacheRef.current);
-      runCommand(nativeRef, "updateLastCandle", normalized);
+      const computed = computeCandlesForRuntime(dataCacheRef.current, false);
+      const updateItem = computed[computed.length - 1];
+      if (updateItem) {
+        runCommand(nativeRef, "updateLastCandle", updateItem);
+      }
     },
     prependData: (candles) => {
       const normalized = normalizeCandles(Array.isArray(candles) ? candles : []);
       if (normalized.length === 0) return;
       dataCacheRef.current = [...normalized, ...dataCacheRef.current];
       lastPropsDataSignatureRef.current = candlesSignature(dataCacheRef.current);
-      runCommand(nativeRef, "prependData", normalized);
+      const computed = computeCandlesForRuntime(dataCacheRef.current, true);
+      const prependItems = computed.slice(0, normalized.length);
+      runCommand(nativeRef, "prependData", prependItems);
     },
     unPredictionSelect: () => runCommand(nativeRef, "unPredictionSelect", null),
   }));
@@ -1293,8 +1445,23 @@ const RNKLineView = forwardRef((props, ref) => {
 
     dataCacheRef.current = normalized;
     lastPropsDataSignatureRef.current = nextSignature;
-    runCommand(nativeRef, "setData", normalized);
-  }, [initialData, candles, emitError]);
+    const computed = computeCandlesForRuntime(normalized, true);
+    runCommand(nativeRef, "setData", computed);
+  }, [initialData, candles, emitError, computeCandlesForRuntime]);
+
+  useEffect(() => {
+    const signature = runtimeConfig.computeSignature;
+    if (lastComputeSignatureRef.current === signature) {
+      return;
+    }
+    lastComputeSignatureRef.current = signature;
+    if (dataCacheRef.current.length === 0) {
+      computedCacheRef.current = [];
+      return;
+    }
+    const computed = computeCandlesForRuntime(dataCacheRef.current, true);
+    runCommand(nativeRef, "setData", computed);
+  }, [runtimeConfig.computeSignature, computeCandlesForRuntime]);
 
   useEffect(() => {
     const enabledCount = (Array.isArray(subCharts) ? subCharts : []).filter(
@@ -1315,7 +1482,7 @@ const RNKLineView = forwardRef((props, ref) => {
     <NativeRNKLineView
       ref={nativeRef}
       {...restProps}
-      config={resolvedConfig}
+      config={runtimeConfig.resolvedConfig}
       onLoadMore={handleLoadMore}
       onChartError={(event) => emitError(event?.nativeEvent ?? event)}
     />

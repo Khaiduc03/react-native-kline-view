@@ -21,6 +21,10 @@ export type SelectedItem = {
 
 export type IndicatorItem = {
   title: string;
+  /**
+   * Optional when passing partial server-computed indicators.
+   * If missing and `indicator.autoCompute !== false`, library computes fallback value.
+   */
   value?: number;
   period?: number;
   kind?: "ma" | "ema";
@@ -37,6 +41,10 @@ export type Candle = {
   close: number;
   vol: number;
   selectedItemList?: SelectedItem[];
+  /**
+   * Optional/partial precomputed indicator fields (from server/client).
+   * Missing items/values are auto-filled when `indicator.autoCompute !== false`.
+   */
   maList?: IndicatorItem[];
   maVolumeList?: IndicatorItem[];
   rsiList?: IndicatorItem[];
@@ -209,6 +217,7 @@ export type IndicatorConfig = {
   time?: number;
   price?: number;
   volume?: number;
+  /** Default true in props-first flow. */
   autoCompute?: boolean;
   computeMode?: "prefer_input" | "always";
   ema?: {
@@ -289,6 +298,7 @@ export type FormatConfig = Partial<{
 }>;
 
 type RNKLineViewBaseProps = ViewProps & {
+  /** Base candles for init/reset. Indicator values can be omitted; wrapper computes from config. */
   initialData?: Candle[];
   /** @deprecated Use `initialData` */
   candles?: Candle[];

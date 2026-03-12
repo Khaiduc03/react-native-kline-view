@@ -246,6 +246,13 @@ klineRef.current?.appendCandle(nextCandle);
 klineRef.current?.updateLastCandle(updatedLastCandle);
 ```
 
+With props-first (`initialData` + `mainIndicators/subCharts/volume`), you only need to pass base OHLCV candles.
+MA/EMA/BOLL/MACD/KDJ/RSI/WR are computed by the library when `indicator.autoCompute !== false`.
+
+You can also mix server/client-computed values:
+- pass partial `maList` / `rsiList` / `wrList` / `maVolumeList` on candles when available
+- library keeps provided numeric values and computes only missing items/values
+
 ### Do I need to call `setData` again after `appendCandle`?
 
 **No.** If you've already called `appendCandle(...)`, the native dataset is updated.
