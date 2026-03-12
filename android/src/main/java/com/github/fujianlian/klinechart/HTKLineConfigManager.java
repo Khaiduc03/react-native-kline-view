@@ -2,6 +2,7 @@ package com.github.fujianlian.klinechart;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.util.Log;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
@@ -18,6 +19,7 @@ import com.github.fujianlian.klinechart.draw.SecondStatus;
 import com.github.fujianlian.klinechart.formatter.ValueFormatter;
 
 public class HTKLineConfigManager {
+    private static final String TAG = "RNKLineView.Config";
 
 	public List<KLineEntity> modelArray = new ArrayList<>();
 
@@ -351,7 +353,13 @@ public class HTKLineConfigManager {
     	boolean shouldPreserveModelArray = preserveModelArray != null && preserveModelArray;
     	List modelArray = (List)optionList.get("modelArray");
     	if (!shouldPreserveModelArray && modelArray != null) {
-    		this.modelArray = this.packModelList(modelArray);
+            if (modelArray.isEmpty() && !this.modelArray.isEmpty()) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Skip empty modelArray on config reload to preserve existing data.");
+                }
+            } else {
+    		    this.modelArray = this.packModelList(modelArray);
+            }
     	}
 
     	Map targetList = (Map)optionList.get("targetList");

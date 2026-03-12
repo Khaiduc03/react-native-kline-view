@@ -1,4 +1,11 @@
-import React, { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 import {
   requireNativeComponent,
   UIManager,
@@ -78,6 +85,20 @@ function normalizeCandles(candles) {
     previousId = next.id;
     return next;
   });
+}
+
+function candlesSignature(candles) {
+  if (!Array.isArray(candles) || candles.length === 0) {
+    return "0:0:0:0";
+  }
+  const first = candles[0] ?? {};
+  const last = candles[candles.length - 1] ?? {};
+  return [
+    candles.length,
+    Number(first.id ?? 0),
+    Number(last.id ?? 0),
+    Number(last.close ?? 0),
+  ].join(":");
 }
 
 const DEFAULT_TARGET_LIST = {
@@ -492,10 +513,10 @@ function resolveTargetList(targetList, periods, autoCompute) {
     base.maVolumeList = buildTargetItemsFromPeriods(periods.maVolumePeriods, true);
   }
   if (fallbackEnabled && (!Array.isArray(base.rsiList) || base.rsiList.length === 0)) {
-    base.rsiList = buildTargetItemsFromPeriods(periods.rsiPeriods, false);
+    base.rsiList = buildTargetItemsFromPeriods(periods.rsiPeriods, true);
   }
   if (fallbackEnabled && (!Array.isArray(base.wrList) || base.wrList.length === 0)) {
-    base.wrList = buildTargetItemsFromPeriods(periods.wrPeriods, false);
+    base.wrList = buildTargetItemsFromPeriods(periods.wrPeriods, true);
   }
 
   base.bollN = String(periods.bollN);
@@ -917,6 +938,105 @@ function composeOptionList({
   return deepMerge(baseOptionList, advanced ?? {});
 }
 
+function mapSubTypeToSecond(type) {
+  switch (String(type ?? "").toLowerCase()) {
+    case "macd":
+      return 3;
+    case "kdj":
+      return 4;
+    case "rsi":
+      return 5;
+    case "wr":
+      return 6;
+    default:
+      return -1;
+  }
+}
+
+function toLegacyPropsConfig({
+  initialData,
+  theme,
+  mainIndicators,
+  subCharts,
+  volume,
+  interaction,
+}) {
+  const enabledSub = (Array.isArray(subCharts) ? subCharts : []).filter(
+    (item) => item && item.enabled !== false
+  );
+  const second = enabledSub.length > 0 ? mapSubTypeToSecond(enabledSub[0].type) : -1;
+
+  const maEnabled = mainIndicators?.ma?.enabled !== false;
+  const emaEnabled = mainIndicators?.ema?.enabled === true;
+  const bollEnabled = mainIndicators?.boll?.enabled === true;
+  const resolvedPrimary = maEnabled || emaEnabled ? 1 : bollEnabled ? 2 : -1;
+
+  const translatedTheme = {
+    colorList: {
+      increaseColor: theme?.candle?.upColor,
+      decreaseColor: theme?.candle?.downColor,
+    },
+    minuteVolumeCandleColor: theme?.volume?.barColor,
+    gridColor: theme?.grid?.lineColor,
+    textColor: theme?.axis?.textColor,
+    panelBackgroundColor: theme?.panel?.backgroundColor,
+    panelBorderColor: theme?.panel?.borderColor,
+    targetColorList: theme?.subIndicator?.colors,
+    indicatorColors: {
+      ma: theme?.mainIndicator?.maColors,
+      ema: theme?.mainIndicator?.emaColors,
+    },
+    cursorStyleEnabled:
+      typeof theme?.crosshair?.enabled === "boolean"
+        ? theme.crosshair.enabled
+        : undefined,
+    cursorInnerColor: theme?.crosshair?.innerColor,
+    cursorOuterColor: theme?.crosshair?.outerColor,
+    cursorInnerRadiusPx: theme?.crosshair?.innerRadius,
+    cursorOuterRadiusPx: theme?.crosshair?.outerRadius,
+  };
+
+  return {
+    candles: Array.isArray(initialData) ? initialData : [],
+    theme: translatedTheme,
+    indicator: {
+      primary: resolvedPrimary,
+      main: {
+        ma: maEnabled,
+        boll: bollEnabled,
+      },
+      second,
+      ema: {
+        enabled: emaEnabled,
+        periods: Array.isArray(mainIndicators?.ema?.periods)
+          ? mainIndicators.ema.periods
+          : DEFAULT_INDICATOR_PERIODS.ema,
+      },
+      targetList: {
+        maList: buildTargetItemsFromPeriods(
+          Array.isArray(mainIndicators?.ma?.periods)
+            ? mainIndicators.ma.periods
+            : DEFAULT_INDICATOR_PERIODS.ma,
+          true
+        ),
+        maVolumeList: buildTargetItemsFromPeriods(
+          Array.isArray(volume?.maPeriods)
+            ? volume.maPeriods
+            : DEFAULT_INDICATOR_PERIODS.maVolume,
+          true
+        ),
+        bollN: String(mainIndicators?.boll?.n ?? DEFAULT_INDICATOR_PERIODS.bollN),
+        bollP: String(mainIndicators?.boll?.p ?? DEFAULT_INDICATOR_PERIODS.bollP),
+      },
+      autoCompute: true,
+      computeMode: "prefer_input",
+    },
+    interaction: {
+      shouldScrollToEnd: interaction?.autoFollow === true,
+    },
+  };
+}
+
 /**
  * Dispatch a native view command:
  * - iOS: use NativeModules.RNKLineView methods directly
@@ -945,8 +1065,15 @@ function runCommand(nativeRef, commandName, payload) {
     }
 
     if (commandName === "setData") {
-      // setData expects an array of candles
       manager.setData(nodeHandle, payload);
+    } else if (commandName === "prependData") {
+      if (typeof manager.prependData === "function") {
+        manager.prependData(nodeHandle, payload);
+      } else {
+        console.warn(
+          "[RNKLineView] iOS method prependData not found. Rebuild native project after pod install."
+        );
+      }
     } else {
       // appendCandle / updateLastCandle take a single candle object
       manager[commandName](nodeHandle, payload);
@@ -967,76 +1094,135 @@ function runCommand(nativeRef, commandName, payload) {
  */
 const RNKLineView = forwardRef((props, ref) => {
   const {
-    optionList,
+    initialData,
     candles,
-    dataMode = "prop",
-    preset,
-    theme,
-    layout,
     indicator,
+    theme,
+    mainIndicators,
+    subCharts,
+    volume,
+    interaction,
     draw,
     prediction,
-    interaction,
     format,
-    advanced,
+    layout,
+    preset,
+    optionList,
+    onLoadMore,
+    onError,
     ...restProps
   } = props;
   const nativeRef = useRef(null);
+  const onLoadMoreRef = useRef(onLoadMore);
+  const onErrorRef = useRef(onError);
+  onLoadMoreRef.current = onLoadMore;
+  onErrorRef.current = onError;
   const dataCacheRef = useRef([]);
-  const isImperativeMode = dataMode === "imperative";
-  const resolvedOptionList = useMemo(() => {
+  const lastPropsDataSignatureRef = useRef(null);
+  const loadingMoreRef = useRef(false);
+  const emitError = useCallback((error) => {
+    if (typeof onErrorRef.current !== "function") return;
+    onErrorRef.current(error);
+  }, []);
+  const resolvedConfig = useMemo(() => {
     if (typeof optionList === "string" && optionList.trim().length > 0) {
-      return optionList;
+      emitError({
+        code: "E_DEPRECATED_OPTION_LIST",
+        message: "optionList is removed in vNext. Use props-first config.",
+        source: "js",
+        fatal: false,
+      });
     }
-
-    const inputCandles = isImperativeMode
-      ? dataCacheRef.current
-      : Array.isArray(candles)
-      ? candles
-      : null;
-    if (Array.isArray(inputCandles)) {
-      return JSON.stringify(
-        composeOptionList({
-          candles: inputCandles,
-          preserveModelArray: isImperativeMode,
-          preset,
-          theme,
-          layout,
-          indicator,
-          draw,
-          prediction,
-          interaction,
-          format,
-          advanced,
-        })
-      );
-    }
-
-    if (__DEV__) {
-      console.warn(
-        "[RNKLineView] Missing required candles when optionList is not provided. Pass optionList or candles, or use dataMode='imperative' with setData()."
-      );
-    }
-    return null;
+    const derivedMainIndicators =
+      mainIndicators ??
+      (indicator
+        ? {
+            ma: {
+              enabled: indicator?.main?.ma !== false,
+              periods: DEFAULT_INDICATOR_PERIODS.ma,
+            },
+            ema: {
+              enabled: indicator?.ema?.enabled === true,
+              periods: indicator?.ema?.periods ?? DEFAULT_INDICATOR_PERIODS.ema,
+            },
+            boll: {
+              enabled: indicator?.main?.boll === true,
+              n: Number(indicator?.targetList?.bollN ?? DEFAULT_INDICATOR_PERIODS.bollN),
+              p: Number(indicator?.targetList?.bollP ?? DEFAULT_INDICATOR_PERIODS.bollP),
+            },
+          }
+        : undefined);
+    const legacy = toLegacyPropsConfig({
+      initialData: [],
+      theme,
+      mainIndicators: derivedMainIndicators,
+      subCharts,
+      volume,
+      interaction,
+    });
+    return composeOptionList({
+      candles: dataCacheRef.current,
+      preserveModelArray: true,
+      preset,
+      theme: legacy.theme,
+      layout,
+      indicator: legacy.indicator,
+      draw,
+      prediction,
+      interaction: legacy.interaction,
+      format,
+      advanced: {
+        loadMoreThreshold: interaction?.loadMoreThreshold ?? 48,
+      },
+    });
   }, [
-    advanced,
-    candles,
-    dataMode,
-    preset,
+    indicator,
+    theme,
+    mainIndicators,
+    subCharts,
+    volume,
+    interaction,
     draw,
     format,
-    indicator,
-    interaction,
     layout,
     optionList,
+    preset,
     prediction,
-    theme,
+    emitError,
   ]);
+
+  const handleLoadMore = useCallback(
+    async (event) => {
+      if (loadingMoreRef.current) return;
+      if (typeof onLoadMoreRef.current !== "function") return;
+      loadingMoreRef.current = true;
+      try {
+        const payload = event?.nativeEvent ?? event ?? {};
+        const candles = await onLoadMoreRef.current(payload);
+        if (Array.isArray(candles) && candles.length > 0) {
+          const normalized = normalizeCandles(candles);
+          dataCacheRef.current = [...normalized, ...dataCacheRef.current];
+          runCommand(nativeRef, "prependData", normalized);
+        }
+      } catch (err) {
+        emitError({
+          code: "E_LOAD_MORE",
+          message: err instanceof Error ? err.message : "Failed to load more candles",
+          source: "data",
+          fatal: false,
+        });
+      } finally {
+        loadingMoreRef.current = false;
+      }
+    },
+    [emitError]
+  );
 
   useImperativeHandle(ref, () => ({
     setData: (nextCandles) => {
       const normalized = normalizeCandles(Array.isArray(nextCandles) ? nextCandles : []);
       dataCacheRef.current = normalized;
+      lastPropsDataSignatureRef.current = candlesSignature(normalized);
       runCommand(nativeRef, "setData", normalized);
     },
     appendCandle: (candle) => {
@@ -1046,6 +1232,7 @@ const RNKLineView = forwardRef((props, ref) => {
           : 0;
       const normalized = normalizeOneCandle(candle, previousId);
       dataCacheRef.current = [...dataCacheRef.current, normalized];
+      lastPropsDataSignatureRef.current = candlesSignature(dataCacheRef.current);
       runCommand(nativeRef, "appendCandle", normalized);
     },
     updateLastCandle: (candle) => {
@@ -1061,20 +1248,76 @@ const RNKLineView = forwardRef((props, ref) => {
         next[next.length - 1] = normalized;
         dataCacheRef.current = next;
       }
+      lastPropsDataSignatureRef.current = candlesSignature(dataCacheRef.current);
       runCommand(nativeRef, "updateLastCandle", normalized);
+    },
+    prependData: (candles) => {
+      const normalized = normalizeCandles(Array.isArray(candles) ? candles : []);
+      if (normalized.length === 0) return;
+      dataCacheRef.current = [...normalized, ...dataCacheRef.current];
+      lastPropsDataSignatureRef.current = candlesSignature(dataCacheRef.current);
+      runCommand(nativeRef, "prependData", normalized);
     },
     unPredictionSelect: () => runCommand(nativeRef, "unPredictionSelect", null),
   }));
 
-  if (!resolvedOptionList) {
-    return null;
-  }
+  useEffect(() => {
+    const source = Array.isArray(initialData)
+      ? initialData
+      : Array.isArray(candles)
+      ? candles
+      : null;
+    if (!Array.isArray(source)) return;
+
+    const normalized = normalizeCandles(source);
+    const nextSignature = candlesSignature(normalized);
+    const prevSignature = lastPropsDataSignatureRef.current;
+
+    if (prevSignature !== null && prevSignature === nextSignature) {
+      return;
+    }
+    if (
+      prevSignature !== null &&
+      normalized.length === 0 &&
+      dataCacheRef.current.length > 0
+    ) {
+      emitError({
+        code: "E_DATA_CONFIG_CONFLICT",
+        message:
+          "Ignored empty prop-driven dataset to preserve current runtime data. Use setData([]) for explicit reset.",
+        source: "js",
+        fatal: false,
+      });
+      return;
+    }
+
+    dataCacheRef.current = normalized;
+    lastPropsDataSignatureRef.current = nextSignature;
+    runCommand(nativeRef, "setData", normalized);
+  }, [initialData, candles, emitError]);
+
+  useEffect(() => {
+    const enabledCount = (Array.isArray(subCharts) ? subCharts : []).filter(
+      (item) => item && item.enabled !== false
+    ).length;
+    if (enabledCount > 1) {
+      emitError({
+        code: "E_MULTI_SUB_CLAMPED",
+        message:
+          "Current native engine supports one sub pane. Using the first enabled sub chart.",
+        source: "bridge",
+        fatal: false,
+      });
+    }
+  }, [subCharts, emitError]);
 
   return (
     <NativeRNKLineView
       ref={nativeRef}
       {...restProps}
-      optionList={resolvedOptionList}
+      config={resolvedConfig}
+      onLoadMore={handleLoadMore}
+      onChartError={(event) => emitError(event?.nativeEvent ?? event)}
     />
   );
 });

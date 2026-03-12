@@ -35,6 +35,13 @@ public class HTKLineContainerView extends RelativeLayout {
         klineView.setChildDraw(0);
         klineView.setDateTimeFormatter(new DateFormatter());
         klineView.configManager = configManager;
+        klineView.setRefreshListener(new KLineChartView.KChartRefreshListener() {
+            @Override
+            public void onLoadMoreBegin(KLineChartView chart) {
+                emitLoadMore();
+                chart.refreshComplete();
+            }
+        });
         addView(klineView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
     }
 
@@ -213,6 +220,15 @@ public class HTKLineContainerView extends RelativeLayout {
         }
     }
 
+    public void prependData(java.util.List<KLineEntity> entities) {
+        if (entities == null || entities.isEmpty()) return;
+        int oldScroll = klineView.getScrollOffset();
+        configManager.modelArray.addAll(0, entities);
+        reloadConfigManager();
+        int delta = Math.round(configManager.itemWidth * entities.size());
+        klineView.setScrollX(oldScroll + delta);
+    }
+
 
 
     @Override
@@ -271,6 +287,34 @@ public class HTKLineContainerView extends RelativeLayout {
         } else {
             shotView.setPoint(new HTPoint(event.getX(), event.getY()));
         }
+    }
+
+    private void emitLoadMore() {
+        WritableMap map = Arguments.createMap();
+        double earliestId = configManager.modelArray.isEmpty() ? 0 : configManager.modelArray.get(0).id;
+        map.putDouble("earliestId", earliestId);
+        WritableMap range = Arguments.createMap();
+        range.putInt("from", klineView.getVisibleStartIndex());
+        range.putInt("to", klineView.getVisibleStopIndex());
+        map.putMap("visibleRange", range);
+        reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
+                this.getId(),
+                RNKLineView.onLoadMoreKey,
+                map
+        );
+    }
+
+    public void emitError(String code, String message, boolean fatal) {
+        WritableMap map = Arguments.createMap();
+        map.putString("code", code);
+        map.putString("message", message);
+        map.putString("source", "android");
+        map.putBoolean("fatal", fatal);
+        reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
+                this.getId(),
+                RNKLineView.onChartErrorKey,
+                map
+        );
     }
 
 }

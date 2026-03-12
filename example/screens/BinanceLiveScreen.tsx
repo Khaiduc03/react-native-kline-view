@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,9 +18,18 @@ import {
   type BinanceInterval,
   type KLineRawPoint,
 } from './BinanceService';
+import { BinanceControlSummary } from './components/binance/BinanceControlSummary';
+import { BinanceControlsModal } from './components/binance/BinanceControlsModal';
 
 const SYMBOL_OPTIONS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'];
-const INTERVAL_OPTIONS: BinanceInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const INTERVAL_OPTIONS: BinanceInterval[] = [
+  '1m',
+  '5m',
+  '15m',
+  '1h',
+  '4h',
+  '1d',
+];
 const EMPTY_CANDLES: Candle[] = [];
 const SUB_INDICATOR_LABEL: Record<number, string> = {
   [-1]: 'None',
@@ -53,7 +61,12 @@ const smaAt = (values: number[], index: number, period: number): number => {
   return sum / period;
 };
 
-const stdevAt = (values: number[], index: number, period: number, mean: number): number => {
+const stdevAt = (
+  values: number[],
+  index: number,
+  period: number,
+  mean: number,
+): number => {
   if (period <= 1 || index + 1 < period) return 0;
   let sum = 0;
   for (let i = index - period + 1; i <= index; i += 1) {
@@ -103,7 +116,8 @@ const kdjSeries = (
     }
 
     const denominator = highestHigh - lowestLow;
-    const currentRsv = denominator === 0 ? 50 : ((close - lowestLow) / denominator) * 100;
+    const currentRsv =
+      denominator === 0 ? 50 : ((close - lowestLow) / denominator) * 100;
     rsv.push(currentRsv);
 
     const currentK = ((kSmooth - 1) * previousK + currentRsv) / kSmooth;
@@ -189,13 +203,20 @@ const buildCandlesWithIndicators = (rawCandles: KLineRawPoint[]): Candle[] => {
     ...maPeriods.map(period => ({ kind: 'ma' as const, period })),
     ...emaPeriods.map(period => ({ kind: 'ema' as const, period })),
   ];
-  const emaMaps = emaPeriods.map(period => ({ period, values: emaSeries(closes, period) }));
+  const emaMaps = emaPeriods.map(period => ({
+    period,
+    values: emaSeries(closes, period),
+  }));
 
   const ema12 = emaSeries(closes, 12);
   const ema26 = emaSeries(closes, 26);
-  const difSeries = closes.map((_, index) => (ema12[index] ?? 0) - (ema26[index] ?? 0));
+  const difSeries = closes.map(
+    (_, index) => (ema12[index] ?? 0) - (ema26[index] ?? 0),
+  );
   const deaSeries = emaSeries(difSeries, 9);
-  const macdSeries = difSeries.map((value, index) => (value - (deaSeries[index] ?? 0)) * 2);
+  const macdSeries = difSeries.map(
+    (value, index) => (value - (deaSeries[index] ?? 0)) * 2,
+  );
   const kdj = kdjSeries(highs, lows, closes, 14, 3, 3);
   const rsi6 = rsiSeries(closes, 6);
   const rsi12 = rsiSeries(closes, 12);
@@ -205,7 +226,9 @@ const buildCandlesWithIndicators = (rawCandles: KLineRawPoint[]): Candle[] => {
     const maList = maLineDefs.map((line, valueIndex) => {
       const value =
         line.kind === 'ema'
-          ? emaMaps.find(entry => entry.period === line.period)?.values[index] ?? 0
+          ? emaMaps.find(entry => entry.period === line.period)?.values[
+              index
+            ] ?? 0
           : smaAt(closes, index, line.period);
       return {
         title: String(line.period),
@@ -272,60 +295,33 @@ export default function BinanceLiveScreen() {
   const [emaEnabled, setEmaEnabled] = useState(true);
   const [controlsModalVisible, setControlsModalVisible] = useState(false);
   const [drawType, setDrawType] = useState(0);
-  const [shouldReloadDrawItemIndex, setShouldReloadDrawItemIndex] = useState(-3);
-  const [drawColor, setDrawColor] = useState(toColorNumber('#2563EB', 0xff2563eb));
+  const [shouldReloadDrawItemIndex, setShouldReloadDrawItemIndex] =
+    useState(-3);
+  const [drawColor, setDrawColor] = useState(
+    toColorNumber('#2563EB', 0xff2563eb),
+  );
   const [drawLineHeight] = useState(1);
   const [drawDashWidth] = useState(0);
   const [drawDashSpace] = useState(0);
   const [drawIsLock, setDrawIsLock] = useState(false);
   const [clearDrawNonce, setClearDrawNonce] = useState(0);
 
-  const primary = useMemo(() => {
-    if (mainMAEnabled) return 1;
-    if (mainBOLLEnabled) return 2;
-    return -1;
-  }, [mainBOLLEnabled, mainMAEnabled]);
-
-  const indicatorConfig = useMemo(
+  const mainIndicatorsConfig = useMemo(
     () => ({
-      primary,
-      main: {
-        ma: mainMAEnabled,
-        boll: mainBOLLEnabled,
-      },
-      second,
-      time: 1,
-      price: 2,
-      volume: 3,
-      autoCompute: true,
-      computeMode: 'prefer_input' as const,
-      ema: {
-        enabled: emaEnabled,
-        periods: [10, 30, 60],
-      },
-      targetList: {
-        maList: [
-          { title: '5', selected: true, index: 0 },
-          { title: '10', selected: true, index: 1 },
-          { title: '20', selected: true, index: 2 },
-        ],
-        maVolumeList: [
-          { title: '5', selected: true, index: 0 },
-          { title: '10', selected: true, index: 1 },
-        ],
-        bollN: '20',
-        bollP: '2',
-        macdS: '12',
-        macdL: '26',
-        macdM: '9',
-        kdjN: '14',
-        kdjM1: '1',
-        kdjM2: '3',
-        rsiList: [],
-        wrList: [],
-      },
+      ma: { enabled: mainMAEnabled, periods: [5, 10, 20] },
+      ema: { enabled: emaEnabled, periods: [10, 30, 60] },
+      boll: { enabled: mainBOLLEnabled, n: 20, p: 2 },
     }),
-    [emaEnabled, mainBOLLEnabled, mainMAEnabled, primary, second],
+    [emaEnabled, mainBOLLEnabled, mainMAEnabled],
+  );
+
+  const subChartsConfig = useMemo(
+    () => [
+      { type: 'macd' as const, enabled: second === 3 },
+      { type: 'kdj' as const, enabled: second === 4 },
+      { type: 'rsi' as const, enabled: second === 5 },
+    ],
+    [second],
   );
 
   const rebuildChartData = (
@@ -427,7 +423,11 @@ export default function BinanceLiveScreen() {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (!active || sessionId !== sessionRef.current || wsRef.current !== ws) {
+        if (
+          !active ||
+          sessionId !== sessionRef.current ||
+          wsRef.current !== ws
+        ) {
           ws.close();
           return;
         }
@@ -461,7 +461,9 @@ export default function BinanceLiveScreen() {
             rawCandlesRef.current = nextRaw;
             updateKind = 'update';
           } else {
-            const index = currentRaw.findIndex(item => item.time === rawCandle.time);
+            const index = currentRaw.findIndex(
+              item => item.time === rawCandle.time,
+            );
             if (index === -1) {
               return;
             }
@@ -497,7 +499,8 @@ export default function BinanceLiveScreen() {
       };
 
       ws.onclose = () => {
-        if (!active || sessionId !== sessionRef.current || wsRef.current !== ws) return;
+        if (!active || sessionId !== sessionRef.current || wsRef.current !== ws)
+          return;
 
         wsRef.current = null;
         setIsConnected(false);
@@ -505,7 +508,10 @@ export default function BinanceLiveScreen() {
         const retryDelay = Math.min(10000, 1000 * Math.pow(2, attempt));
         setIsReconnecting(true);
         clearReconnectTimer();
-        reconnectTimerRef.current = setTimeout(() => connectWebSocket(nextAttempt), retryDelay);
+        reconnectTimerRef.current = setTimeout(
+          () => connectWebSocket(nextAttempt),
+          retryDelay,
+        );
       };
     };
 
@@ -520,11 +526,19 @@ export default function BinanceLiveScreen() {
 
     const bootstrap = async () => {
       try {
-        const raw = await fetchBinanceKLineData(symbol, normalizedInterval, 300);
+        const raw = await fetchBinanceKLineData(
+          symbol,
+          normalizedInterval,
+          300,
+        );
         if (!active || sessionId !== sessionRef.current) return;
         rawCandlesRef.current = raw;
         const historyCandles = rebuildChartData(raw, { emitSetData: true });
-        setLastPrice(historyCandles.length > 0 ? historyCandles[historyCandles.length - 1].close : null);
+        setLastPrice(
+          historyCandles.length > 0
+            ? historyCandles[historyCandles.length - 1].close
+            : null,
+        );
         if (historyCandles.length === 0) {
           setError('No data from Binance');
           return;
@@ -532,7 +546,11 @@ export default function BinanceLiveScreen() {
         connectWebSocket(0);
       } catch (fetchError) {
         if (!active || sessionId !== sessionRef.current) return;
-        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load Binance data');
+        setError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : 'Failed to load Binance data',
+        );
       } finally {
         if (active && sessionId === sessionRef.current) {
           setLoading(false);
@@ -581,33 +599,34 @@ export default function BinanceLiveScreen() {
   }, [clearDrawNonce]);
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Binance Live</Text>
-      <Text style={styles.subTitle}>REST history + realtime WebSocket kline stream</Text>
+      <Text style={styles.subTitle}>
+        REST history + realtime WebSocket kline stream
+      </Text>
 
-      <View style={styles.pickerSection}>
-        <Text style={styles.controlsSummaryText}>
-          {symbol} · {interval} · Main{' '}
-          {[
+      <BinanceControlSummary
+        symbol={symbol}
+        interval={interval}
+        mainLabels={
+          [
             mainMAEnabled ? 'MA' : null,
             mainBOLLEnabled ? 'BOLL' : null,
             emaEnabled ? 'EMA' : null,
-          ]
-            .filter(Boolean)
-            .join('+') || 'None'}
-        </Text>
-        <Text style={styles.controlsSummaryText}>
-          Sub {SUB_INDICATOR_LABEL[second] ?? 'None'} · Draw{' '}
-          {drawType === 0 ? 'None' : drawType === 1 ? 'Line' : drawType === 2 ? 'HLine' : 'Rect'}
-        </Text>
-        <TouchableOpacity
-          style={styles.indicatorButton}
-          onPress={() => setControlsModalVisible(true)}
-        >
-          <Text style={styles.indicatorButtonText}>Open Controls</Text>
-          <Text style={styles.indicatorSummaryText}>Symbol, Interval, Indicator, Draw</Text>
-        </TouchableOpacity>
-      </View>
+          ].filter(Boolean) as string[]
+        }
+        subLabel={SUB_INDICATOR_LABEL[second] ?? 'None'}
+        drawLabel={
+          drawType === 0
+            ? 'None'
+            : drawType === 1
+            ? 'Line'
+            : drawType === 2
+            ? 'HLine'
+            : 'Rect'
+        }
+        onOpenControls={() => setControlsModalVisible(true)}
+      />
 
       <View style={styles.statusRow}>
         <View style={styles.statusBadge}>
@@ -625,187 +644,53 @@ export default function BinanceLiveScreen() {
         <RNKLineView
           ref={klineRef}
           style={styles.chart}
-          candles={EMPTY_CANDLES}
-          dataMode="imperative"
+          initialData={EMPTY_CANDLES}
           preset="binance"
-          indicator={indicatorConfig}
+          mainIndicators={mainIndicatorsConfig}
+          subCharts={subChartsConfig}
+          volume={{ enabled: true, maPeriods: [5, 10] }}
           theme={themeConfig}
           draw={drawConfig}
-          interaction={{ shouldScrollToEnd: false }}
+          interaction={{ autoFollow: false, loadMoreThreshold: 48 }}
+          onLoadMore={async () => []}
           onDrawItemDidTouch={onDrawItemDidTouch}
         />
       </View>
 
-      <TouchableOpacity style={styles.reconnectButton} onPress={() => reconnectRef.current?.()}>
+      <TouchableOpacity
+        style={styles.reconnectButton}
+        onPress={() => reconnectRef.current?.()}
+      >
         <Text style={styles.reconnectButtonText}>Reconnect</Text>
       </TouchableOpacity>
 
-      <Modal
+      <BinanceControlsModal
         visible={controlsModalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setControlsModalVisible(false)}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setControlsModalVisible(false)}
-        >
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Chart Controls</Text>
-
-            <Text style={styles.modalSectionLabel}>Symbol</Text>
-            <View style={styles.row}>
-              {SYMBOL_OPTIONS.map(item => (
-                <TouchableOpacity
-                  key={item}
-                  style={[styles.chip, symbol === item && styles.chipActive]}
-                  onPress={() => setSymbol(item)}
-                >
-                  <Text style={[styles.chipText, symbol === item && styles.chipTextActive]}>
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.modalSectionLabel}>Interval</Text>
-            <View style={styles.row}>
-              {INTERVAL_OPTIONS.map(item => (
-                <TouchableOpacity
-                  key={item}
-                  style={[styles.chip, interval === item && styles.chipActive]}
-                  onPress={() => setInterval(item)}
-                >
-                  <Text style={[styles.chipText, interval === item && styles.chipTextActive]}>
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.modalSectionLabel}>Main</Text>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.chip, mainMAEnabled && styles.chipActive]}
-                onPress={() => setMainMAEnabled(value => !value)}
-              >
-                <Text style={[styles.chipText, mainMAEnabled && styles.chipTextActive]}>
-                  MA
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, mainBOLLEnabled && styles.chipActive]}
-                onPress={() => setMainBOLLEnabled(value => !value)}
-              >
-                <Text style={[styles.chipText, mainBOLLEnabled && styles.chipTextActive]}>
-                  BOLL
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, emaEnabled && styles.chipActive]}
-                onPress={() => setEmaEnabled(value => !value)}
-              >
-                <Text style={[styles.chipText, emaEnabled && styles.chipTextActive]}>
-                  EMA
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, styles.clearChip]}
-                onPress={() => {
-                  setMainMAEnabled(false);
-                  setMainBOLLEnabled(false);
-                  setEmaEnabled(false);
-                }}
-              >
-                <Text style={styles.clearChipText}>Clear Main</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSectionLabel}>Sub</Text>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.chip, second === -1 && styles.chipActive]}
-                onPress={() => setSecond(-1)}
-              >
-                <Text style={[styles.chipText, second === -1 && styles.chipTextActive]}>
-                  No Sub
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, second === 3 && styles.chipActive]}
-                onPress={() => setSecond(3)}
-              >
-                <Text style={[styles.chipText, second === 3 && styles.chipTextActive]}>
-                  MACD
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, second === 4 && styles.chipActive]}
-                onPress={() => setSecond(4)}
-              >
-                <Text style={[styles.chipText, second === 4 && styles.chipTextActive]}>
-                  KDJ
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, second === 5 && styles.chipActive]}
-                onPress={() => setSecond(5)}
-              >
-                <Text style={[styles.chipText, second === 5 && styles.chipTextActive]}>
-                  RSI
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSectionLabel}>Draw</Text>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.chip, drawType === 0 && styles.chipActive]}
-                onPress={() => setDrawType(0)}
-              >
-                <Text style={[styles.chipText, drawType === 0 && styles.chipTextActive]}>
-                  None
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, drawType === 1 && styles.chipActive]}
-                onPress={() => setDrawType(1)}
-              >
-                <Text style={[styles.chipText, drawType === 1 && styles.chipTextActive]}>
-                  Line
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, drawType === 2 && styles.chipActive]}
-                onPress={() => setDrawType(2)}
-              >
-                <Text style={[styles.chipText, drawType === 2 && styles.chipTextActive]}>
-                  HLine
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.chip, drawType === 6 && styles.chipActive]}
-                onPress={() => setDrawType(6)}
-              >
-                <Text style={[styles.chipText, drawType === 6 && styles.chipTextActive]}>
-                  Rect
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.chip, styles.clearChip]} onPress={triggerClearDraw}>
-                <Text style={styles.clearChipText}>Clear Draw</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setControlsModalVisible(false)}
-            >
-              <Text style={styles.modalCloseButtonText}>Done</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+        symbolOptions={SYMBOL_OPTIONS}
+        intervalOptions={INTERVAL_OPTIONS}
+        symbol={symbol}
+        interval={interval}
+        mainMAEnabled={mainMAEnabled}
+        mainBOLLEnabled={mainBOLLEnabled}
+        emaEnabled={emaEnabled}
+        second={second}
+        drawType={drawType}
+        onClose={() => setControlsModalVisible(false)}
+        onSelectSymbol={setSymbol}
+        onSelectInterval={item => setInterval(item as BinanceInterval)}
+        onToggleMA={() => setMainMAEnabled(value => !value)}
+        onToggleBOLL={() => setMainBOLLEnabled(value => !value)}
+        onToggleEMA={() => setEmaEnabled(value => !value)}
+        onClearMain={() => {
+          setMainMAEnabled(false);
+          setMainBOLLEnabled(false);
+          setEmaEnabled(false);
+        }}
+        onSelectSub={setSecond}
+        onSelectDrawType={setDrawType}
+        onClearDraw={triggerClearDraw}
+      />
+    </ScrollView>
   );
 }
 
@@ -825,81 +710,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
     fontSize: 13,
-  },
-  pickerSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dbe4f0',
-    padding: 12,
-    marginBottom: 10,
-  },
-  pickerLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-  chip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  chipActive: {
-    backgroundColor: '#1d4ed8',
-    borderColor: '#1d4ed8',
-  },
-  chipText: {
-    color: '#334155',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: '#ffffff',
-  },
-  clearChip: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fff1f2',
-  },
-  clearChipText: {
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  indicatorButton: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-  },
-  indicatorButtonText: {
-    color: '#0f172a',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  indicatorSummaryText: {
-    marginTop: 4,
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  controlsSummaryText: {
-    color: '#334155',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
   },
   statusRow: {
     flexDirection: 'row',
@@ -933,7 +743,7 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     flex: 1,
-    minHeight: 380,
+    minHeight: 500,
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
@@ -953,44 +763,6 @@ const styles = StyleSheet.create({
   reconnectButtonText: {
     color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    padding: 18,
-  },
-  modalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#dbe4f0',
-    padding: 14,
-  },
-  modalTitle: {
-    fontSize: 16,
-    color: '#0f172a',
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  modalSectionLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  modalCloseButton: {
-    marginTop: 6,
-    borderRadius: 10,
-    backgroundColor: '#1d4ed8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  modalCloseButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
     fontWeight: '700',
   },
 });

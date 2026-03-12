@@ -69,20 +69,27 @@ export default function SimpleKLineScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Simple Usage</Text>
       <Text style={styles.subTitle}>
-        Chỉ truyền `candles`. Không cần tự tạo `optionList`.
+        Props-first: `initialData` + cấu hình main/sub rõ ràng.
       </Text>
 
       <View style={styles.chartContainer}>
         <RNKLineView
           ref={klineRef}
           style={styles.chart}
-          candles={seedCandles}
-          indicator={{ primary: 1, second: 3, time: 1 }}
+          initialData={seedCandles}
+          mainIndicators={{
+            ma: { enabled: true, periods: [5, 10, 20] },
+            ema: { enabled: true, periods: [10, 30, 60] },
+            boll: { enabled: false, n: 20, p: 2 },
+          }}
+          subCharts={[{ type: 'macd', enabled: true }]}
+          volume={{ enabled: true, maPeriods: [5, 10] }}
+          interaction={{ autoFollow: true, loadMoreThreshold: 48 }}
           format={{ price: 2, volume: 2, time: 1 }}
           theme={{
-            colorList: {
-              increaseColor: '#1E9E69',
-              decreaseColor: '#F04438',
+            candle: {
+              upColor: '#1E9E69',
+              downColor: '#F04438',
             },
           }}
         />

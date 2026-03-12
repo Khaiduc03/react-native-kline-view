@@ -1378,6 +1378,14 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
     	return configManager.modelArray.get(position);
     }
 
+    public int getVisibleStartIndex() {
+        return mStartIndex;
+    }
+
+    public int getVisibleStopIndex() {
+        return mStopIndex;
+    }
+
     /**
      * 根据索引索取x坐标
      *

@@ -18,34 +18,25 @@ class HTKLineContainerView: UIView {
     @objc var onDrawPointComplete: RCTBubblingEventBlock?
     
     @objc var onPredictionSelect: RCTBubblingEventBlock?
+    @objc var onLoadMore: RCTBubblingEventBlock?
+    @objc var onChartError: RCTBubblingEventBlock?
     
-    @objc var optionList: String? {
+    @objc var config: NSDictionary? {
         didSet {
-            guard let optionList = optionList else {
+            guard let config = config as? [String: Any] else {
                 return
             }
             
             RNKLineView.queue.async { [weak self] in
-                do {
-                    guard let optionListData = optionList.data(using: .utf8),
-                          let optionListDict = try JSONSerialization.jsonObject(with: optionListData, options: .allowFragments) as? [String: Any] else {
-                        return
+                self?.configManager.reloadOptionList(config)
+                
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    let isEmpty = self.configManager.predictionList.isEmpty
+                    if !isEmpty {
+                        self.klineView.startPredictionAnimation()
                     }
-                    
-                    self?.configManager.reloadOptionList(optionListDict)
-                    
-                    DispatchQueue.main.async {
-                        guard let self = self else { return }
-                        // Check empty state here on main thread (safe)
-                        // Forced animation for now to ensure user sees it
-                        let isEmpty = self.configManager.predictionList.isEmpty
-                        if !isEmpty {
-                            self.klineView.startPredictionAnimation()
-                        }
-                        self.reloadConfigManager(self.configManager)
-                    }
-                } catch {
-                    print("Error parsing optionList: \(error)")
+                    self.reloadConfigManager(self.configManager)
                 }
             }
         }
@@ -76,6 +67,22 @@ class HTKLineContainerView: UIView {
                 self.configManager.modelArray.append(model)
                 self.configManager.shouldScrollToEnd = false
                 self.reloadConfigManager(self.configManager)
+            }
+        }
+    }
+
+    func prependData(_ candles: [[String: Any]]) {
+        RNKLineView.queue.async { [weak self] in
+            guard let self = self else { return }
+            let models = HTKLineModel.packModelArray(candles)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let oldOffset = self.klineView.contentOffset.x
+                let deltaX = CGFloat(models.count) * self.configManager.itemWidth
+                self.configManager.modelArray.insert(contentsOf: models, at: 0)
+                self.configManager.shouldScrollToEnd = false
+                self.reloadConfigManager(self.configManager)
+                self.klineView.reloadContentOffset(oldOffset + deltaX)
             }
         }
     }
@@ -155,6 +162,9 @@ class HTKLineContainerView: UIView {
              // If details is nil/empty, we can send empty dict to signal deselect
              let payload = details ?? [:]
              self?.onPredictionSelect?(payload)
+        }
+        klineView.onReachLeftThreshold = { [weak self] payload in
+            self?.onLoadMore?(payload)
         }
         
         configManager.onDrawItemDidTouch = { [weak self] (drawItem, drawItemIndex) in
@@ -283,6 +293,15 @@ class HTKLineContainerView: UIView {
         
         klineView.drawContext.touchesGesture(location, translation, state)
         shotView.shotPoint = state != .ended ? touched.first?.location(in: self) : nil
+    }
+
+    private func emitError(code: String, message: String, fatal: Bool) {
+        onChartError?([
+            "code": code,
+            "message": message,
+            "source": "ios",
+            "fatal": fatal,
+        ])
     }
     
 }

@@ -115,6 +115,19 @@ class RNKLineView: RCTViewManager {
         }
     }
 
+    // Called from JS: NativeModules.RNKLineView.prependData(reactTag, candles)
+    @objc func prependData(_ reactTag: NSNumber, candles: NSArray) {
+        let uiManager = bridge.uiManager
+        uiManager?.addUIBlock { [weak self] (_, viewRegistry) in
+            guard let self = self else { return }
+            let viewFromRegistry = viewRegistry?[reactTag] as? HTKLineContainerView
+            let viewDirect = uiManager?.view(forReactTag: reactTag) as? HTKLineContainerView
+            let view = viewFromRegistry ?? viewDirect
+            let list = candles as? [[String: Any]] ?? []
+            view?.prependData(list)
+        }
+    }
+
     // Called from JS: NativeModules.RNKLineView.unPredictionSelect(reactTag, null)
     @objc func unPredictionSelect(_ reactTag: NSNumber, unused: Any?) {
         print("🚀 [Pods RNKLineView] unPredictionSelect called")

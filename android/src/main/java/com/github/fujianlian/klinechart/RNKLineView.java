@@ -19,8 +19,6 @@ import com.github.fujianlian.klinechart.formatter.ValueFormatter;
 import javax.annotation.Nonnull;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.parser.Feature;
 import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
 
@@ -34,6 +32,8 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
 	public static String onDrawPointCompleteKey = "onDrawPointComplete";
 
 	public static String onPredictionSelectKey = "onPredictionSelect";
+    public static String onLoadMoreKey = "onLoadMore";
+    public static String onChartErrorKey = "onChartError";
 
     @Nonnull
     @Override
@@ -55,6 +55,8 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
 				.put(onDrawItemCompleteKey, MapBuilder.of("registrationName", onDrawItemCompleteKey))
 				.put(onDrawPointCompleteKey, MapBuilder.of("registrationName", onDrawPointCompleteKey))
 				.put(onPredictionSelectKey, MapBuilder.of("registrationName", onPredictionSelectKey))
+                .put(onLoadMoreKey, MapBuilder.of("registrationName", onLoadMoreKey))
+                .put(onChartErrorKey, MapBuilder.of("registrationName", onChartErrorKey))
 				.build();
 	}
 
@@ -70,6 +72,7 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
     private static final int COMMAND_APPEND_CANDLE = 2;
     private static final int COMMAND_UPDATE_LAST_CANDLE = 3;
     private static final int COMMAND_UN_PREDICTION_SELECT = 4;
+    private static final int COMMAND_PREPEND_DATA = 5;
 
   private static final String COMMAND_SET_DATA_NAME = "setData";
   private static final String COMMAND_APPEND_CANDLE_NAME = "appendCandle";
@@ -80,6 +83,7 @@ public class RNKLineView extends SimpleViewManager<HTKLineContainerView> {
         map.put("appendCandle", COMMAND_APPEND_CANDLE);
         map.put("updateLastCandle", COMMAND_UPDATE_LAST_CANDLE);
         map.put("unPredictionSelect", COMMAND_UN_PREDICTION_SELECT);
+        map.put("prependData", COMMAND_PREPEND_DATA);
         return map;
     }
 public void receiveCommand(@Nonnull final HTKLineContainerView root, int commandId, @androidx.annotation.Nullable final ReadableArray args) {
@@ -115,15 +119,24 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        final List<KLineEntity> entities = root.configManager.packModelList((List) candleMaps);
-                        root.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                root.configManager.modelArray.clear();
-                                root.configManager.modelArray.addAll(entities);
-                                root.reloadConfigManager();
-                            }
-                        });
+                        try {
+                            final List<KLineEntity> entities = root.configManager.packModelList((List) candleMaps);
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.configManager.modelArray.clear();
+                                    root.configManager.modelArray.addAll(entities);
+                                    root.reloadConfigManager();
+                                }
+                            });
+                        } catch (Exception e) {
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.emitError("E_SET_DATA", "Failed to set chart data", false);
+                                }
+                            });
+                        }
                     }
                 }).start();
                 return;
@@ -145,14 +158,23 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        final KLineEntity entity = root.configManager.packModel(candleMap);
-                        root.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                root.configManager.modelArray.add(entity);
-                                root.reloadConfigManager();
-                            }
-                        });
+                        try {
+                            final KLineEntity entity = root.configManager.packModel(candleMap);
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.configManager.modelArray.add(entity);
+                                    root.reloadConfigManager();
+                                }
+                            });
+                        } catch (Exception e) {
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.emitError("E_APPEND_CANDLE", "Failed to append candle", false);
+                                }
+                            });
+                        }
                     }
                 }).start();
                 return;
@@ -174,19 +196,28 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        final KLineEntity entity = root.configManager.packModel(candleMap);
-                        root.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                int size = root.configManager.modelArray.size();
-                                if (size == 0) {
-                                    root.configManager.modelArray.add(entity);
-                                } else {
-                                    root.configManager.modelArray.set(size - 1, entity);
+                        try {
+                            final KLineEntity entity = root.configManager.packModel(candleMap);
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    int size = root.configManager.modelArray.size();
+                                    if (size == 0) {
+                                        root.configManager.modelArray.add(entity);
+                                    } else {
+                                        root.configManager.modelArray.set(size - 1, entity);
+                                    }
+                                    root.reloadConfigManager();
                                 }
-                                root.reloadConfigManager();
-                            }
-                        });
+                            });
+                        } catch (Exception e) {
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.emitError("E_UPDATE_LAST", "Failed to update last candle", false);
+                                }
+                            });
+                        }
                     }
                 }).start();
                 return;
@@ -200,6 +231,46 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                         root.unPredictionSelect();
                     }
                 });
+                return;
+            }
+            case COMMAND_PREPEND_DATA: {
+                if (args == null || args.size() == 0 || args.isNull(0)) {
+                    return;
+                }
+                final ReadableArray candleArray = args.getArray(0);
+                if (candleArray == null) {
+                    return;
+                }
+                final List<Map<String, Object>> candleMaps = new ArrayList<>();
+                for (int i = 0; i < candleArray.size(); i++) {
+                    if (!candleArray.isNull(i)) {
+                        ReadableMap m = candleArray.getMap(i);
+                        if (m != null) {
+                            candleMaps.add(readableMapToMap(m));
+                        }
+                    }
+                }
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            final List<KLineEntity> entities = root.configManager.packModelList((List) candleMaps);
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.prependData(entities);
+                                }
+                            });
+                        } catch (Exception e) {
+                            root.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    root.emitError("E_PREPEND_DATA", "Failed to prepend candles", false);
+                                }
+                            });
+                        }
+                    }
+                }).start();
                 return;
             }
         }
@@ -220,6 +291,9 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                 return;
             case "unPredictionSelect":
                 receiveCommand(root, COMMAND_UN_PREDICTION_SELECT, args);
+                return;
+            case "prependData":
+                receiveCommand(root, COMMAND_PREPEND_DATA, args);
                 return;
             default:
                 return;
@@ -286,24 +360,31 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
     }
 
 
-@ReactProp(name = "optionList")
-    public void setOptionList(final HTKLineContainerView containerView, String optionList) {
-        if (optionList == null) {
+@ReactProp(name = "config")
+    public void setConfig(final HTKLineContainerView containerView, ReadableMap config) {
+        if (config == null) {
             return;
         }
-        
+        final Map optionMap = readableMapToMap(config);
         new Thread(new Runnable() {
             @Override
             public void run() {
-                int disableDecimalFeature = JSON.DEFAULT_PARSER_FEATURE & ~Feature.UseBigDecimal.getMask();
-                Map optionMap = (Map)JSON.parse(optionList, disableDecimalFeature);
-                containerView.configManager.reloadOptionList(optionMap);
-                containerView.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        containerView.reloadConfigManager();
-                    }
-                });
+                try {
+                    containerView.configManager.reloadOptionList(optionMap);
+                    containerView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            containerView.reloadConfigManager();
+                        }
+                    });
+                } catch (Exception e) {
+                    containerView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            containerView.emitError("E_INVALID_CONFIG", "Failed to apply chart config", false);
+                        }
+                    });
+                }
             }
         }).start();
     }

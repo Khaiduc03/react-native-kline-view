@@ -69,6 +69,7 @@ class HTKLineConfigManager: NSObject {
     var modelArray = [HTKLineModel]()
 
     var shouldScrollToEnd = true
+    var loadMoreThreshold: CGFloat = 48
 
     var maList = [HTKLineItemModel]()
 
@@ -467,7 +468,13 @@ class HTKLineConfigManager: NSObject {
     func reloadOptionList(_ optionList: [String: Any]) {
         let preserveModelArray = optionList["preserveModelArray"] as? Bool ?? false
         if !preserveModelArray, let modelList = optionList["modelArray"] as? [[String: Any]] {
+            if modelList.isEmpty && !modelArray.isEmpty {
+                #if DEBUG
+                print("[RNKLineView][iOS] Skip empty modelArray on config reload to preserve existing data.")
+                #endif
+            } else {
             modelArray = HTKLineModel.packModelArray(modelList)
+            }
         }
 
 
@@ -529,6 +536,11 @@ class HTKLineConfigManager: NSObject {
 
         if let shouldScrollToEnd = optionList["shouldScrollToEnd"] as? Bool {
             self.shouldScrollToEnd = shouldScrollToEnd
+        }
+        if let threshold = optionList["loadMoreThreshold"] as? CGFloat {
+            self.loadMoreThreshold = max(0, threshold)
+        } else if let threshold = optionList["loadMoreThreshold"] as? Double {
+            self.loadMoreThreshold = max(0, CGFloat(threshold))
         }
         if shouldReloadDrawItemIndex >= HTDrawState.showPencil.rawValue {
             self.shouldScrollToEnd = false

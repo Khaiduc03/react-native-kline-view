@@ -35,6 +35,14 @@ class RNKLineViewCommands: NSObject, RCTBridgeModule {
         }
     }
 
+    @objc func prependData(_ reactTag: NSNumber, candles: NSArray) {
+        bridge.uiManager.addUIBlock { (_, viewRegistry) in
+            let view = viewRegistry?[reactTag] as? HTKLineContainerView
+            let list = candles as? [[String: Any]] ?? []
+            view?.prependData(list)
+        }
+    }
+
     @objc func updateLastCandle(_ reactTag: NSNumber, candle: NSDictionary) {
         bridge.uiManager.addUIBlock { (_, viewRegistry) in
             guard let view = viewRegistry?[reactTag] as? HTKLineContainerView else { return }
@@ -50,4 +58,3 @@ class RNKLineViewCommands: NSObject, RCTBridgeModule {
         }
     }
 }
-

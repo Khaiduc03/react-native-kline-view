@@ -105,6 +105,9 @@ class HTKLineView: UIScrollView {
     
     // Prediction Selection
     var onPredictionSelect: ((_ details: [String: Any]?) -> Void)?
+    var onReachLeftThreshold: ((_ payload: [String: Any]) -> Void)?
+    private var didTriggerLoadMore = false
+    private var lastLoadMoreDataCount = 0
     var selectedPredictionType: String? = nil // "entry", "sl", "tp"
     var selectedPredictionIndex: Int? = nil // Index for TP list
 
@@ -242,6 +245,10 @@ class HTKLineView: UIScrollView {
         }
 
         scrollViewDidScroll(self)
+        if configManager.modelArray.count != lastLoadMoreDataCount {
+            didTriggerLoadMore = false
+            lastLoadMoreDataCount = configManager.modelArray.count
+        }
 
         guard lastLoadAnimationSource != configManager.closePriceRightLightLottieSource else {
             return
@@ -1425,6 +1432,21 @@ extension HTKLineView: UIScrollViewDelegate {
         visibleStartIndex = min(max(0, visibleStartIndex), configManager.modelArray.count - 1)
         visibleEndIndex = min(max(0, visibleEndIndex), configManager.modelArray.count - 1)
         visibleRange = visibleStartIndex...visibleEndIndex
+        if contentOffsetX <= configManager.loadMoreThreshold {
+            if !didTriggerLoadMore {
+                didTriggerLoadMore = true
+                let earliestId = configManager.modelArray.first?.id ?? 0
+                onReachLeftThreshold?([
+                    "earliestId": Double(earliestId),
+                    "visibleRange": [
+                        "from": visibleStartIndex,
+                        "to": visibleEndIndex,
+                    ],
+                ])
+            }
+        } else {
+            didTriggerLoadMore = false
+        }
         self.setNeedsDisplay()
     }
 

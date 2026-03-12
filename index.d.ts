@@ -143,6 +143,43 @@ export type ThemeConfig = Partial<
   }
 >;
 
+export type ChartThemeConfig = Partial<{
+  candle: {
+    upColor?: ColorValue;
+    downColor?: ColorValue;
+    wickUpColor?: ColorValue;
+    wickDownColor?: ColorValue;
+  };
+  mainIndicator: {
+    maColors?: ColorValue[];
+    emaColors?: ColorValue[];
+    bollColors?: ColorValue[];
+  };
+  subIndicator: {
+    colors?: ColorValue[];
+  };
+  volume: {
+    barColor?: ColorValue;
+  };
+  grid: {
+    lineColor?: ColorValue;
+  };
+  axis: {
+    textColor?: ColorValue;
+  };
+  panel: {
+    backgroundColor?: ColorValue;
+    borderColor?: ColorValue;
+  };
+  crosshair: {
+    enabled?: boolean;
+    innerColor?: ColorValue;
+    outerColor?: ColorValue;
+    innerRadius?: number;
+    outerRadius?: number;
+  };
+}>;
+
 export type LayoutConfig = Partial<{
   mainFlex: number;
   volumeFlex: number;
@@ -181,6 +218,34 @@ export type IndicatorConfig = {
   targetList?: IndicatorTargetList;
 };
 
+export type MainIndicatorsConfig = {
+  ma?: {
+    enabled: boolean;
+    periods: number[];
+  };
+  ema?: {
+    enabled: boolean;
+    periods: number[];
+  };
+  boll?: {
+    enabled: boolean;
+    n?: number;
+    p?: number;
+  };
+};
+
+export type SubChartConfig = {
+  type: "macd" | "kdj" | "rsi" | "wr";
+  enabled: boolean;
+  heightRatio?: number;
+  params?: JsonObject;
+};
+
+export type VolumeConfig = {
+  enabled: boolean;
+  maPeriods?: number[];
+};
+
 export type DrawConfig = Partial<{
   shotBackgroundColor: ColorValue;
   drawType: number;
@@ -211,7 +276,9 @@ export type PredictionConfig = Partial<{
 }>;
 
 export type InteractionConfig = Partial<{
-  shouldScrollToEnd: boolean;
+  shouldScrollToEnd: boolean; // legacy internal
+  autoFollow: boolean;
+  loadMoreThreshold: number;
   configList: JsonObject;
 }>;
 
@@ -222,11 +289,14 @@ export type FormatConfig = Partial<{
 }>;
 
 type RNKLineViewBaseProps = ViewProps & {
-  /**
-   * Candle list used by the simplified JS API.
-   * Required when `optionList` is not provided.
-   */
+  initialData?: Candle[];
+  /** @deprecated Use `initialData` */
   candles?: Candle[];
+  /** @deprecated Removed in vNext, kept for migration warnings at runtime */
+  optionList?: string;
+  /** @deprecated Legacy simplified indicator config */
+  indicator?: IndicatorConfig;
+  /** @deprecated Legacy mode flag */
   dataMode?: "prop" | "imperative";
   preset?: "simple" | "trading" | "binance";
 
@@ -234,54 +304,29 @@ type RNKLineViewBaseProps = ViewProps & {
   onDrawItemComplete?: (event: DrawItemCompleteEvent) => void;
   onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
   onPredictionSelect?: (event: PredictionSelectEvent) => void;
+  onLoadMore?: (ctx: {
+    earliestId: number;
+    visibleRange: { from: number; to: number };
+  }) => Promise<Candle[]>;
+  onError?: (error: {
+    code: string;
+    message: string;
+    source: "js" | "bridge" | "ios" | "android" | "data";
+    fatal: boolean;
+  }) => void;
 
-  theme?: ThemeConfig;
+  theme?: ChartThemeConfig;
   layout?: LayoutConfig;
-  indicator?: IndicatorConfig;
+  mainIndicators?: MainIndicatorsConfig;
+  subCharts?: SubChartConfig[];
+  volume?: VolumeConfig;
   draw?: DrawConfig;
   prediction?: PredictionConfig;
   interaction?: InteractionConfig;
   format?: FormatConfig;
-  advanced?: JsonObject;
 };
 
-type RNKLineViewPropsWithOptionList = RNKLineViewBaseProps & {
-  /**
-   * JSON string for optionList config.
-   * Cursor style keys inside configList:
-   * cursorStyleEnabled, cursorInnerRadiusPx, cursorOuterRadiusPx,
-   * cursorInnerColor, cursorOuterColor, cursorOuterBlurRadiusPx,
-   * cursorBorderWidthPx, cursorBorderColor,
-   * cursorInnerBorderWidthPx, cursorInnerBorderColor.
-   */
-  optionList: string;
-  candles?: Candle[];
-};
-
-type RNKLineViewPropsWithCandles = RNKLineViewBaseProps & {
-  /**
-   * Omit optionList to use simplified API.
-   * In this mode, `candles` is required.
-   */
-  optionList?: undefined;
-  dataMode?: "prop" | undefined;
-  candles: Candle[];
-};
-
-type RNKLineViewPropsImperative = RNKLineViewBaseProps & {
-  /**
-   * In imperative mode, data is pushed via ref commands.
-   * `candles` can be omitted and initialized later via `setData`.
-   */
-  optionList?: undefined;
-  dataMode: "imperative";
-  candles?: Candle[];
-};
-
-export type RNKLineViewProps =
-  | RNKLineViewPropsWithOptionList
-  | RNKLineViewPropsWithCandles
-  | RNKLineViewPropsImperative;
+export type RNKLineViewProps = RNKLineViewBaseProps;
 
 export interface RNKLineViewRef {
   /**
@@ -298,6 +343,10 @@ export interface RNKLineViewRef {
    * Replace the last candle (or append if the dataset is empty).
    */
   updateLastCandle: (candle: Candle) => void;
+  /**
+   * Insert candles at the start for load-more without snapping viewport.
+   */
+  prependData: (candles: Candle[]) => void;
   /**
    * Clear any selected prediction state (Entry/SL/TP).
    */
