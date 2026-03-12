@@ -63,6 +63,10 @@ public class HTKLineConfigManager {
 
 	public PrimaryStatus primaryStatus = PrimaryStatus.MA;
 
+    public boolean showMainMA = true;
+
+    public boolean showMainBOLL = false;
+
 	public SecondStatus secondStatus = SecondStatus.MACD;
 
 	public Boolean isMinute = false;
@@ -420,6 +424,14 @@ public class HTKLineConfigManager {
             }
         }
         this.primaryStatus = primaryStatus;
+        this.showMainMA = primaryStatus == PrimaryStatus.MA;
+        this.showMainBOLL = primaryStatus == PrimaryStatus.BOLL;
+        if (optionList.containsKey("showMainMA")) {
+            this.showMainMA = readBoolean(optionList, "showMainMA", this.showMainMA);
+        }
+        if (optionList.containsKey("showMainBOLL")) {
+            this.showMainBOLL = readBoolean(optionList, "showMainBOLL", this.showMainBOLL);
+        }
         this.secondStatus = secondStatus;
         this.isMinute = time == -1;
 

@@ -10,23 +10,29 @@ import UIKit
 
 class HTMainDraw: NSObject, HTKLineDrawProtocol {
 
+    private func shouldDrawMA(_ configManager: HTKLineConfigManager) -> Bool {
+        if configManager.isMinute { return false }
+        return configManager.showMainMA
+    }
+
+    private func shouldDrawBOLL(_ configManager: HTKLineConfigManager) -> Bool {
+        if configManager.isMinute { return false }
+        return configManager.showMainBOLL
+    }
+
     func minMaxRange(_ visibleModelArray: [HTKLineModel], _ configManager: HTKLineConfigManager) -> Range<CGFloat> {
         var maxValue = CGFloat.leastNormalMagnitude
         var minValue = CGFloat.greatestFiniteMagnitude
 
         for model in visibleModelArray {
             var valueList = [model.high, model.low]
-            switch configManager.mainType {
-            case .ma:
+            if shouldDrawMA(configManager) {
                 valueList.append(contentsOf: model.maList.map({ (item) -> CGFloat in
                     return item.value
                 }))
-                break
-            case .boll:
+            }
+            if shouldDrawBOLL(configManager) {
                 valueList.append(contentsOf: [model.bollMb, model.bollUp, model.bollDn])
-                break
-            default:
-                break
             }
             maxValue = max(maxValue, valueList.max() ?? 0)
             minValue = min(minValue, valueList.min() ?? 0)
@@ -77,10 +83,7 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         if (configManager.isMinute) {
             drawLine(value: model.close, lastValue: lastModel.close, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: configManager.minuteLineColor, isBezier: true, context: context, configManager: configManager)
         } else {
-            switch configManager.mainType {
-            case .none:
-                break
-            case .ma:
+            if shouldDrawMA(configManager) {
                 for (configIndex, itemModel) in configManager.maList.enumerated() {
                     let dataIndex = itemModel.index
                     guard
@@ -93,7 +96,8 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
                     let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
                     drawLine(value: currentItem.value, lastValue: lastItem.value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
                 }
-            case .boll:
+            }
+            if shouldDrawBOLL(configManager) {
                 let itemList = [
                     ["value": model.bollMb, "lastValue": lastModel.bollMb, "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
                     ["value": model.bollUp, "lastValue": lastModel.bollUp, "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
@@ -110,25 +114,23 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         if (configManager.isMinute) {
 
         } else {
-            switch configManager.mainType {
-            case .none:
-                break
-            case .ma:
-                var x = baseX
+            var x = baseX
+            if shouldDrawMA(configManager) {
                 for (configIndex, itemModel) in configManager.maList.enumerated() {
                     let dataIndex = itemModel.index
                     guard let item = safeElement(model.maList, at: dataIndex) ?? safeElement(model.maList, at: configIndex) else {
                         debugInvalidIndex(owner: "HTMainDraw.drawText.maList", index: dataIndex, count: model.maList.count)
                         continue
                     }
-                    let title = String(format: "MA%@:%@", item.title, configManager.precision(item.value, configManager.price))
+                    let prefix = item.kind.lowercased() == "ema" ? "EMA" : "MA"
+                    let title = String(format: "%@%@:%@", prefix, item.title, configManager.precision(item.value, configManager.price))
                     let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
                     let font = configManager.createFont(configManager.headerTextFontSize)
                     x += drawText(title: title, point: CGPoint.init(x: x, y: baseY), color: color, font: font, context: context, configManager: configManager)
                     x += 5
                 }
-            case .boll:
-                var x = baseX
+            }
+            if shouldDrawBOLL(configManager) {
                 let itemList = [
                     ["title": String(format: "BOLL:%@", configManager.precision(model.bollMb, configManager.price)), "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
                     ["title": String(format: "UB:%@", configManager.precision(model.bollUp, configManager.price)), "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],

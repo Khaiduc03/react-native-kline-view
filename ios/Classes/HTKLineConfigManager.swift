@@ -103,6 +103,10 @@ class HTKLineConfigManager: NSObject {
 
     var second: Int = 0
 
+    var showMainMA = true
+
+    var showMainBOLL = false
+
     var mainType: HTKLineMainType {
         get {
             return HTKLineMainType(rawValue: self.primary) ?? HTKLineMainType.none
@@ -539,6 +543,14 @@ class HTKLineConfigManager: NSObject {
         time = optionList["time"] as? Int ?? -1
         price = optionList["price"] as? Int ?? -1
         volume = optionList["volume"] as? Int ?? -1
+        showMainMA = primary == HTKLineMainType.ma.rawValue
+        showMainBOLL = primary == HTKLineMainType.boll.rawValue
+        if let value = optionList["showMainMA"] as? Bool {
+            showMainMA = value
+        }
+        if let value = optionList["showMainBOLL"] as? Bool {
+            showMainBOLL = value
+        }
 
         _itemWidth = configList["itemWidth"] as? CGFloat ?? 0
         _candleWidth = configList["candleWidth"] as? CGFloat ?? 0

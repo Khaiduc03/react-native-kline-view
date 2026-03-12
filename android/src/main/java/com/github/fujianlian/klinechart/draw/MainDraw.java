@@ -78,6 +78,14 @@ public class MainDraw implements IChartDraw<ICandle> {
         return primaryStatus;
     }
 
+    private boolean shouldDrawMA(@NonNull BaseKLineChartView view) {
+        return !view.isMinute && view.configManager.showMainMA;
+    }
+
+    private boolean shouldDrawBOLL(@NonNull BaseKLineChartView view) {
+        return !view.isMinute && view.configManager.showMainBOLL;
+    }
+
 
     public void drawMinuteMinute(float top, int startIndex, float bottom, int stopIndex, @NonNull Canvas canvas, @NonNull BaseKLineChartView view) {
         if (!view.isMinute) {
@@ -128,23 +136,25 @@ public class MainDraw implements IChartDraw<ICandle> {
             return;
         }
         drawCandle(view, canvas, curX, curPoint.getHighPrice(), curPoint.getLowPrice(), curPoint.getOpenPrice(), curPoint.getClosePrice());
-        if (primaryStatus == PrimaryStatus.MA) {
+        if (shouldDrawMA(view)) {
             if (lastPoint == null) {
-                return;
-            }
-            KLineEntity lastItem = (KLineEntity) lastPoint;
-            KLineEntity currentItem = (KLineEntity) curPoint;
-            for (int i = 0; i < view.configManager.maList.size(); i ++) {
-                HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
-                HTKLineTargetItem currentTargetItem = safeTargetItem(currentItem.maList, configItem.index, "drawTranslated.current");
-                HTKLineTargetItem lastTargetItem = safeTargetItem(lastItem.maList, configItem.index, "drawTranslated.last");
-                if (currentTargetItem == null || lastTargetItem == null) {
-                    continue;
+                // Need a previous candle to draw MA line segments.
+            } else {
+                KLineEntity lastItem = (KLineEntity) lastPoint;
+                KLineEntity currentItem = (KLineEntity) curPoint;
+                for (int i = 0; i < view.configManager.maList.size(); i ++) {
+                    HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
+                    HTKLineTargetItem currentTargetItem = safeTargetItem(currentItem.maList, configItem.index, "drawTranslated.current");
+                    HTKLineTargetItem lastTargetItem = safeTargetItem(lastItem.maList, configItem.index, "drawTranslated.last");
+                    if (currentTargetItem == null || lastTargetItem == null) {
+                        continue;
+                    }
+                    primaryPaint.setColor(safeTargetColor(view, configItem.index, 0));
+                    view.drawMainLine(canvas, this.primaryPaint, lastX, lastTargetItem.value, curX, currentTargetItem.value);
                 }
-                primaryPaint.setColor(safeTargetColor(view, configItem.index, 0));
-                view.drawMainLine(canvas, this.primaryPaint, lastX, lastTargetItem.value, curX, currentTargetItem.value);
             }
-        } else if (primaryStatus == PrimaryStatus.BOLL) {
+        }
+        if (shouldDrawBOLL(view) && lastPoint != null) {
             //画boll
             if (lastPoint.getMb() != 0) {
                 primaryPaint.setColor(safeTargetColor(view, 0, 0));
@@ -170,7 +180,7 @@ public class MainDraw implements IChartDraw<ICandle> {
         if (view.isMinute) {
 
         } else {
-            if (primaryStatus == PrimaryStatus.MA) {
+            if (shouldDrawMA(view)) {
                 for (int i = 0; i < view.configManager.maList.size(); i ++) {
                     HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
                     HTKLineTargetItem targetItem = safeTargetItem(point.maList, configItem.index, "drawText");
@@ -179,7 +189,8 @@ public class MainDraw implements IChartDraw<ICandle> {
                     }
                     this.primaryPaint.setColor(safeTargetColor(view, configItem.index, 0));
                     StringBuilder stringBuilder = new StringBuilder();
-                    stringBuilder.append("MA");
+                    String prefix = "ema".equalsIgnoreCase(targetItem.kind) ? "EMA" : "MA";
+                    stringBuilder.append(prefix);
                     stringBuilder.append(targetItem.title);
                     stringBuilder.append(":");
                     stringBuilder.append(view.formatValue(targetItem.value));
@@ -188,7 +199,8 @@ public class MainDraw implements IChartDraw<ICandle> {
                     canvas.drawText(text, x, y, this.primaryPaint);
                     x += this.primaryPaint.measureText(text);
                 }
-            } else if (primaryStatus == PrimaryStatus.BOLL) {
+            }
+            if (shouldDrawBOLL(view)) {
                 if (point.getMb() != 0) {
                     text = "BOLL:" + view.formatValue(point.getMb()) + space;
                     this.primaryPaint.setColor(safeTargetColor(view, 0, 0));
@@ -212,9 +224,10 @@ public class MainDraw implements IChartDraw<ICandle> {
             add(item.getHighPrice());
             add(item.getLowPrice());
         }};
-        if (primaryStatus == PrimaryStatus.MA) {
+        if (shouldDrawMA(kChartView)) {
             valueList.add(item.targetListISMax(item.maList, isMax));
-        } else if (primaryStatus == PrimaryStatus.BOLL) {
+        }
+        if (shouldDrawBOLL(kChartView)) {
             valueList.add(item.getMb());
             valueList.add(item.getUp());
             valueList.add(item.getDn());

@@ -73,7 +73,19 @@ export default function SimpleKLineScreen() {
       </Text>
 
       <View style={styles.chartContainer}>
-        <RNKLineView ref={klineRef} style={styles.chart} candles={seedCandles} />
+        <RNKLineView
+          ref={klineRef}
+          style={styles.chart}
+          candles={seedCandles}
+          indicator={{ primary: 1, second: 3, time: 1 }}
+          format={{ price: 2, volume: 2, time: 1 }}
+          theme={{
+            colorList: {
+              increaseColor: '#1E9E69',
+              decreaseColor: '#F04438',
+            },
+          }}
+        />
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleUpdateLast}>

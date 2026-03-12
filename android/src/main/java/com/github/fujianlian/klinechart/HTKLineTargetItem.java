@@ -11,6 +11,7 @@ public class HTKLineTargetItem {
     public int index = 0;
     public String title = "";
     public float value = 0.0f;
+    public String kind = "ma";
 
 
     public HTKLineTargetItem(Map valueList) {
@@ -30,10 +31,13 @@ public class HTKLineTargetItem {
             object = new Double(0);
         }
         int index = ((Number) object).intValue();
+        object = valueList.get("kind");
+        String kind = object == null ? "ma" : object.toString();
         this.title = title;
         this.value = value;
         this.selected = selected;
         this.index = index;
+        this.kind = kind;
     }
 
     public static ArrayList<HTKLineTargetItem> packModelArray(List<Map> valueList) {

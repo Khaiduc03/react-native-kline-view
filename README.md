@@ -114,6 +114,47 @@ const candles: Candle[] = [
 <RNKLineView style={{ flex: 1 }} candles={candles} />;
 ```
 
+### Props API (No Manual `optionList`)
+
+You can now configure chart behavior with typed props directly:
+
+```tsx
+<RNKLineView
+  style={{ flex: 1 }}
+  candles={candles}
+  indicator={{
+    primary: 1, // MA
+    second: 3, // MACD
+    time: 1,
+    price: 2,
+    volume: 3,
+    targetList: {
+      maList: [
+        { title: "5", selected: true, index: 0 },
+        { title: "10", selected: true, index: 1 },
+        { title: "20", selected: true, index: 2 },
+      ],
+    },
+  }}
+  draw={{
+    drawType: 0,
+    drawColor: 0xff2563eb,
+  }}
+  theme={{
+    colorList: {
+      increaseColor: 0xff16a34a,
+      decreaseColor: 0xffef4444,
+    },
+  }}
+/>
+```
+
+If you need a rare/legacy key, use `advanced` as override:
+
+```tsx
+<RNKLineView candles={candles} advanced={{ configList: { rightOffsetCandles: 2 } }} />
+```
+
 > Note: The example has been migrated to TypeScript, so `example/App.js` is no longer the main reference.
 
 The example app demonstrates:
@@ -139,11 +180,35 @@ If you fork/customize this library, keep the example updated first — it double
 | --------------------- | -------- | -------- | ------- | ------------------------------------------------------- |
 | `optionList`          | string   | ✅*      | -       | JSON string containing all chart configuration and data |
 | `candles`             | Candle[] | ✅*      | -       | Simplified input. Required when `optionList` is omitted |
+| `theme`               | object   | ❌       | -       | Theme/color overrides for `configList`                  |
+| `layout`              | object   | ❌       | -       | Layout/size overrides for `configList`                  |
+| `indicator`           | object   | ❌       | -       | Main/sub indicator, precision and `targetList`          |
+| `draw`                | object   | ❌       | -       | Drawing state (`drawType`, `drawColor`, clear/fix...)   |
+| `prediction`          | object   | ❌       | -       | Prediction overlays (`predictionList`, entry/SL/TP...)  |
+| `interaction`         | object   | ❌       | -       | Interaction flags (e.g. `shouldScrollToEnd`)            |
+| `format`              | object   | ❌       | -       | Root precision/time fields (`price`, `volume`, `time`)  |
+| `advanced`            | object   | ❌       | -       | Partial raw option override for uncommon legacy fields  |
 | `onDrawItemDidTouch`  | function | ❌       | -       | Callback when a drawing item is touched                 |
 | `onDrawItemComplete`  | function | ❌       | -       | Callback when a drawing item is completed               |
 | `onDrawPointComplete` | function | ❌       | -       | Callback when drawing point is completed                |
 
 `*` Requirement rule: pass either `optionList` or `candles`. If both are passed, `optionList` takes priority.
+
+### Migration Mapping (`optionList` -> New Props)
+
+| Legacy key                  | New prop path                       |
+| --------------------------- | ----------------------------------- |
+| `modelArray`                | `candles`                           |
+| `targetList`                | `indicator.targetList`              |
+| `primary`, `second`         | `indicator.primary`, `indicator.second` |
+| `price`, `volume`, `time`   | `format` (or `indicator`)           |
+| `configList.*Color*`        | `theme`                             |
+| `configList` layout fields  | `layout`                            |
+| `drawList`                  | `draw`                              |
+| `prediction*`               | `prediction`                        |
+| `shouldScrollToEnd`         | `interaction.shouldScrollToEnd`     |
+
+For keys without a dedicated prop, use `advanced`.
 
 ### Event Callbacks Detail
 

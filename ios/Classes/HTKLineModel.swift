@@ -18,6 +18,8 @@ class HTKLineItemModel: NSObject {
 
     var index = 0
 
+    var kind = "ma"
+
     static func packModelArray(_ modelList: [[String: Any]]) -> [HTKLineItemModel] {
         var modelArray = [HTKLineItemModel]()
         for dictionary in modelList {
@@ -26,6 +28,7 @@ class HTKLineItemModel: NSObject {
             itemModel.value = dictionary["value"] as? CGFloat ?? 0
             itemModel.selected = dictionary["selected"] as? Bool ?? true
             itemModel.index = dictionary["index"] as? Int ?? 0
+            itemModel.kind = dictionary["kind"] as? String ?? "ma"
             if itemModel.selected {
                 modelArray.append(itemModel)
             }

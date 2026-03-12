@@ -1850,11 +1850,6 @@ const KLineScreen: React.FC = () => {
     }
   }, [predictionEntry]);
 
-  // Serialize optionList to JSON string for native component
-  const optionListString = useMemo(() => {
-    return JSON.stringify(optionList);
-  }, [optionList]);
-
   // Handlers
   const handleToggleTheme = useCallback(() => {
     setIsDarkTheme(prev => !prev);
@@ -2146,7 +2141,8 @@ const KLineScreen: React.FC = () => {
         // @ts-ignore - RNKLineView ref is handled internally
         ref={handleKLineRef}
         style={styles.chart}
-        optionList={optionListString}
+        candles={processedKLineData}
+        advanced={optionList}
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}

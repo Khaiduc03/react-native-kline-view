@@ -81,115 +81,829 @@ function normalizeCandles(candles) {
   }));
 }
 
-function buildOptionListFromCandles(candles) {
-  const configList = {
-    colorList: {
-      increaseColor: toColorNumber("#1E9E69", 0xff1e9e69),
-      decreaseColor: toColorNumber("#F04438", 0xfff04438),
+const DEFAULT_TARGET_LIST = {
+  maList: [],
+  maVolumeList: [],
+  bollN: "20",
+  bollP: "2",
+  macdS: "12",
+  macdL: "26",
+  macdM: "9",
+  kdjN: "14",
+  kdjM1: "1",
+  kdjM2: "3",
+  rsiList: [],
+  wrList: [],
+};
+
+const DEFAULT_CONFIG_LIST = {
+  colorList: {
+    increaseColor: toColorNumber("#1E9E69", 0xff1e9e69),
+    decreaseColor: toColorNumber("#F04438", 0xfff04438),
+  },
+  targetColorList: [
+    toColorNumber("#F59E0B", 0xfff59e0b),
+    toColorNumber("#10B981", 0xff10b981),
+    toColorNumber("#3B82F6", 0xff3b82f6),
+    toColorNumber("#F97316", 0xfff97316),
+    toColorNumber("#8B5CF6", 0xff8b5cf6),
+    toColorNumber("#06B6D4", 0xff06b6d4),
+    toColorNumber("#EC4899", 0xffec4899),
+    toColorNumber("#22C55E", 0xff22c55e),
+    toColorNumber("#EF4444", 0xffef4444),
+  ],
+  minuteLineColor: toColorNumber("#2563EB", 0xff2563eb),
+  minuteGradientColorList: [
+    toColorNumber("rgba(37,99,235,0.25)", 0x402563eb),
+    toColorNumber("rgba(37,99,235,0.12)", 0x1f2563eb),
+    toColorNumber("rgba(37,99,235,0)", 0x002563eb),
+  ],
+  minuteGradientLocationList: [0, 0.6, 1],
+  backgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
+  textColor: toColorNumber("#475467", 0xff475467),
+  gridColor: toColorNumber("#EAECF0", 0xffeaecf0),
+  candleTextColor: toColorNumber("#101828", 0xff101828),
+  panelBackgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
+  panelBorderColor: toColorNumber("#D0D5DD", 0xffd0d5dd),
+  selectedPointContainerColor: toColorNumber("#000000", 0xff000000),
+  selectedPointContentColor: toColorNumber("#000000", 0xff000000),
+  cursorStyleEnabled: true,
+  cursorInnerRadiusPx: 3,
+  cursorOuterRadiusPx: 8,
+  cursorInnerColor: toColorNumber("#FF783E", 0xffff783e),
+  cursorOuterColor: toColorNumber("rgba(48,48,48,0.07)", 0x12303030),
+  cursorOuterBlurRadiusPx: 0,
+  cursorBorderWidthPx: 0,
+  cursorBorderColor: toColorNumber("#1F2937", 0xff1f2937),
+  cursorInnerBorderWidthPx: 0.5,
+  cursorInnerBorderColor: toColorNumber("#F8FAFC", 0xfff8fafc),
+  closePriceCenterBackgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
+  closePriceCenterBorderColor: toColorNumber("#98A2B3", 0xff98a2b3),
+  closePriceCenterTriangleColor: toColorNumber("#98A2B3", 0xff98a2b3),
+  closePriceCenterSeparatorColor: toColorNumber("#98A2B3", 0xff98a2b3),
+  closePriceRightBackgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
+  closePriceRightSeparatorColor: toColorNumber("#98A2B3", 0xff98a2b3),
+  closePriceRightLightLottieFloder: "",
+  closePriceRightLightLottieScale: 0,
+  closePriceRightLightLottieSource: "",
+  panelGradientColorList: [toColorNumber("#FFFFFF", 0xffffffff)],
+  panelGradientLocationList: [1],
+  mainFlex: 0.72,
+  volumeFlex: 0.2,
+  paddingTop: 26,
+  paddingBottom: 20,
+  paddingRight: 54,
+  itemWidth: 11,
+  candleWidth: 8,
+  minuteVolumeCandleColor: toColorNumber("#2563EB", 0xff2563eb),
+  minuteVolumeCandleWidth: 2,
+  macdCandleWidth: 3,
+  headerTextFontSize: 11,
+  rightTextFontSize: 10,
+  candleTextFontSize: 10,
+  panelTextFontSize: 10,
+  panelMinWidth: 48,
+  fontFamily: "",
+  rightOffsetCandles: 0,
+};
+
+const DEFAULT_DRAW_LIST = {
+  shotBackgroundColor: toColorNumber("rgba(0,0,0,0)", 0x00000000),
+  drawType: 0,
+  shouldReloadDrawItemIndex: 0,
+  drawShouldContinue: false,
+  drawColor: toColorNumber("#2563EB", 0xff2563eb),
+  drawLineHeight: 1,
+  drawDashWidth: 1,
+  drawDashSpace: 1,
+  drawIsLock: false,
+  shouldFixDraw: false,
+  shouldClearDraw: false,
+};
+
+const DEFAULT_INDICATOR_PERIODS = {
+  ma: [5, 10, 20],
+  ema: [10, 30, 60],
+  maVolume: [5, 10],
+  rsi: [6, 12, 24],
+  wr: [14],
+  bollN: 20,
+  bollP: 2,
+  macdS: 12,
+  macdL: 26,
+  macdM: 9,
+  kdjN: 14,
+  kdjM1: 1,
+  kdjM2: 3,
+};
+
+const PRESET_OVERRIDES = {
+  simple: {},
+  trading: {
+    indicator: {
+      price: 2,
+      volume: 2,
+      time: 1,
+      primary: 1,
+      second: 3,
     },
-    targetColorList: [
-      toColorNumber("#F59E0B", 0xfff59e0b),
-      toColorNumber("#10B981", 0xff10b981),
-      toColorNumber("#3B82F6", 0xff3b82f6),
-      toColorNumber("#F97316", 0xfff97316),
-      toColorNumber("#8B5CF6", 0xff8b5cf6),
-      toColorNumber("#06B6D4", 0xff06b6d4),
-      toColorNumber("#EC4899", 0xffec4899),
-      toColorNumber("#22C55E", 0xff22c55e),
-      toColorNumber("#EF4444", 0xffef4444),
-    ],
-    minuteLineColor: toColorNumber("#2563EB", 0xff2563eb),
-    minuteGradientColorList: [
-      toColorNumber("rgba(37,99,235,0.25)", 0x402563eb),
-      toColorNumber("rgba(37,99,235,0.12)", 0x1f2563eb),
-      toColorNumber("rgba(37,99,235,0)", 0x002563eb),
-    ],
-    minuteGradientLocationList: [0, 0.6, 1],
-    backgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
-    textColor: toColorNumber("#475467", 0xff475467),
-    gridColor: toColorNumber("#EAECF0", 0xffeaecf0),
-    candleTextColor: toColorNumber("#101828", 0xff101828),
-    panelBackgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
-    panelBorderColor: toColorNumber("#D0D5DD", 0xffd0d5dd),
-    selectedPointContainerColor: toColorNumber("#000000", 0xff000000),
-    selectedPointContentColor: toColorNumber("#000000", 0xff000000),
-    cursorStyleEnabled: true,
-    cursorInnerRadiusPx: 3,
-    cursorOuterRadiusPx: 8,
-    cursorInnerColor: toColorNumber("#FF783E", 0xffff783e),
-    cursorOuterColor: toColorNumber("rgba(48,48,48,0.07)", 0x12303030),
-    cursorOuterBlurRadiusPx: 0,
-    cursorBorderWidthPx: 0,
-    cursorBorderColor: toColorNumber("#1F2937", 0xff1f2937),
-    cursorInnerBorderWidthPx: 0.5,
-    cursorInnerBorderColor: toColorNumber("#F8FAFC", 0xfff8fafc),
-    closePriceCenterBackgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
-    closePriceCenterBorderColor: toColorNumber("#98A2B3", 0xff98a2b3),
-    closePriceCenterTriangleColor: toColorNumber("#98A2B3", 0xff98a2b3),
-    closePriceCenterSeparatorColor: toColorNumber("#98A2B3", 0xff98a2b3),
-    closePriceRightBackgroundColor: toColorNumber("#FFFFFF", 0xffffffff),
-    closePriceRightSeparatorColor: toColorNumber("#98A2B3", 0xff98a2b3),
-    closePriceRightLightLottieFloder: "",
-    closePriceRightLightLottieScale: 0,
-    closePriceRightLightLottieSource: "",
-    panelGradientColorList: [toColorNumber("#FFFFFF", 0xffffffff)],
-    panelGradientLocationList: [1],
-    mainFlex: 0.72,
-    volumeFlex: 0.2,
-    paddingTop: 26,
-    paddingBottom: 20,
-    paddingRight: 54,
-    itemWidth: 11,
-    candleWidth: 8,
-    minuteVolumeCandleColor: toColorNumber("#2563EB", 0xff2563eb),
-    minuteVolumeCandleWidth: 2,
-    macdCandleWidth: 3,
-    headerTextFontSize: 11,
-    rightTextFontSize: 10,
-    candleTextFontSize: 10,
-    panelTextFontSize: 10,
-    panelMinWidth: 48,
-    fontFamily: "",
-    rightOffsetCandles: 0,
-  };
+  },
+  binance: {
+    indicator: {
+      price: 2,
+      volume: 3,
+      time: 1,
+      primary: 1,
+      second: 3,
+      ema: {
+        enabled: true,
+        periods: [10, 30, 60],
+      },
+    },
+    indicatorColors: {
+      ema: ["#f97316", "#06b6d4", "#8b5cf6"],
+    },
+    configList: {
+      colorList: {
+        increaseColor: toColorNumber("#16A34A", 0xff16a34a),
+        decreaseColor: toColorNumber("#EF4444", 0xffef4444),
+      },
+      targetColorList: [
+        toColorNumber("#eab308", 0xffeab308),
+        toColorNumber("#22c55e", 0xff22c55e),
+        toColorNumber("#a855f7", 0xffa855f7),
+        toColorNumber("#38bdf8", 0xff38bdf8),
+        toColorNumber("#f97316", 0xfff97316),
+        toColorNumber("#6366f1", 0xff6366f1),
+      ],
+      minuteGradientColorList: [
+        toColorNumber("rgba(37,99,235,0.25)", 0x402563eb),
+        toColorNumber("rgba(37,99,235,0.10)", 0x1a2563eb),
+        toColorNumber("rgba(37,99,235,0)", 0x002563eb),
+      ],
+      minuteGradientLocationList: [0, 0.6, 1],
+      backgroundColor: toColorNumber("#ffffff", 0xffffffff),
+      textColor: toColorNumber("#475467", 0xff475467),
+      gridColor: toColorNumber("#e2e8f0", 0xffe2e8f0),
+      candleTextColor: toColorNumber("#0f172a", 0xff0f172a),
+      panelBackgroundColor: toColorNumber("#ffffff", 0xffffffff),
+      panelBorderColor: toColorNumber("#cbd5e1", 0xffcbd5e1),
+      panelGradientColorList: [toColorNumber("#ffffff", 0xffffffff)],
+      panelGradientLocationList: [1],
+      closePriceCenterBackgroundColor: toColorNumber("#ffffff", 0xffffffff),
+      closePriceCenterBorderColor: toColorNumber("#94a3b8", 0xff94a3b8),
+      closePriceCenterTriangleColor: toColorNumber("#94a3b8", 0xff94a3b8),
+      closePriceCenterSeparatorColor: toColorNumber("#94a3b8", 0xff94a3b8),
+      closePriceRightBackgroundColor: toColorNumber("#ffffff", 0xffffffff),
+      closePriceRightSeparatorColor: toColorNumber("#94a3b8", 0xff94a3b8),
+      closePriceRightLightLottieFloder: "",
+      closePriceRightLightLottieScale: 0,
+      closePriceRightLightLottieSource: "",
+      mainFlex: 0.72,
+      volumeFlex: 0.14,
+      paddingTop: 26,
+      paddingBottom: 20,
+      paddingRight: 54,
+      itemWidth: 11,
+      candleWidth: 8,
+      minuteVolumeCandleWidth: 2,
+      macdCandleWidth: 3,
+      headerTextFontSize: 11,
+      rightTextFontSize: 10,
+      candleTextFontSize: 10,
+      panelTextFontSize: 10,
+      panelMinWidth: 48,
+      fontFamily: "",
+      rightOffsetCandles: 0,
+    },
+  },
+};
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepMerge(base, override) {
+  if (override === undefined) return base;
+  if (Array.isArray(base) || Array.isArray(override)) {
+    return Array.isArray(override) ? override : base;
+  }
+  if (!isObject(base) || !isObject(override)) {
+    return override;
+  }
+
+  const output = { ...base };
+  Object.keys(override).forEach((key) => {
+    output[key] = deepMerge(base[key], override[key]);
+  });
+  return output;
+}
+
+function toResolvedColor(value, fallback) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return toColorNumber(value, fallback);
+  return fallback;
+}
+
+function normalizeConfigColors(configList) {
+  const next = { ...configList };
+  Object.keys(next).forEach((key) => {
+    const value = next[key];
+    if (key === "colorList" && isObject(value)) {
+      next[key] = {
+        ...value,
+        increaseColor: toResolvedColor(
+          value.increaseColor,
+          DEFAULT_CONFIG_LIST.colorList.increaseColor
+        ),
+        decreaseColor: toResolvedColor(
+          value.decreaseColor,
+          DEFAULT_CONFIG_LIST.colorList.decreaseColor
+        ),
+      };
+      return;
+    }
+    if (key.endsWith("ColorList") && Array.isArray(value)) {
+      next[key] = value.map((item, index) =>
+        toResolvedColor(item, value[index] ?? 0)
+      );
+      return;
+    }
+    if (key.endsWith("Color")) {
+      next[key] = toResolvedColor(value, DEFAULT_CONFIG_LIST[key] ?? 0);
+    }
+  });
+  return next;
+}
+
+function toPeriod(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function toIndex(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function uniqPositiveIntegers(list, fallback) {
+  const values = Array.from(
+    new Set(
+      (Array.isArray(list) ? list : [])
+        .map((value) => toPeriod(value, 0))
+        .filter((value) => value > 0)
+    )
+  );
+  return values.length > 0 ? values : fallback;
+}
+
+function listPeriodsFromItems(items, fallback) {
+  if (!Array.isArray(items)) {
+    return fallback;
+  }
+  return uniqPositiveIntegers(
+    items.map((item) => (item && typeof item.title === "string" ? item.title : item?.period)),
+    fallback
+  );
+}
+
+function listPeriodsFromItemsByKind(items, fallback, kind) {
+  if (!Array.isArray(items)) {
+    return fallback;
+  }
+  const filtered = items.filter((item) => {
+    const itemKind = String(item?.kind ?? "ma").toLowerCase();
+    return kind === "ma" ? itemKind !== "ema" : itemKind === kind;
+  });
+  if (filtered.length === 0) {
+    return fallback;
+  }
+  return uniqPositiveIntegers(
+    filtered.map((item) =>
+      item && typeof item.title === "string" ? item.title : item?.period
+    ),
+    fallback
+  );
+}
+
+function buildTargetItemsFromPeriods(periods, selected = true) {
+  return periods.map((period, index) => ({
+    title: String(period),
+    selected,
+    index,
+  }));
+}
+
+function extractIndicatorPeriods(targetList, indicatorConfig) {
+  const emaEnabled = indicatorConfig?.ema?.enabled === true;
+  const maPeriods = listPeriodsFromItemsByKind(
+    targetList?.maList,
+    DEFAULT_INDICATOR_PERIODS.ma,
+    "ma"
+  );
+  const emaPeriods = emaEnabled
+    ? uniqPositiveIntegers(
+        indicatorConfig?.ema?.periods,
+        DEFAULT_INDICATOR_PERIODS.ema
+      )
+    : [];
+  const maVolumePeriods = listPeriodsFromItems(
+    targetList?.maVolumeList,
+    DEFAULT_INDICATOR_PERIODS.maVolume
+  );
+  const rsiPeriods = listPeriodsFromItems(
+    targetList?.rsiList,
+    DEFAULT_INDICATOR_PERIODS.rsi
+  );
+  const wrPeriods = listPeriodsFromItems(
+    targetList?.wrList,
+    DEFAULT_INDICATOR_PERIODS.wr
+  );
 
   return {
-    modelArray: normalizeCandles(candles),
-    shouldScrollToEnd: true,
-    targetList: {
-      maList: [],
-      maVolumeList: [],
-      bollN: "20",
-      bollP: "2",
-      macdS: "12",
-      macdL: "26",
-      macdM: "9",
-      kdjN: "14",
-      kdjM1: "1",
-      kdjM2: "3",
-      rsiList: [],
-      wrList: [],
-    },
-    price: 2,
-    volume: 2,
-    primary: 0,
-    second: 0,
-    time: 1,
-    configList,
-    drawList: {
-      shotBackgroundColor: toColorNumber("rgba(0,0,0,0)", 0x00000000),
-      drawType: 0,
-      shouldReloadDrawItemIndex: 0,
-      drawShouldContinue: false,
-      drawColor: toColorNumber("#2563EB", 0xff2563eb),
-      drawLineHeight: 1,
-      drawDashWidth: 1,
-      drawDashSpace: 1,
-      drawIsLock: false,
-      shouldFixDraw: false,
-      shouldClearDraw: false,
-    },
+    emaEnabled,
+    maPeriods,
+    emaPeriods,
+    mainLineDefs: [
+      ...maPeriods.map((period) => ({ kind: "ma", period })),
+      ...emaPeriods.map((period) => ({ kind: "ema", period })),
+    ].map((item, index) => ({ ...item, index })),
+    maVolumePeriods,
+    rsiPeriods,
+    wrPeriods,
+    bollN: toPeriod(targetList?.bollN, DEFAULT_INDICATOR_PERIODS.bollN),
+    bollP: Number.isFinite(Number(targetList?.bollP))
+      ? Number(targetList?.bollP)
+      : DEFAULT_INDICATOR_PERIODS.bollP,
+    macdS: toPeriod(targetList?.macdS, DEFAULT_INDICATOR_PERIODS.macdS),
+    macdL: toPeriod(targetList?.macdL, DEFAULT_INDICATOR_PERIODS.macdL),
+    macdM: toPeriod(targetList?.macdM, DEFAULT_INDICATOR_PERIODS.macdM),
+    kdjN: toPeriod(targetList?.kdjN, DEFAULT_INDICATOR_PERIODS.kdjN),
+    kdjM1: toPeriod(targetList?.kdjM1, DEFAULT_INDICATOR_PERIODS.kdjM1),
+    kdjM2: toPeriod(targetList?.kdjM2, DEFAULT_INDICATOR_PERIODS.kdjM2),
   };
+}
+
+function resolveTargetList(targetList, periods, autoCompute) {
+  const base = deepMerge(DEFAULT_TARGET_LIST, targetList ?? {});
+  const fallbackEnabled = autoCompute !== false;
+
+  const selectedStateMap = new Map();
+  if (Array.isArray(base.maList)) {
+    base.maList.forEach((item) => {
+      const period = toPeriod(item?.period ?? item?.title, 0);
+      if (period <= 0) {
+        return;
+      }
+      const kind = String(item?.kind ?? "ma").toLowerCase() === "ema" ? "ema" : "ma";
+      selectedStateMap.set(`${kind}:${period}`, item?.selected !== false);
+    });
+  }
+
+  if (fallbackEnabled) {
+    base.maList = periods.mainLineDefs.map((item) => {
+      const key = `${item.kind}:${item.period}`;
+      return {
+        title: String(item.period),
+        period: item.period,
+        kind: item.kind,
+        selected: selectedStateMap.has(key) ? selectedStateMap.get(key) : true,
+        index: item.index,
+      };
+    });
+  }
+  if (
+    fallbackEnabled &&
+    (!Array.isArray(base.maVolumeList) || base.maVolumeList.length === 0)
+  ) {
+    base.maVolumeList = buildTargetItemsFromPeriods(periods.maVolumePeriods, true);
+  }
+  if (fallbackEnabled && (!Array.isArray(base.rsiList) || base.rsiList.length === 0)) {
+    base.rsiList = buildTargetItemsFromPeriods(periods.rsiPeriods, false);
+  }
+  if (fallbackEnabled && (!Array.isArray(base.wrList) || base.wrList.length === 0)) {
+    base.wrList = buildTargetItemsFromPeriods(periods.wrPeriods, false);
+  }
+
+  base.bollN = String(periods.bollN);
+  base.bollP = String(periods.bollP);
+  base.macdS = String(periods.macdS);
+  base.macdL = String(periods.macdL);
+  base.macdM = String(periods.macdM);
+  base.kdjN = String(periods.kdjN);
+  base.kdjM1 = String(periods.kdjM1);
+  base.kdjM2 = String(periods.kdjM2);
+  return base;
+}
+
+function emaSeries(values, period) {
+  const alpha = 2 / (period + 1);
+  let previous = values[0] ?? 0;
+  return values.map((value, index) => {
+    if (index === 0) {
+      previous = value;
+      return value;
+    }
+    previous = value * alpha + previous * (1 - alpha);
+    return previous;
+  });
+}
+
+function smaAt(values, index, period) {
+  if (period <= 1) {
+    return values[index] ?? 0;
+  }
+  if (index + 1 < period) {
+    return values[index] ?? 0;
+  }
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) {
+    sum += values[i] ?? 0;
+  }
+  return sum / period;
+}
+
+function stdevAt(values, index, period, mean) {
+  if (index + 1 < period || period <= 1) {
+    return 0;
+  }
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) {
+    const diff = (values[i] ?? 0) - mean;
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum / period);
+}
+
+function rsiSeries(closes, period) {
+  const output = new Array(closes.length).fill(0);
+  if (closes.length === 0) return output;
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i < closes.length; i += 1) {
+    const change = (closes[i] ?? 0) - (closes[i - 1] ?? 0);
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+    if (i <= period) {
+      avgGain += gain;
+      avgLoss += loss;
+      if (i === period) {
+        avgGain /= period;
+        avgLoss /= period;
+      }
+    } else {
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+    }
+    if (i < period) {
+      output[i] = 0;
+      continue;
+    }
+    if (avgLoss === 0) {
+      output[i] = 100;
+    } else {
+      const rs = avgGain / avgLoss;
+      output[i] = 100 - 100 / (1 + rs);
+    }
+  }
+  return output;
+}
+
+function wrSeries(highs, lows, closes, period) {
+  return closes.map((close, index) => {
+    if (index + 1 < period) {
+      return 0;
+    }
+    let highest = -Infinity;
+    let lowest = Infinity;
+    for (let i = index - period + 1; i <= index; i += 1) {
+      highest = Math.max(highest, highs[i] ?? close);
+      lowest = Math.min(lowest, lows[i] ?? close);
+    }
+    if (highest === lowest) {
+      return 0;
+    }
+    return (-100 * (highest - close)) / (highest - lowest);
+  });
+}
+
+function kdjSeries(highs, lows, closes, nPeriod, m1, m2) {
+  const k = new Array(closes.length).fill(0);
+  const d = new Array(closes.length).fill(0);
+  const j = new Array(closes.length).fill(0);
+  let prevK = 50;
+  let prevD = 50;
+  for (let index = 0; index < closes.length; index += 1) {
+    const start = Math.max(0, index - nPeriod + 1);
+    let highest = -Infinity;
+    let lowest = Infinity;
+    for (let i = start; i <= index; i += 1) {
+      highest = Math.max(highest, highs[i] ?? closes[index] ?? 0);
+      lowest = Math.min(lowest, lows[i] ?? closes[index] ?? 0);
+    }
+    const range = highest - lowest;
+    const rsv = range === 0 ? 0 : (((closes[index] ?? 0) - lowest) / range) * 100;
+    const currentK = ((m1 - 1) * prevK + rsv) / m1;
+    const currentD = ((m2 - 1) * prevD + currentK) / m2;
+    const currentJ = 3 * currentK - 2 * currentD;
+    if (index < nPeriod - 1) {
+      k[index] = 0;
+      d[index] = 0;
+      j[index] = 0;
+    } else {
+      k[index] = currentK;
+      d[index] = currentD;
+      j[index] = currentJ;
+    }
+    prevK = currentK;
+    prevD = currentD;
+  }
+  return { k, d, j };
+}
+
+function shouldUseInputValue(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === "object") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  return false;
+}
+
+function mainLineKey(item) {
+  const kind = String(item?.kind ?? "ma").toLowerCase() === "ema" ? "ema" : "ma";
+  const period = toPeriod(item?.period ?? item?.title, 0);
+  if (period <= 0) {
+    return null;
+  }
+  return `${kind}:${period}`;
+}
+
+function mergeMainLinePreferInput(inputList, computedList) {
+  if (!Array.isArray(inputList) || inputList.length === 0) {
+    return computedList;
+  }
+  const map = new Map();
+  inputList.forEach((item) => {
+    const key = mainLineKey(item);
+    if (key) {
+      map.set(key, item);
+    }
+  });
+  return computedList.map((item) => {
+    const key = mainLineKey(item);
+    if (!key) {
+      return item;
+    }
+    const existing = map.get(key);
+    if (!existing) {
+      return item;
+    }
+    return {
+      ...item,
+      ...existing,
+      title: String(item.period),
+      period: item.period,
+      kind: item.kind,
+      index: item.index,
+    };
+  });
+}
+
+function applyMainLineColors(configList, targetList, indicatorColors) {
+  const next = { ...configList };
+  const currentColors = Array.isArray(next.targetColorList)
+    ? [...next.targetColorList]
+    : [];
+  const maColors = Array.isArray(indicatorColors?.ma) ? indicatorColors.ma : [];
+  const emaColors = Array.isArray(indicatorColors?.ema) ? indicatorColors.ema : [];
+  let maColorIndex = 0;
+  let emaColorIndex = 0;
+  (targetList?.maList ?? []).forEach((item) => {
+    const index = toIndex(item?.index, -1);
+    if (index < 0) {
+      return;
+    }
+    const isEMA = String(item?.kind ?? "ma").toLowerCase() === "ema";
+    const colorValue = isEMA ? emaColors[emaColorIndex++] : maColors[maColorIndex++];
+    if (colorValue === undefined) {
+      return;
+    }
+    currentColors[index] = toResolvedColor(colorValue, currentColors[index] ?? 0);
+  });
+  next.targetColorList = currentColors;
+  return next;
+}
+
+function computeIndicators(candles, indicatorConfig, targetList) {
+  const computeMode = indicatorConfig?.computeMode ?? "prefer_input";
+  const preferInput = computeMode !== "always";
+  const periods = extractIndicatorPeriods(targetList, indicatorConfig);
+  const closes = candles.map((item) => Number(item.close ?? 0));
+  const highs = candles.map((item) => Number(item.high ?? 0));
+  const lows = candles.map((item) => Number(item.low ?? 0));
+  const volumes = candles.map((item) => Number(item.vol ?? 0));
+
+  const emaShort = emaSeries(closes, periods.macdS);
+  const emaLong = emaSeries(closes, periods.macdL);
+  const difSeries = closes.map((_, index) => emaShort[index] - emaLong[index]);
+  const deaSeries = emaSeries(difSeries, periods.macdM);
+  const macdSeries = difSeries.map((value, index) => (value - (deaSeries[index] ?? 0)) * 2);
+  const kdj = kdjSeries(
+    highs,
+    lows,
+    closes,
+    periods.kdjN,
+    periods.kdjM1,
+    periods.kdjM2
+  );
+  const rsiMap = periods.rsiPeriods.map((period) => ({
+    period,
+    values: rsiSeries(closes, period),
+  }));
+  const wrMap = periods.wrPeriods.map((period) => ({
+    period,
+    values: wrSeries(highs, lows, closes, period),
+  }));
+  const emaMap = periods.emaPeriods.map((period) => ({
+    period,
+    values: emaSeries(closes, period),
+  }));
+
+  return candles.map((item, index) => {
+    const maList = periods.mainLineDefs.map((line) => {
+      const emaSeriesValue = emaMap.find((entry) => entry.period === line.period);
+      const value =
+        line.kind === "ema"
+          ? emaSeriesValue?.values[index] ?? 0
+          : smaAt(closes, index, line.period);
+      return {
+        title: String(line.period),
+        period: line.period,
+        kind: line.kind,
+        value,
+        selected: true,
+        index: line.index,
+      };
+    });
+    const maVolumeList = periods.maVolumePeriods.map((period, valueIndex) => ({
+      title: String(period),
+      value: smaAt(volumes, index, period),
+      selected: true,
+      index: valueIndex,
+    }));
+    const bollMb = smaAt(closes, index, periods.bollN);
+    const bollStdev = stdevAt(closes, index, periods.bollN, bollMb);
+    const bollUp = bollMb + periods.bollP * bollStdev;
+    const bollDn = bollMb - periods.bollP * bollStdev;
+    const rsiList = rsiMap.map((entry, valueIndex) => ({
+      title: String(entry.period),
+      value: entry.values[index] ?? 0,
+      selected: true,
+      index: valueIndex,
+    }));
+    const wrList = wrMap.map((entry, valueIndex) => ({
+      title: String(entry.period),
+      value: entry.values[index] ?? 0,
+      selected: true,
+      index: valueIndex,
+    }));
+
+    const nextItem = {
+      ...item,
+      maList:
+        preferInput && shouldUseInputValue(item.maList) ? item.maList : maList,
+      maVolumeList:
+        preferInput && shouldUseInputValue(item.maVolumeList)
+          ? item.maVolumeList
+          : maVolumeList,
+      bollMb:
+        preferInput && shouldUseInputValue(item.bollMb) ? item.bollMb : bollMb,
+      bollUp:
+        preferInput && shouldUseInputValue(item.bollUp) ? item.bollUp : bollUp,
+      bollDn:
+        preferInput && shouldUseInputValue(item.bollDn) ? item.bollDn : bollDn,
+      macdDif:
+        preferInput && shouldUseInputValue(item.macdDif)
+          ? item.macdDif
+          : difSeries[index] ?? 0,
+      macdDea:
+        preferInput && shouldUseInputValue(item.macdDea)
+          ? item.macdDea
+          : deaSeries[index] ?? 0,
+      macdValue:
+        preferInput && shouldUseInputValue(item.macdValue)
+          ? item.macdValue
+          : macdSeries[index] ?? 0,
+      kdjK:
+        preferInput && shouldUseInputValue(item.kdjK)
+          ? item.kdjK
+          : kdj.k[index] ?? 0,
+      kdjD:
+        preferInput && shouldUseInputValue(item.kdjD)
+          ? item.kdjD
+          : kdj.d[index] ?? 0,
+      kdjJ:
+        preferInput && shouldUseInputValue(item.kdjJ)
+          ? item.kdjJ
+          : kdj.j[index] ?? 0,
+      rsiList:
+        preferInput && shouldUseInputValue(item.rsiList) ? item.rsiList : rsiList,
+      wrList:
+        preferInput && shouldUseInputValue(item.wrList) ? item.wrList : wrList,
+    };
+    if (preferInput) {
+      nextItem.maList = mergeMainLinePreferInput(item.maList, maList);
+    }
+    return nextItem;
+  });
+}
+
+function composeOptionList({
+  candles,
+  preset,
+  theme,
+  layout,
+  indicator,
+  draw,
+  prediction,
+  interaction,
+  format,
+  advanced,
+}) {
+  const presetConfig = PRESET_OVERRIDES[preset] ?? {};
+  const resolvedIndicator = deepMerge(presetConfig.indicator ?? {}, indicator ?? {});
+  const mainConfig = isObject(resolvedIndicator?.main) ? resolvedIndicator.main : null;
+  const showMainMA =
+    typeof mainConfig?.ma === "boolean"
+      ? mainConfig.ma
+      : resolvedIndicator?.primary === 1;
+  const showMainBOLL =
+    typeof mainConfig?.boll === "boolean"
+      ? mainConfig.boll
+      : resolvedIndicator?.primary === 2;
+  const resolvedPrimary = showMainMA ? 1 : showMainBOLL ? 2 : -1;
+  const autoCompute = resolvedIndicator?.autoCompute !== false;
+  const periods = extractIndicatorPeriods(
+    resolvedIndicator?.targetList ?? {},
+    resolvedIndicator
+  );
+  const targetList = resolveTargetList(resolvedIndicator?.targetList, periods, autoCompute);
+  let modelArray = normalizeCandles(candles);
+  if (autoCompute) {
+    modelArray = computeIndicators(modelArray, resolvedIndicator, targetList);
+  }
+  const themeIndicatorColors = theme?.indicatorColors ?? {};
+  const presetIndicatorColors = presetConfig.indicatorColors ?? {};
+  const themeConfigSafe = isObject(theme) ? { ...theme } : {};
+  if (isObject(themeConfigSafe) && "indicatorColors" in themeConfigSafe) {
+    delete themeConfigSafe.indicatorColors;
+  }
+
+  const baseConfigList = deepMerge(
+    DEFAULT_CONFIG_LIST,
+    deepMerge(
+      deepMerge(
+        deepMerge(presetConfig.configList ?? {}, themeConfigSafe ?? {}),
+        layout ?? {}
+      ),
+      interaction?.configList ?? {}
+    )
+  );
+  const configList = applyMainLineColors(
+    normalizeConfigColors(baseConfigList),
+    targetList,
+    deepMerge(presetIndicatorColors, themeIndicatorColors)
+  );
+  const drawList = deepMerge(DEFAULT_DRAW_LIST, draw ?? {});
+
+  const baseOptionList = {
+    modelArray,
+    shouldScrollToEnd: interaction?.shouldScrollToEnd ?? true,
+    targetList,
+    price: format?.price ?? resolvedIndicator?.price ?? 2,
+    volume: format?.volume ?? resolvedIndicator?.volume ?? 2,
+    primary: resolvedPrimary,
+    showMainMA,
+    showMainBOLL,
+    second: resolvedIndicator?.second ?? 0,
+    time: format?.time ?? resolvedIndicator?.time ?? 1,
+    configList,
+    drawList,
+    predictionList: prediction?.predictionList,
+    predictionStartTime: prediction?.predictionStartTime,
+    predictionEntry: prediction?.predictionEntry,
+    predictionStopLoss: prediction?.predictionStopLoss,
+    predictionBias: prediction?.predictionBias,
+    predictionEntryZones: prediction?.predictionEntryZones,
+    predictionMinCandles: prediction?.predictionMinCandles,
+  };
+
+  return deepMerge(baseOptionList, advanced ?? {});
 }
 
 /**
@@ -241,7 +955,20 @@ function runCommand(nativeRef, commandName, payload) {
  * - updateLastCandle(candle): replace the last candle (or append if empty)
  */
 const RNKLineView = forwardRef((props, ref) => {
-  const { optionList, candles, ...restProps } = props;
+  const {
+    optionList,
+    candles,
+    preset,
+    theme,
+    layout,
+    indicator,
+    draw,
+    prediction,
+    interaction,
+    format,
+    advanced,
+    ...restProps
+  } = props;
   const nativeRef = useRef(null);
   const resolvedOptionList = useMemo(() => {
     if (typeof optionList === "string" && optionList.trim().length > 0) {
@@ -249,7 +976,20 @@ const RNKLineView = forwardRef((props, ref) => {
     }
 
     if (Array.isArray(candles)) {
-      return JSON.stringify(buildOptionListFromCandles(candles));
+      return JSON.stringify(
+        composeOptionList({
+          candles,
+          preset,
+          theme,
+          layout,
+          indicator,
+          draw,
+          prediction,
+          interaction,
+          format,
+          advanced,
+        })
+      );
     }
 
     if (__DEV__) {
@@ -258,7 +998,19 @@ const RNKLineView = forwardRef((props, ref) => {
       );
     }
     return null;
-  }, [candles, optionList]);
+  }, [
+    advanced,
+    candles,
+    preset,
+    draw,
+    format,
+    indicator,
+    interaction,
+    layout,
+    optionList,
+    prediction,
+    theme,
+  ]);
 
   useImperativeHandle(ref, () => ({
     setData: (candles) => runCommand(nativeRef, "setData", candles),
