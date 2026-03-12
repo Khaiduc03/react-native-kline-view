@@ -465,7 +465,8 @@ class HTKLineConfigManager: NSObject {
     }
 
     func reloadOptionList(_ optionList: [String: Any]) {
-        if let modelList = optionList["modelArray"] as? [[String: Any]] {
+        let preserveModelArray = optionList["preserveModelArray"] as? Bool ?? false
+        if !preserveModelArray, let modelList = optionList["modelArray"] as? [[String: Any]] {
             modelArray = HTKLineModel.packModelArray(modelList)
         }
 
@@ -657,6 +658,41 @@ class HTKLineConfigManager: NSObject {
         }
         
         predictionMinCandles = optionList["predictionMinCandles"] as? Int ?? 12
+
+        applyMainHeaderPaddingTopIfNeeded()
+    }
+
+    private func hasMAItemsForHeader() -> Bool {
+        return maList.contains { item in
+            item.kind.lowercased() != "ema"
+        }
+    }
+
+    private func hasEMAItemsForHeader() -> Bool {
+        return maList.contains { item in
+            item.kind.lowercased() == "ema"
+        }
+    }
+
+    private func requiredMainHeaderRows() -> Int {
+        if isMinute { return 0 }
+        var rows = 0
+        if showMainMA {
+            if hasMAItemsForHeader() { rows += 1 }
+            if hasEMAItemsForHeader() { rows += 1 }
+        }
+        if showMainBOLL {
+            rows += 1
+        }
+        return rows
+    }
+
+    private func applyMainHeaderPaddingTopIfNeeded() {
+        let rows = requiredMainHeaderRows()
+        if rows <= 0 { return }
+        let rowSpacing = max(headerTextFontSize + 4, 14)
+        let requiredPaddingTop = 8 + CGFloat(rows) * rowSpacing
+        paddingTop = max(paddingTop, requiredPaddingTop)
     }
 
 }

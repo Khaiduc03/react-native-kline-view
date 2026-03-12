@@ -16,69 +16,68 @@ function toColorNumber(color, fallback) {
   return typeof value === "number" ? value : fallback;
 }
 
+function normalizeOneCandle(candle, previousId = 0) {
+  const open = Number(
+    Number.isFinite(candle?.open) ? candle.open : candle?.close ?? 0
+  );
+  const close = Number(
+    Number.isFinite(candle?.close) ? candle.close : candle?.open ?? open
+  );
+  const highRaw = Number(
+    Number.isFinite(candle?.high) ? candle.high : Math.max(open, close)
+  );
+  const lowRaw = Number(
+    Number.isFinite(candle?.low) ? candle.low : Math.min(open, close)
+  );
+  const high = Math.max(highRaw, open, close);
+  const low = Math.min(lowRaw, open, close);
+
+  let nextId = Number.isFinite(candle?.id) ? Number(candle.id) : previousId + 60_000;
+  if (nextId <= previousId) {
+    nextId = previousId + 60_000;
+  }
+
+  const volume = Number(
+    Number.isFinite(candle?.vol)
+      ? candle.vol
+      : Number.isFinite(candle?.volume)
+      ? candle.volume
+      : 0
+  );
+
+  const selectedItemList = Array.isArray(candle?.selectedItemList)
+    ? candle.selectedItemList
+    : [
+        { title: "O:", detail: open.toFixed(2) },
+        { title: "H:", detail: high.toFixed(2) },
+        { title: "L:", detail: low.toFixed(2) },
+        { title: "C:", detail: close.toFixed(2) },
+        { title: "VOL:", detail: volume.toFixed(2) },
+      ];
+
+  return {
+    ...candle,
+    id: nextId,
+    dateString:
+      typeof candle?.dateString === "string" && candle.dateString.length > 0
+        ? candle.dateString
+        : String(nextId),
+    open,
+    high,
+    low,
+    close,
+    vol: volume,
+    selectedItemList,
+  };
+}
+
 function normalizeCandles(candles) {
   let previousId = 0;
-  return candles.map((candle, index) => ({
-    ...(() => {
-      const open = Number(
-        Number.isFinite(candle?.open) ? candle.open : candle?.close ?? 0
-      );
-      const close = Number(
-        Number.isFinite(candle?.close) ? candle.close : candle?.open ?? open
-      );
-      const highRaw = Number(
-        Number.isFinite(candle?.high)
-          ? candle.high
-          : Math.max(open, close)
-      );
-      const lowRaw = Number(
-        Number.isFinite(candle?.low)
-          ? candle.low
-          : Math.min(open, close)
-      );
-      const high = Math.max(highRaw, open, close);
-      const low = Math.min(lowRaw, open, close);
-
-      let nextId = Number.isFinite(candle?.id) ? Number(candle.id) : previousId + 60_000;
-      if (nextId <= previousId) {
-        nextId = previousId + 60_000;
-      }
-      previousId = nextId;
-
-      const volume = Number(
-        Number.isFinite(candle?.vol)
-          ? candle.vol
-          : Number.isFinite(candle?.volume)
-          ? candle.volume
-          : 0
-      );
-
-      const selectedItemList = Array.isArray(candle?.selectedItemList)
-        ? candle.selectedItemList
-        : [
-            { title: "O:", detail: open.toFixed(2) },
-            { title: "H:", detail: high.toFixed(2) },
-            { title: "L:", detail: low.toFixed(2) },
-            { title: "C:", detail: close.toFixed(2) },
-            { title: "VOL:", detail: volume.toFixed(2) },
-          ];
-
-      return {
-        ...candle,
-        id: nextId,
-        dateString:
-          typeof candle?.dateString === "string" && candle.dateString.length > 0
-            ? candle.dateString
-            : String(nextId),
-        open,
-        high,
-        low,
-        close,
-        vol: volume,
-        selectedItemList,
-      };
-    })(),
-  }));
+  return candles.map((candle) => {
+    const next = normalizeOneCandle(candle, previousId);
+    previousId = next.id;
+    return next;
+  });
 }
 
 const DEFAULT_TARGET_LIST = {
@@ -402,11 +401,18 @@ function buildTargetItemsFromPeriods(periods, selected = true) {
 
 function extractIndicatorPeriods(targetList, indicatorConfig) {
   const emaEnabled = indicatorConfig?.ema?.enabled === true;
-  const maPeriods = listPeriodsFromItemsByKind(
-    targetList?.maList,
-    DEFAULT_INDICATOR_PERIODS.ma,
-    "ma"
-  );
+  const mainConfig = isObject(indicatorConfig?.main) ? indicatorConfig.main : null;
+  const maEnabled =
+    typeof mainConfig?.ma === "boolean"
+      ? mainConfig.ma
+      : indicatorConfig?.primary === 1;
+  const maPeriods = maEnabled
+    ? listPeriodsFromItemsByKind(
+        targetList?.maList,
+        DEFAULT_INDICATOR_PERIODS.ma,
+        "ma"
+      )
+    : [];
   const emaPeriods = emaEnabled
     ? uniqPositiveIntegers(
         indicatorConfig?.ema?.periods,
@@ -427,6 +433,7 @@ function extractIndicatorPeriods(targetList, indicatorConfig) {
   );
 
   return {
+    maEnabled,
     emaEnabled,
     maPeriods,
     emaPeriods,
@@ -825,6 +832,7 @@ function computeIndicators(candles, indicatorConfig, targetList) {
 
 function composeOptionList({
   candles,
+  preserveModelArray,
   preset,
   theme,
   layout,
@@ -838,15 +846,17 @@ function composeOptionList({
   const presetConfig = PRESET_OVERRIDES[preset] ?? {};
   const resolvedIndicator = deepMerge(presetConfig.indicator ?? {}, indicator ?? {});
   const mainConfig = isObject(resolvedIndicator?.main) ? resolvedIndicator.main : null;
+  const emaOverlayEnabled = resolvedIndicator?.ema?.enabled === true;
   const showMainMA =
     typeof mainConfig?.ma === "boolean"
       ? mainConfig.ma
-      : resolvedIndicator?.primary === 1;
+      : resolvedIndicator?.primary === 1 || emaOverlayEnabled;
+  const showMainMAResolved = showMainMA || emaOverlayEnabled;
   const showMainBOLL =
     typeof mainConfig?.boll === "boolean"
       ? mainConfig.boll
       : resolvedIndicator?.primary === 2;
-  const resolvedPrimary = showMainMA ? 1 : showMainBOLL ? 2 : -1;
+  const resolvedPrimary = showMainMAResolved ? 1 : showMainBOLL ? 2 : -1;
   const autoCompute = resolvedIndicator?.autoCompute !== false;
   const periods = extractIndicatorPeriods(
     resolvedIndicator?.targetList ?? {},
@@ -883,12 +893,13 @@ function composeOptionList({
 
   const baseOptionList = {
     modelArray,
+    preserveModelArray: preserveModelArray === true,
     shouldScrollToEnd: interaction?.shouldScrollToEnd ?? true,
     targetList,
     price: format?.price ?? resolvedIndicator?.price ?? 2,
     volume: format?.volume ?? resolvedIndicator?.volume ?? 2,
     primary: resolvedPrimary,
-    showMainMA,
+    showMainMA: showMainMAResolved,
     showMainBOLL,
     second: resolvedIndicator?.second ?? 0,
     time: format?.time ?? resolvedIndicator?.time ?? 1,
@@ -958,6 +969,7 @@ const RNKLineView = forwardRef((props, ref) => {
   const {
     optionList,
     candles,
+    dataMode = "prop",
     preset,
     theme,
     layout,
@@ -970,15 +982,23 @@ const RNKLineView = forwardRef((props, ref) => {
     ...restProps
   } = props;
   const nativeRef = useRef(null);
+  const dataCacheRef = useRef([]);
+  const isImperativeMode = dataMode === "imperative";
   const resolvedOptionList = useMemo(() => {
     if (typeof optionList === "string" && optionList.trim().length > 0) {
       return optionList;
     }
 
-    if (Array.isArray(candles)) {
+    const inputCandles = isImperativeMode
+      ? dataCacheRef.current
+      : Array.isArray(candles)
+      ? candles
+      : null;
+    if (Array.isArray(inputCandles)) {
       return JSON.stringify(
         composeOptionList({
-          candles,
+          candles: inputCandles,
+          preserveModelArray: isImperativeMode,
           preset,
           theme,
           layout,
@@ -994,13 +1014,14 @@ const RNKLineView = forwardRef((props, ref) => {
 
     if (__DEV__) {
       console.warn(
-        "[RNKLineView] Missing required candles when optionList is not provided. Pass optionList or candles."
+        "[RNKLineView] Missing required candles when optionList is not provided. Pass optionList or candles, or use dataMode='imperative' with setData()."
       );
     }
     return null;
   }, [
     advanced,
     candles,
+    dataMode,
     preset,
     draw,
     format,
@@ -1013,10 +1034,35 @@ const RNKLineView = forwardRef((props, ref) => {
   ]);
 
   useImperativeHandle(ref, () => ({
-    setData: (candles) => runCommand(nativeRef, "setData", candles),
-    appendCandle: (candle) => runCommand(nativeRef, "appendCandle", candle),
-    updateLastCandle: (candle) =>
-      runCommand(nativeRef, "updateLastCandle", candle),
+    setData: (nextCandles) => {
+      const normalized = normalizeCandles(Array.isArray(nextCandles) ? nextCandles : []);
+      dataCacheRef.current = normalized;
+      runCommand(nativeRef, "setData", normalized);
+    },
+    appendCandle: (candle) => {
+      const previousId =
+        dataCacheRef.current.length > 0
+          ? Number(dataCacheRef.current[dataCacheRef.current.length - 1]?.id ?? 0)
+          : 0;
+      const normalized = normalizeOneCandle(candle, previousId);
+      dataCacheRef.current = [...dataCacheRef.current, normalized];
+      runCommand(nativeRef, "appendCandle", normalized);
+    },
+    updateLastCandle: (candle) => {
+      const previousId =
+        dataCacheRef.current.length > 1
+          ? Number(dataCacheRef.current[dataCacheRef.current.length - 2]?.id ?? 0)
+          : 0;
+      const normalized = normalizeOneCandle(candle, previousId);
+      if (dataCacheRef.current.length === 0) {
+        dataCacheRef.current = [normalized];
+      } else {
+        const next = [...dataCacheRef.current];
+        next[next.length - 1] = normalized;
+        dataCacheRef.current = next;
+      }
+      runCommand(nativeRef, "updateLastCandle", normalized);
+    },
     unPredictionSelect: () => runCommand(nativeRef, "unPredictionSelect", null),
   }));
 

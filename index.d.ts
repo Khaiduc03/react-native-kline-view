@@ -227,6 +227,7 @@ type RNKLineViewBaseProps = ViewProps & {
    * Required when `optionList` is not provided.
    */
   candles?: Candle[];
+  dataMode?: "prop" | "imperative";
   preset?: "simple" | "trading" | "binance";
 
   onDrawItemDidTouch?: (event: DrawItemTouchEvent) => void;
@@ -263,12 +264,24 @@ type RNKLineViewPropsWithCandles = RNKLineViewBaseProps & {
    * In this mode, `candles` is required.
    */
   optionList?: undefined;
+  dataMode?: "prop" | undefined;
   candles: Candle[];
+};
+
+type RNKLineViewPropsImperative = RNKLineViewBaseProps & {
+  /**
+   * In imperative mode, data is pushed via ref commands.
+   * `candles` can be omitted and initialized later via `setData`.
+   */
+  optionList?: undefined;
+  dataMode: "imperative";
+  candles?: Candle[];
 };
 
 export type RNKLineViewProps =
   | RNKLineViewPropsWithOptionList
-  | RNKLineViewPropsWithCandles;
+  | RNKLineViewPropsWithCandles
+  | RNKLineViewPropsImperative;
 
 export interface RNKLineViewRef {
   /**

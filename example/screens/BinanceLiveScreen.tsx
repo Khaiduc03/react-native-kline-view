@@ -10,6 +10,7 @@ import {
   processColor,
 } from 'react-native';
 import RNKLineView, { type DrawItemTouchEvent } from 'react-native-kline-view';
+import type { Candle, RNKLineViewRef } from 'react-native-kline-view';
 import {
   buildBinanceWsUrl,
   fetchBinanceKLineData,
@@ -21,6 +22,13 @@ import {
 
 const SYMBOL_OPTIONS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'];
 const INTERVAL_OPTIONS: BinanceInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const EMPTY_CANDLES: Candle[] = [];
+const SUB_INDICATOR_LABEL: Record<number, string> = {
+  [-1]: 'None',
+  3: 'MACD',
+  4: 'KDJ',
+  5: 'RSI',
+};
 
 const toColorNumber = (color: string, fallback: number): number => {
   const value = processColor(color);
@@ -36,25 +44,215 @@ const formatDateString = (time: number): string => {
   return `${month}-${day} ${hh}:${mm}`;
 };
 
-const buildCandles = (rawCandles: KLineRawPoint[]) =>
-  rawCandles.map(item => ({
-    id: item.time,
-    dateString: formatDateString(item.time),
-    open: item.open,
-    high: item.high,
-    low: item.low,
-    close: item.close,
-    vol: item.volume,
-    selectedItemList: [
-      { title: 'O: ', detail: item.open.toFixed(2) },
-      { title: 'H: ', detail: item.high.toFixed(2) },
-      { title: 'L: ', detail: item.low.toFixed(2) },
-      { title: 'C: ', detail: item.close.toFixed(2) },
-      { title: 'VOL: ', detail: item.volume.toFixed(2) },
-    ],
-  }));
+const smaAt = (values: number[], index: number, period: number): number => {
+  if (period <= 1 || index + 1 < period) return values[index] ?? 0;
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) {
+    sum += values[i] ?? 0;
+  }
+  return sum / period;
+};
+
+const stdevAt = (values: number[], index: number, period: number, mean: number): number => {
+  if (period <= 1 || index + 1 < period) return 0;
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) {
+    const diff = (values[i] ?? 0) - mean;
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum / period);
+};
+
+const emaSeries = (values: number[], period: number): number[] => {
+  const alpha = 2 / (period + 1);
+  let previous = values[0] ?? 0;
+  return values.map((value, index) => {
+    if (index === 0) {
+      previous = value;
+      return value;
+    }
+    previous = value * alpha + previous * (1 - alpha);
+    return previous;
+  });
+};
+
+const kdjSeries = (
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period = 14,
+  kSmooth = 3,
+  dSmooth = 3,
+): { k: number[]; d: number[]; j: number[] } => {
+  const rsv: number[] = [];
+  const k: number[] = [];
+  const d: number[] = [];
+  const j: number[] = [];
+  let previousK = 50;
+  let previousD = 50;
+
+  closes.forEach((close, index) => {
+    const start = Math.max(0, index - period + 1);
+    let highestHigh = highs[start] ?? close;
+    let lowestLow = lows[start] ?? close;
+    for (let i = start + 1; i <= index; i += 1) {
+      const high = highs[i] ?? close;
+      const low = lows[i] ?? close;
+      if (high > highestHigh) highestHigh = high;
+      if (low < lowestLow) lowestLow = low;
+    }
+
+    const denominator = highestHigh - lowestLow;
+    const currentRsv = denominator === 0 ? 50 : ((close - lowestLow) / denominator) * 100;
+    rsv.push(currentRsv);
+
+    const currentK = ((kSmooth - 1) * previousK + currentRsv) / kSmooth;
+    const currentD = ((dSmooth - 1) * previousD + currentK) / dSmooth;
+    const currentJ = 3 * currentK - 2 * currentD;
+
+    k.push(currentK);
+    d.push(currentD);
+    j.push(currentJ);
+    previousK = currentK;
+    previousD = currentD;
+  });
+
+  return { k, d, j };
+};
+
+const rsiSeries = (closes: number[], period: number): number[] => {
+  if (period <= 1) {
+    return closes.map(() => 0);
+  }
+  const result: number[] = [];
+  let avgGain = 0;
+  let avgLoss = 0;
+
+  closes.forEach((close, index) => {
+    if (index === 0) {
+      result.push(0);
+      return;
+    }
+    const change = close - (closes[index - 1] ?? close);
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+
+    if (index <= period) {
+      avgGain += gain;
+      avgLoss += loss;
+      if (index === period) {
+        avgGain /= period;
+        avgLoss /= period;
+        const rs = avgLoss === 0 ? 0 : avgGain / avgLoss;
+        result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + rs));
+      } else {
+        result.push(0);
+      }
+      return;
+    }
+
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    const rs = avgLoss === 0 ? 0 : avgGain / avgLoss;
+    result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + rs));
+  });
+
+  return result;
+};
+
+const buildCandle = (item: KLineRawPoint): Candle => ({
+  id: item.time,
+  dateString: formatDateString(item.time),
+  open: item.open,
+  high: item.high,
+  low: item.low,
+  close: item.close,
+  vol: item.volume,
+  selectedItemList: [
+    { title: 'O: ', detail: item.open.toFixed(2) },
+    { title: 'H: ', detail: item.high.toFixed(2) },
+    { title: 'L: ', detail: item.low.toFixed(2) },
+    { title: 'C: ', detail: item.close.toFixed(2) },
+    { title: 'VOL: ', detail: item.volume.toFixed(2) },
+  ],
+});
+
+const buildCandlesWithIndicators = (rawCandles: KLineRawPoint[]): Candle[] => {
+  const closes = rawCandles.map(item => item.close);
+  const highs = rawCandles.map(item => item.high);
+  const lows = rawCandles.map(item => item.low);
+  const volumes = rawCandles.map(item => item.volume);
+
+  const maPeriods = [5, 10, 20];
+  const emaPeriods = [10, 30, 60];
+  const maLineDefs = [
+    ...maPeriods.map(period => ({ kind: 'ma' as const, period })),
+    ...emaPeriods.map(period => ({ kind: 'ema' as const, period })),
+  ];
+  const emaMaps = emaPeriods.map(period => ({ period, values: emaSeries(closes, period) }));
+
+  const ema12 = emaSeries(closes, 12);
+  const ema26 = emaSeries(closes, 26);
+  const difSeries = closes.map((_, index) => (ema12[index] ?? 0) - (ema26[index] ?? 0));
+  const deaSeries = emaSeries(difSeries, 9);
+  const macdSeries = difSeries.map((value, index) => (value - (deaSeries[index] ?? 0)) * 2);
+  const kdj = kdjSeries(highs, lows, closes, 14, 3, 3);
+  const rsi6 = rsiSeries(closes, 6);
+  const rsi12 = rsiSeries(closes, 12);
+  const rsi24 = rsiSeries(closes, 24);
+
+  return rawCandles.map((item, index) => {
+    const maList = maLineDefs.map((line, valueIndex) => {
+      const value =
+        line.kind === 'ema'
+          ? emaMaps.find(entry => entry.period === line.period)?.values[index] ?? 0
+          : smaAt(closes, index, line.period);
+      return {
+        title: String(line.period),
+        period: line.period,
+        kind: line.kind,
+        value,
+        selected: true,
+        index: valueIndex,
+      };
+    });
+
+    const maVolumeList = [5, 10].map((period, valueIndex) => ({
+      title: String(period),
+      value: smaAt(volumes, index, period),
+      selected: true,
+      index: valueIndex,
+    }));
+
+    const bollMb = smaAt(closes, index, 20);
+    const bollStd = stdevAt(closes, index, 20, bollMb);
+
+    return {
+      ...buildCandle(item),
+      maList,
+      maVolumeList,
+      bollMb,
+      bollUp: bollMb + 2 * bollStd,
+      bollDn: bollMb - 2 * bollStd,
+      macdDif: difSeries[index] ?? 0,
+      macdDea: deaSeries[index] ?? 0,
+      macdValue: macdSeries[index] ?? 0,
+      kdjK: kdj.k[index] ?? 0,
+      kdjD: kdj.d[index] ?? 0,
+      kdjJ: kdj.j[index] ?? 0,
+      rsiList: [
+        { title: '6', selected: true, index: 0, value: rsi6[index] ?? 0 },
+        { title: '12', selected: true, index: 1, value: rsi12[index] ?? 0 },
+        { title: '24', selected: true, index: 2, value: rsi24[index] ?? 0 },
+      ],
+    };
+  });
+};
 
 export default function BinanceLiveScreen() {
+  const klineRef = useRef<RNKLineViewRef | null>(null);
+  const rawCandlesRef = useRef<KLineRawPoint[]>([]);
+  const candlesRef = useRef<Candle[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectRef = useRef<(() => void) | null>(null);
@@ -62,7 +260,6 @@ export default function BinanceLiveScreen() {
 
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [interval, setInterval] = useState<BinanceInterval>('1m');
-  const [rawCandles, setRawCandles] = useState<KLineRawPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -71,7 +268,7 @@ export default function BinanceLiveScreen() {
 
   const [mainMAEnabled, setMainMAEnabled] = useState(true);
   const [mainBOLLEnabled, setMainBOLLEnabled] = useState(false);
-  const [second, setSecond] = useState<-1 | 3>(3);
+  const [second, setSecond] = useState<-1 | 3 | 4 | 5>(3);
   const [emaEnabled, setEmaEnabled] = useState(true);
   const [controlsModalVisible, setControlsModalVisible] = useState(false);
   const [drawType, setDrawType] = useState(0);
@@ -82,8 +279,6 @@ export default function BinanceLiveScreen() {
   const [drawDashSpace] = useState(0);
   const [drawIsLock, setDrawIsLock] = useState(false);
   const [clearDrawNonce, setClearDrawNonce] = useState(0);
-
-  const candles = useMemo(() => buildCandles(rawCandles), [rawCandles]);
 
   const primary = useMemo(() => {
     if (mainMAEnabled) return 1;
@@ -132,6 +327,18 @@ export default function BinanceLiveScreen() {
     }),
     [emaEnabled, mainBOLLEnabled, mainMAEnabled, primary, second],
   );
+
+  const rebuildChartData = (
+    inputRaw: KLineRawPoint[],
+    opts?: { emitSetData?: boolean },
+  ): Candle[] => {
+    const nextCandles = buildCandlesWithIndicators(inputRaw);
+    candlesRef.current = nextCandles;
+    if (opts?.emitSetData !== false) {
+      klineRef.current?.setData(nextCandles);
+    }
+    return nextCandles;
+  };
 
   const themeConfig = useMemo(
     () => ({
@@ -203,10 +410,14 @@ export default function BinanceLiveScreen() {
 
     clearReconnectTimer();
     closeSocket();
+    rawCandlesRef.current = [];
+    candlesRef.current = [];
+    klineRef.current?.setData([]);
     setLoading(true);
     setError(null);
     setIsConnected(false);
     setIsReconnecting(false);
+    setLastPrice(null);
 
     const connectWebSocket = (attempt: number) => {
       if (!active || sessionId !== sessionRef.current) return;
@@ -230,30 +441,54 @@ export default function BinanceLiveScreen() {
         const update = parseBinanceWsKlineUpdate(event.data);
         if (!update) return;
 
-        setLastPrice(update.candle.close);
-        setRawCandles(prev => {
-          if (prev.length === 0) {
-            return [update.candle];
-          }
+        const currentRaw = rawCandlesRef.current;
+        const currentCandles = candlesRef.current;
+        let updateKind: 'set' | 'append' | 'update' = 'set';
+        const rawCandle = update.candle;
+        setLastPrice(rawCandle.close);
 
-          const last = prev[prev.length - 1];
-          if (update.candle.time > last.time) {
-            return [...prev, update.candle];
+        if (currentRaw.length === 0) {
+          rawCandlesRef.current = [rawCandle];
+          updateKind = 'set';
+        } else {
+          const lastRaw = currentRaw[currentRaw.length - 1];
+          if (rawCandle.time > lastRaw.time) {
+            rawCandlesRef.current = [...currentRaw, rawCandle];
+            updateKind = 'append';
+          } else if (rawCandle.time === lastRaw.time) {
+            const nextRaw = [...currentRaw];
+            nextRaw[nextRaw.length - 1] = rawCandle;
+            rawCandlesRef.current = nextRaw;
+            updateKind = 'update';
+          } else {
+            const index = currentRaw.findIndex(item => item.time === rawCandle.time);
+            if (index === -1) {
+              return;
+            }
+            const nextRaw = [...currentRaw];
+            nextRaw[index] = rawCandle;
+            rawCandlesRef.current = nextRaw;
+            updateKind = index === nextRaw.length - 1 ? 'update' : 'set';
           }
-          if (update.candle.time === last.time) {
-            const next = [...prev];
-            next[next.length - 1] = update.candle;
-            return next;
-          }
+        }
 
-          const index = prev.findIndex(item => item.time === update.candle.time);
-          if (index === -1) {
-            return prev;
-          }
-          const next = [...prev];
-          next[index] = update.candle;
-          return next;
+        const nextCandles = rebuildChartData(rawCandlesRef.current, {
+          emitSetData: updateKind === 'set',
         });
+
+        if (updateKind === 'append') {
+          const appendItem = nextCandles[nextCandles.length - 1];
+          if (appendItem) {
+            klineRef.current?.appendCandle(appendItem);
+          }
+        } else if (updateKind === 'update') {
+          const updateItem = nextCandles[nextCandles.length - 1];
+          if (updateItem) {
+            klineRef.current?.updateLastCandle(updateItem);
+          } else if (currentCandles.length > 0) {
+            klineRef.current?.setData(nextCandles);
+          }
+        }
       };
 
       ws.onerror = () => {
@@ -287,10 +522,10 @@ export default function BinanceLiveScreen() {
       try {
         const raw = await fetchBinanceKLineData(symbol, normalizedInterval, 300);
         if (!active || sessionId !== sessionRef.current) return;
-
-        setRawCandles(raw);
-        setLastPrice(raw.length > 0 ? raw[raw.length - 1].close : null);
-        if (raw.length === 0) {
+        rawCandlesRef.current = raw;
+        const historyCandles = rebuildChartData(raw, { emitSetData: true });
+        setLastPrice(historyCandles.length > 0 ? historyCandles[historyCandles.length - 1].close : null);
+        if (historyCandles.length === 0) {
           setError('No data from Binance');
           return;
         }
@@ -362,7 +597,7 @@ export default function BinanceLiveScreen() {
             .join('+') || 'None'}
         </Text>
         <Text style={styles.controlsSummaryText}>
-          Sub {second === -1 ? 'None' : 'MACD'} · Draw{' '}
+          Sub {SUB_INDICATOR_LABEL[second] ?? 'None'} · Draw{' '}
           {drawType === 0 ? 'None' : drawType === 1 ? 'Line' : drawType === 2 ? 'HLine' : 'Rect'}
         </Text>
         <TouchableOpacity
@@ -388,13 +623,15 @@ export default function BinanceLiveScreen() {
 
       <View style={styles.chartContainer}>
         <RNKLineView
+          ref={klineRef}
           style={styles.chart}
-          candles={candles}
+          candles={EMPTY_CANDLES}
+          dataMode="imperative"
           preset="binance"
           indicator={indicatorConfig}
           theme={themeConfig}
           draw={drawConfig}
-          interaction={{ shouldScrollToEnd: true }}
+          interaction={{ shouldScrollToEnd: false }}
           onDrawItemDidTouch={onDrawItemDidTouch}
         />
       </View>
@@ -500,6 +737,22 @@ export default function BinanceLiveScreen() {
               >
                 <Text style={[styles.chipText, second === 3 && styles.chipTextActive]}>
                   MACD
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chip, second === 4 && styles.chipActive]}
+                onPress={() => setSecond(4)}
+              >
+                <Text style={[styles.chipText, second === 4 && styles.chipTextActive]}>
+                  KDJ
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chip, second === 5 && styles.chipActive]}
+                onPress={() => setSecond(5)}
+              >
+                <Text style={[styles.chipText, second === 5 && styles.chipTextActive]}>
+                  RSI
                 </Text>
               </TouchableOpacity>
             </View>

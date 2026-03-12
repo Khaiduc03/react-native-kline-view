@@ -86,6 +86,23 @@ public class MainDraw implements IChartDraw<ICandle> {
         return !view.isMinute && view.configManager.showMainBOLL;
     }
 
+    private float drawIndicatorRow(
+            @NonNull Canvas canvas,
+            @NonNull List<String> texts,
+            @NonNull List<Integer> colors,
+            float x,
+            float y
+    ) {
+        for (int i = 0; i < texts.size(); i++) {
+            String text = texts.get(i);
+            int color = i < colors.size() ? colors.get(i) : this.primaryPaint.getColor();
+            this.primaryPaint.setColor(color);
+            canvas.drawText(text, x, y, this.primaryPaint);
+            x += this.primaryPaint.measureText(text);
+        }
+        return x;
+    }
+
 
     public void drawMinuteMinute(float top, int startIndex, float bottom, int stopIndex, @NonNull Canvas canvas, @NonNull BaseKLineChartView view) {
         if (!view.isMinute) {
@@ -180,14 +197,19 @@ public class MainDraw implements IChartDraw<ICandle> {
         if (view.isMinute) {
 
         } else {
+            float rowY = y;
+            float rowSpacing = Math.max(view.configManager.headerTextFontSize + 4f, 14f);
             if (shouldDrawMA(view)) {
+                List<String> maTexts = new ArrayList<>();
+                List<Integer> maColors = new ArrayList<>();
+                List<String> emaTexts = new ArrayList<>();
+                List<Integer> emaColors = new ArrayList<>();
                 for (int i = 0; i < view.configManager.maList.size(); i ++) {
                     HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
                     HTKLineTargetItem targetItem = safeTargetItem(point.maList, configItem.index, "drawText");
                     if (targetItem == null) {
                         continue;
                     }
-                    this.primaryPaint.setColor(safeTargetColor(view, configItem.index, 0));
                     StringBuilder stringBuilder = new StringBuilder();
                     String prefix = "ema".equalsIgnoreCase(targetItem.kind) ? "EMA" : "MA";
                     stringBuilder.append(prefix);
@@ -195,24 +217,39 @@ public class MainDraw implements IChartDraw<ICandle> {
                     stringBuilder.append(":");
                     stringBuilder.append(view.formatValue(targetItem.value));
                     stringBuilder.append(space);
-                    text = stringBuilder.toString();
-                    canvas.drawText(text, x, y, this.primaryPaint);
-                    x += this.primaryPaint.measureText(text);
+                    int color = safeTargetColor(view, configItem.index, 0);
+                    if ("ema".equalsIgnoreCase(targetItem.kind)) {
+                        emaTexts.add(stringBuilder.toString());
+                        emaColors.add(color);
+                    } else {
+                        maTexts.add(stringBuilder.toString());
+                        maColors.add(color);
+                    }
+                }
+                if (!maTexts.isEmpty()) {
+                    drawIndicatorRow(canvas, maTexts, maColors, x, rowY);
+                    rowY += rowSpacing;
+                }
+                if (!emaTexts.isEmpty()) {
+                    drawIndicatorRow(canvas, emaTexts, emaColors, x, rowY);
+                    rowY += rowSpacing;
                 }
             }
             if (shouldDrawBOLL(view)) {
+                List<String> bollTexts = new ArrayList<>();
+                List<Integer> bollColors = new ArrayList<>();
                 if (point.getMb() != 0) {
-                    text = "BOLL:" + view.formatValue(point.getMb()) + space;
-                    this.primaryPaint.setColor(safeTargetColor(view, 0, 0));
-                    canvas.drawText(text, x, y, primaryPaint);
-                    x += ma5Paint.measureText(text);
-                    text = "UB:" + view.formatValue(point.getUp()) + space;
-                    this.primaryPaint.setColor(safeTargetColor(view, 1, 0));
-                    canvas.drawText(text, x, y, primaryPaint);
-                    x += ma10Paint.measureText(text);
-                    text = "LB:" + view.formatValue(point.getDn());
-                    this.primaryPaint.setColor(safeTargetColor(view, 2, 0));
-                    canvas.drawText(text, x, y, primaryPaint);
+                    bollTexts.add("BOLL(" + view.configManager.bollN + "," + view.configManager.bollP + ")" + space);
+                    bollColors.add(safeTargetColor(view, 0, 0));
+                    bollTexts.add("MID:" + view.formatValue(point.getMb()) + space);
+                    bollColors.add(safeTargetColor(view, 0, 0));
+                    bollTexts.add("UPPER:" + view.formatValue(point.getUp()) + space);
+                    bollColors.add(safeTargetColor(view, 1, 0));
+                    bollTexts.add("LOWER:" + view.formatValue(point.getDn()) + space);
+                    bollColors.add(safeTargetColor(view, 2, 0));
+                }
+                if (!bollTexts.isEmpty()) {
+                    drawIndicatorRow(canvas, bollTexts, bollColors, x, rowY);
                 }
             }
         }

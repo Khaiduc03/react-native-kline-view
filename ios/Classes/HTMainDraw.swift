@@ -20,6 +20,28 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         return configManager.showMainBOLL
     }
 
+    private func drawIndicatorRow(
+        _ entries: [(title: String, color: UIColor)],
+        _ baseX: CGFloat,
+        _ baseY: CGFloat,
+        _ font: UIFont,
+        _ context: CGContext,
+        _ configManager: HTKLineConfigManager
+    ) {
+        var x = baseX
+        for entry in entries {
+            x += drawText(
+                title: entry.title,
+                point: CGPoint(x: x, y: baseY),
+                color: entry.color,
+                font: font,
+                context: context,
+                configManager: configManager
+            )
+            x += 5
+        }
+    }
+
     func minMaxRange(_ visibleModelArray: [HTKLineModel], _ configManager: HTKLineConfigManager) -> Range<CGFloat> {
         var maxValue = CGFloat.leastNormalMagnitude
         var minValue = CGFloat.greatestFiniteMagnitude
@@ -114,33 +136,45 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         if (configManager.isMinute) {
 
         } else {
-            var x = baseX
+            let font = configManager.createFont(configManager.headerTextFontSize)
+            let rowSpacing = max(configManager.headerTextFontSize + 4, 14)
+            var rowY = baseY
             if shouldDrawMA(configManager) {
+                var maEntries = [(title: String, color: UIColor)]()
+                var emaEntries = [(title: String, color: UIColor)]()
                 for (configIndex, itemModel) in configManager.maList.enumerated() {
                     let dataIndex = itemModel.index
                     guard let item = safeElement(model.maList, at: dataIndex) ?? safeElement(model.maList, at: configIndex) else {
                         debugInvalidIndex(owner: "HTMainDraw.drawText.maList", index: dataIndex, count: model.maList.count)
                         continue
                     }
+                    let kind = item.kind.lowercased() == "ema" ? "ema" : "ma"
                     let prefix = item.kind.lowercased() == "ema" ? "EMA" : "MA"
                     let title = String(format: "%@%@:%@", prefix, item.title, configManager.precision(item.value, configManager.price))
                     let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
-                    let font = configManager.createFont(configManager.headerTextFontSize)
-                    x += drawText(title: title, point: CGPoint.init(x: x, y: baseY), color: color, font: font, context: context, configManager: configManager)
-                    x += 5
+                    if kind == "ema" {
+                        emaEntries.append((title: title, color: color))
+                    } else {
+                        maEntries.append((title: title, color: color))
+                    }
+                }
+                if !maEntries.isEmpty {
+                    drawIndicatorRow(maEntries, baseX, rowY, font, context, configManager)
+                    rowY += rowSpacing
+                }
+                if !emaEntries.isEmpty {
+                    drawIndicatorRow(emaEntries, baseX, rowY, font, context, configManager)
+                    rowY += rowSpacing
                 }
             }
             if shouldDrawBOLL(configManager) {
-                let itemList = [
-                    ["title": String(format: "BOLL:%@", configManager.precision(model.bollMb, configManager.price)), "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
-                    ["title": String(format: "UB:%@", configManager.precision(model.bollUp, configManager.price)), "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
-                    ["title": String(format: "LB:%@", configManager.precision(model.bollDn, configManager.price)), "color": safeTargetColor(configManager, at: 2, fallback: configManager.textColor)],
+                let entries: [(title: String, color: UIColor)] = [
+                    (title: String(format: "BOLL(%@,%@)", configManager.bollN, configManager.bollP), color: safeTargetColor(configManager, at: 0, fallback: configManager.textColor)),
+                    (title: String(format: "MID:%@", configManager.precision(model.bollMb, configManager.price)), color: safeTargetColor(configManager, at: 0, fallback: configManager.textColor)),
+                    (title: String(format: "UPPER:%@", configManager.precision(model.bollUp, configManager.price)), color: safeTargetColor(configManager, at: 1, fallback: configManager.textColor)),
+                    (title: String(format: "LOWER:%@", configManager.precision(model.bollDn, configManager.price)), color: safeTargetColor(configManager, at: 2, fallback: configManager.textColor)),
                 ]
-                let font = configManager.createFont(configManager.headerTextFontSize)
-                for item in itemList {
-                    x += drawText(title: item["title"] as? String ?? "", point: CGPoint.init(x: x, y: baseY), color: item["color"] as? UIColor ?? UIColor.orange, font: font, context: context, configManager: configManager)
-                    x += 5
-                }
+                drawIndicatorRow(entries, baseX, rowY, font, context, configManager)
             }
         }
     }

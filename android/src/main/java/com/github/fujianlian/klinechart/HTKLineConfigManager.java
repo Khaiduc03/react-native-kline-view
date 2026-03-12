@@ -253,6 +253,53 @@ public class HTKLineConfigManager {
         return defaultValue;
     }
 
+    private boolean hasMAItemsForHeader() {
+        for (HTKLineTargetItem item : this.maList) {
+            if (item == null) continue;
+            if (!"ema".equalsIgnoreCase(item.kind)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasEMAItemsForHeader() {
+        for (HTKLineTargetItem item : this.maList) {
+            if (item == null) continue;
+            if ("ema".equalsIgnoreCase(item.kind)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int requiredMainHeaderRows() {
+        if (this.isMinute) {
+            return 0;
+        }
+        int rows = 0;
+        if (this.showMainMA) {
+            if (hasMAItemsForHeader()) rows += 1;
+            if (hasEMAItemsForHeader()) rows += 1;
+        }
+        if (this.showMainBOLL) {
+            rows += 1;
+        }
+        return rows;
+    }
+
+    private void applyMainHeaderPaddingTopIfNeeded() {
+        int rows = requiredMainHeaderRows();
+        if (rows <= 0) {
+            return;
+        }
+        float rowSpacing = Math.max(this.headerTextFontSize + 4f, 14f);
+        float requiredPaddingTop = 8f + rows * rowSpacing;
+        if (this.paddingTop < requiredPaddingTop) {
+            this.paddingTop = requiredPaddingTop;
+        }
+    }
+
     public KLineEntity packModel(Map<String, Object> keyValue) {
     	KLineEntity entity = new KLineEntity();
     	entity.id = ((Number)keyValue.get("id")).longValue();
@@ -300,8 +347,10 @@ public class HTKLineConfigManager {
 
     public void reloadOptionList(Map optionList) {
 
+    	Boolean preserveModelArray = (Boolean) optionList.get("preserveModelArray");
+    	boolean shouldPreserveModelArray = preserveModelArray != null && preserveModelArray;
     	List modelArray = (List)optionList.get("modelArray");
-    	if (modelArray != null) {
+    	if (!shouldPreserveModelArray && modelArray != null) {
     		this.modelArray = this.packModelList(modelArray);
     	}
 
@@ -542,6 +591,8 @@ public class HTKLineConfigManager {
         } else {
             this.predictionMinCandles = 12;
         }
+
+        applyMainHeaderPaddingTopIfNeeded();
     }
 
 }
