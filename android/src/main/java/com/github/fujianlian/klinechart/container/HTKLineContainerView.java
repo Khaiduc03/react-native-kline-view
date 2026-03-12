@@ -11,6 +11,7 @@ import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.github.fujianlian.klinechart.HTKLineConfigManager;
 import com.github.fujianlian.klinechart.KLineChartView;
 import com.github.fujianlian.klinechart.BaseKLineChartView;
+import com.github.fujianlian.klinechart.KLineEntity;
 import com.github.fujianlian.klinechart.RNKLineView;
 import com.github.fujianlian.klinechart.formatter.DateFormatter;
 

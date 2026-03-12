@@ -720,6 +720,18 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             float currentPointX = getItemMiddleScrollX(i);
             Object lastPoint = i == 0 ? currentPoint : getItem(i - 1);
             float lastX = i == 0 ? currentPointX : getItemMiddleScrollX(i - 1);
+            if (mMainDraw instanceof MainDraw) {
+                ((MainDraw) mMainDraw).drawBackground((IKLine) lastPoint, (IKLine) currentPoint, lastX, currentPointX, canvas, this);
+            }
+        }
+        for (int i = mStartIndex; i <= mStopIndex; i++) {
+            if (i < 0 || i >= configManager.modelArray.size()) {
+                continue;
+            }
+            Object currentPoint = getItem(i);
+            float currentPointX = getItemMiddleScrollX(i);
+            Object lastPoint = i == 0 ? currentPoint : getItem(i - 1);
+            float lastX = i == 0 ? currentPointX : getItemMiddleScrollX(i - 1);
             if (mMainDraw != null) {
                 mMainDraw.drawTranslated(lastPoint, currentPoint, lastX, currentPointX, canvas, this, i);
             }

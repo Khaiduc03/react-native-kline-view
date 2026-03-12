@@ -35,6 +35,7 @@ public class MainDraw implements IChartDraw<ICandle> {
     private Paint ma10Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint ma30Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint primaryPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint superFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Paint minuteGradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -189,6 +190,161 @@ public class MainDraw implements IChartDraw<ICandle> {
 
     }
 
+    public void drawBackground(@Nullable ICandle lastPoint, @NonNull ICandle curPoint, float lastX, float curX, @NonNull Canvas canvas, @NonNull BaseKLineChartView view) {
+        if (view.isMinute) {
+            return;
+        }
+        if (lastPoint == null) {
+            return;
+        }
+        drawSuperFill(lastPoint, curPoint, lastX, curX, canvas, view);
+    }
+
+    private HTKLineTargetItem resolveSuperItem(KLineEntity item, BaseKLineChartView view) {
+        for (int i = 0; i < view.configManager.maList.size(); i++) {
+            HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
+            if (!"super".equalsIgnoreCase(configItem.kind)) {
+                continue;
+            }
+            HTKLineTargetItem target = safeTargetItem(item.maList, configItem.index, "resolveSuper");
+            if (target != null) {
+                return target;
+            }
+            target = safeTargetItem(item.maList, i, "resolveSuper.fallback");
+            if (target != null) {
+                return target;
+            }
+        }
+        return null;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    private void drawSuperFillSegment(
+            Canvas canvas,
+            float lastX,
+            float curX,
+            float lastCloseY,
+            float curCloseY,
+            float lastSuperY,
+            float curSuperY,
+            boolean isUp,
+            BaseKLineChartView view
+    ) {
+        float minY = Math.min(Math.min(lastCloseY, curCloseY), Math.min(lastSuperY, curSuperY));
+        float maxY = Math.max(Math.max(lastCloseY, curCloseY), Math.max(lastSuperY, curSuperY));
+        if (Math.abs(maxY - minY) < 0.5f) {
+            return;
+        }
+
+        int base = isUp ? view.configManager.increaseColor : view.configManager.decreaseColor;
+        int strong = withAlpha(base, 56);
+        int weak = withAlpha(base, 10);
+        int startColor = isUp ? strong : weak;
+        int endColor = isUp ? weak : strong;
+
+        Path path = new Path();
+        path.moveTo(lastX, lastCloseY);
+        path.lineTo(curX, curCloseY);
+        path.lineTo(curX, curSuperY);
+        path.lineTo(lastX, lastSuperY);
+        path.close();
+
+        Shader gradient = new LinearGradient(
+                lastX, minY,
+                lastX, maxY,
+                startColor,
+                endColor,
+                Shader.TileMode.CLAMP
+        );
+        superFillPaint.setShader(gradient);
+        superFillPaint.setStyle(Paint.Style.FILL);
+        canvas.drawPath(path, superFillPaint);
+        superFillPaint.setShader(null);
+    }
+
+    private void drawSuperFill(
+            @NonNull ICandle lastPoint,
+            @NonNull ICandle curPoint,
+            float lastX,
+            float curX,
+            @NonNull Canvas canvas,
+            @NonNull BaseKLineChartView view
+    ) {
+        if (!shouldDrawMA(view)) {
+            return;
+        }
+        KLineEntity lastItem = (KLineEntity) lastPoint;
+        KLineEntity currentItem = (KLineEntity) curPoint;
+        HTKLineTargetItem lastSuperItem = resolveSuperItem(lastItem, view);
+        HTKLineTargetItem currentSuperItem = resolveSuperItem(currentItem, view);
+        if (lastSuperItem == null || currentSuperItem == null) {
+            return;
+        }
+
+        float lastClose = lastItem.getClosePrice();
+        float currentClose = currentItem.getClosePrice();
+        float lastSuper = lastSuperItem.value;
+        float currentSuper = currentSuperItem.value;
+
+        float d1 = lastClose - lastSuper;
+        float d2 = currentClose - currentSuper;
+        if (d1 == 0f && d2 == 0f) {
+            return;
+        }
+
+        float lastCloseY = view.yFromValue(lastClose);
+        float currentCloseY = view.yFromValue(currentClose);
+        float lastSuperY = view.yFromValue(lastSuper);
+        float currentSuperY = view.yFromValue(currentSuper);
+
+        boolean sameSide = (d1 >= 0f && d2 >= 0f) || (d1 <= 0f && d2 <= 0f);
+        if (sameSide) {
+            drawSuperFillSegment(
+                    canvas, lastX, curX, lastCloseY, currentCloseY, lastSuperY, currentSuperY, d2 >= 0f, view
+            );
+            return;
+        }
+
+        float denominator = d1 - d2;
+        if (denominator == 0f) {
+            drawSuperFillSegment(
+                    canvas, lastX, curX, lastCloseY, currentCloseY, lastSuperY, currentSuperY, d2 >= 0f, view
+            );
+            return;
+        }
+        float t = d1 / denominator;
+        t = Math.max(0f, Math.min(1f, t));
+        float crossX = lastX + (curX - lastX) * t;
+        float crossCloseY = lastCloseY + (currentCloseY - lastCloseY) * t;
+        float crossSuperY = lastSuperY + (currentSuperY - lastSuperY) * t;
+
+        drawSuperFillSegment(
+                canvas,
+                lastX,
+                crossX,
+                lastCloseY,
+                crossCloseY,
+                lastSuperY,
+                crossSuperY,
+                d1 >= 0f,
+                view
+        );
+        drawSuperFillSegment(
+                canvas,
+                crossX,
+                curX,
+                crossCloseY,
+                currentCloseY,
+                crossSuperY,
+                currentSuperY,
+                d2 >= 0f,
+                view
+        );
+    }
+
     @Override
     public void drawText(@NonNull Canvas canvas, @NonNull BaseKLineChartView view, int position, float x, float y) {
         KLineEntity point = (KLineEntity) view.getItem(position);
@@ -204,6 +360,8 @@ public class MainDraw implements IChartDraw<ICandle> {
                 List<Integer> maColors = new ArrayList<>();
                 List<String> emaTexts = new ArrayList<>();
                 List<Integer> emaColors = new ArrayList<>();
+                List<String> superTexts = new ArrayList<>();
+                List<Integer> superColors = new ArrayList<>();
                 for (int i = 0; i < view.configManager.maList.size(); i ++) {
                     HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
                     HTKLineTargetItem targetItem = safeTargetItem(point.maList, configItem.index, "drawText");
@@ -211,16 +369,26 @@ public class MainDraw implements IChartDraw<ICandle> {
                         continue;
                     }
                     StringBuilder stringBuilder = new StringBuilder();
-                    String prefix = "ema".equalsIgnoreCase(targetItem.kind) ? "EMA" : "MA";
-                    stringBuilder.append(prefix);
-                    stringBuilder.append(targetItem.title);
+                    String lowerKind = targetItem.kind == null ? "ma" : targetItem.kind.toLowerCase();
+                    String prefix = "ema".equals(lowerKind) ? "EMA" : ("super".equals(lowerKind) ? "SUPER" : "MA");
+                    if ("super".equals(lowerKind)) {
+                        stringBuilder.append("SUPERTREND(");
+                        stringBuilder.append(targetItem.title);
+                        stringBuilder.append(")");
+                    } else {
+                        stringBuilder.append(prefix);
+                        stringBuilder.append(targetItem.title);
+                    }
                     stringBuilder.append(":");
                     stringBuilder.append(view.formatValue(targetItem.value));
                     stringBuilder.append(space);
                     int color = safeTargetColor(view, configItem.index, 0);
-                    if ("ema".equalsIgnoreCase(targetItem.kind)) {
+                    if ("ema".equals(lowerKind)) {
                         emaTexts.add(stringBuilder.toString());
                         emaColors.add(color);
+                    } else if ("super".equals(lowerKind)) {
+                        superTexts.add(stringBuilder.toString());
+                        superColors.add(color);
                     } else {
                         maTexts.add(stringBuilder.toString());
                         maColors.add(color);
@@ -232,6 +400,10 @@ public class MainDraw implements IChartDraw<ICandle> {
                 }
                 if (!emaTexts.isEmpty()) {
                     drawIndicatorRow(canvas, emaTexts, emaColors, x, rowY);
+                    rowY += rowSpacing;
+                }
+                if (!superTexts.isEmpty()) {
+                    drawIndicatorRow(canvas, superTexts, superColors, x, rowY);
                     rowY += rowSpacing;
                 }
             }

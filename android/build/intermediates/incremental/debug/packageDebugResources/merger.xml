@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/main/res"><file path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/main/res/values/colors.xml" qualifiers=""><color name="colorPrimary">#3F51B5</color><color name="colorPrimaryDark">#303F9F</color><color name="colorAccent">#FF4081</color><color name="chart_red">#03AD8F</color><color name="chart_green">#DE345B</color><color name="chart_line">#C9933E</color><color name="chart_line_background">#1aC9933E</color><color name="chart_ma5">#DA8AE5</color><color name="chart_ma10">#39B0E8</color><color name="chart_ma30">#FFC76D</color><color name="chart_white">#ffffff</color><color name="chart_background">#202326</color><color name="chart_bac">#00FFFFFF</color><color name="chart_point_bac">#202326</color><color name="chart_grid_line">#CCCC</color><color name="chart_text">#818596</color><color name="chart_selector">#202326</color><color name="chart_tab_background">#30343C</color><color name="chart_tab_indicator">#FF6601</color></file><file path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/main/res/values/dimens.xml" qualifiers=""><dimen name="chart_text_size">10sp</dimen><dimen name="chart_selector_text_size">12sp</dimen><dimen name="chart_candle_line_width">1dp</dimen><dimen name="chart_candle_width">6dp</dimen><dimen name="chart_line_width">1dp</dimen><dimen name="chart_grid_line_width">0dp</dimen><dimen name="chart_0.5dp">0.5dp</dimen><dimen name="chart_point_width">7dp</dimen><dimen name="chart_top_padding">15dp</dimen><dimen name="chart_bottom_padding">15dp</dimen><dimen name="child_top_padding">10dp</dimen></file><file path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/main/res/values/strings.xml" qualifiers=""><string name="app_name">KLineChartLib</string></file><file path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/main/res/values/attrs.xml" qualifiers=""><declare-styleable name="KLineChartView">
+        
+        <attr format="dimension" name="kc_text_size"/>
+        <attr format="color" name="kc_text_color"/>
+        <attr format="dimension" name="kc_line_width"/>
+        <attr format="color" name="kc_background_color"/>
+        <attr format="color" name="kc_selected_line_color"/>
+        <attr format="dimension" name="kc_selected_line_width"/>
+        <attr format="dimension" name="kc_grid_line_width"/>
+        <attr format="color" name="kc_grid_line_color"/>
+        <attr format="dimension" name="kc_point_width"/>
+        
+        <attr format="dimension" name="kc_macd_width"/>
+        <attr format="color" name="kc_dif_color"/>
+        <attr format="color" name="kc_dea_color"/>
+        <attr format="color" name="kc_macd_color"/>
+        
+        <attr format="color" name="kc_k_color"/>
+        <attr format="color" name="kc_d_color"/>
+        <attr format="color" name="kc_j_color"/>
+        
+        <attr format="color" name="kc_rsi1_color"/>
+        <attr format="color" name="kc_rsi2_color"/>
+        <attr format="color" name="kc_ris3_color"/>
+        
+        <attr format="color" name="kc_up_color"/>
+        <attr format="color" name="kc_mb_color"/>
+        <attr format="color" name="kc_dn_color"/>
+        
+        <attr format="color" name="kc_ma5_color"/>
+        <attr format="color" name="kc_ma10_color"/>
+        <attr format="color" name="kc_ma20_color"/>
+        <attr format="dimension" name="kc_candle_width"/>
+        <attr format="dimension" name="kc_candle_line_width"/>
+        <attr format="color" name="kc_selector_background_color"/>
+        <attr format="dimension" name="kc_selector_text_size"/>
+        <attr format="boolean" name="kc_candle_solid"/>
+        
+        <attr format="color" name="kc_tab_background_color"/>
+        <attr format="color" name="kc_tab_text_color"/>
+        <attr format="color" name="kc_tab_indicator_color"/>
+    </declare-styleable></file></source></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/build/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/khaimai/workspacing/hongthai/topone_project/react-native-kline-view2/example/node_modules/react-native-kline-view/android/build/generated/res/resValues/debug"/></dataSet><mergedItems><configuration qualifiers=""><declare-styleable name="KLineChartView">
+        
+        <attr format="dimension" name="kc_text_size"/>
+        <attr format="color" name="kc_text_color"/>
+        <attr format="dimension" name="kc_line_width"/>
+        <attr format="color" name="kc_background_color"/>
+        <attr format="color" name="kc_selected_line_color"/>
+        <attr format="dimension" name="kc_selected_line_width"/>
+        <attr format="dimension" name="kc_grid_line_width"/>
+        <attr format="color" name="kc_grid_line_color"/>
+        <attr format="dimension" name="kc_point_width"/>
+        
+        <attr format="dimension" name="kc_macd_width"/>
+        <attr format="color" name="kc_dif_color"/>
+        <attr format="color" name="kc_dea_color"/>
+        <attr format="color" name="kc_macd_color"/>
+        
+        <attr format="color" name="kc_k_color"/>
+        <attr format="color" name="kc_d_color"/>
+        <attr format="color" name="kc_j_color"/>
+        
+        <attr format="color" name="kc_rsi1_color"/>
+        <attr format="color" name="kc_rsi2_color"/>
+        <attr format="color" name="kc_ris3_color"/>
+        
+        <attr format="color" name="kc_up_color"/>
+        <attr format="color" name="kc_mb_color"/>
+        <attr format="color" name="kc_dn_color"/>
+        
+        <attr format="color" name="kc_ma5_color"/>
+        <attr format="color" name="kc_ma10_color"/>
+        <attr format="color" name="kc_ma20_color"/>
+        <attr format="dimension" name="kc_candle_width"/>
+        <attr format="dimension" name="kc_candle_line_width"/>
+        <attr format="color" name="kc_selector_background_color"/>
+        <attr format="dimension" name="kc_selector_text_size"/>
+        <attr format="boolean" name="kc_candle_solid"/>
+        
+        <attr format="color" name="kc_tab_background_color"/>
+        <attr format="color" name="kc_tab_text_color"/>
+        <attr format="color" name="kc_tab_indicator_color"/>
+    </declare-styleable></configuration></mergedItems></merger>

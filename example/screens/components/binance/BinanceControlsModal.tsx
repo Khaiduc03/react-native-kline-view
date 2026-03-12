@@ -17,6 +17,7 @@ type Props = {
   mainMAEnabled: boolean;
   mainBOLLEnabled: boolean;
   emaEnabled: boolean;
+  superEnabled: boolean;
   second: -1 | 3 | 4 | 5;
   drawType: number;
   onClose: () => void;
@@ -25,6 +26,7 @@ type Props = {
   onToggleMA: () => void;
   onToggleBOLL: () => void;
   onToggleEMA: () => void;
+  onToggleSUPER: () => void;
   onClearMain: () => void;
   onSelectSub: (value: -1 | 3 | 4 | 5) => void;
   onSelectDrawType: (value: number) => void;
@@ -40,6 +42,7 @@ export function BinanceControlsModal({
   mainMAEnabled,
   mainBOLLEnabled,
   emaEnabled,
+  superEnabled,
   second,
   drawType,
   onClose,
@@ -48,6 +51,7 @@ export function BinanceControlsModal({
   onToggleMA,
   onToggleBOLL,
   onToggleEMA,
+  onToggleSUPER,
   onClearMain,
   onSelectSub,
   onSelectDrawType,
@@ -102,6 +106,12 @@ export function BinanceControlsModal({
             </TouchableOpacity>
             <TouchableOpacity style={[styles.chip, emaEnabled && styles.chipActive]} onPress={onToggleEMA}>
               <Text style={[styles.chipText, emaEnabled && styles.chipTextActive]}>EMA</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chip, superEnabled && styles.chipActive]}
+              onPress={onToggleSUPER}
+            >
+              <Text style={[styles.chipText, superEnabled && styles.chipTextActive]}>SUPER</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.chip, styles.clearChip]} onPress={onClearMain}>
               <Text style={styles.clearChipText}>Clear Main</Text>

@@ -29,7 +29,7 @@ Perfect for cryptocurrency exchanges, stock trading apps, financial dashboards, 
 
 ### 📊 **Technical Analysis**
 
-- ✅ **Main Chart Indicators**: MA (Moving Average), BOLL (Bollinger Bands)
+- ✅ **Main Chart Indicators**: MA, EMA, BOLL, SUPER (Supertrend)
 - ✅ **Sub Chart Indicators**: MACD, KDJ, RSI, WR
 - ✅ **Customizable parameters** for all indicators
 - ✅ **Multi-color indicator lines** with smooth animations

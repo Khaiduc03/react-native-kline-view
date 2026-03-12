@@ -27,7 +27,8 @@ export type IndicatorItem = {
    */
   value?: number;
   period?: number;
-  kind?: "ma" | "ema";
+  multiplier?: number;
+  kind?: "ma" | "ema" | "super";
   selected?: boolean;
   index?: number;
 };
@@ -147,6 +148,7 @@ export type ThemeConfig = Partial<
     indicatorColors: {
       ma?: ColorValue[];
       ema?: ColorValue[];
+      super?: ColorValue[];
     };
   }
 >;
@@ -161,6 +163,7 @@ export type ChartThemeConfig = Partial<{
   mainIndicator: {
     maColors?: ColorValue[];
     emaColors?: ColorValue[];
+    superColors?: ColorValue[];
     bollColors?: ColorValue[];
   };
   subIndicator: {
@@ -224,6 +227,11 @@ export type IndicatorConfig = {
     enabled?: boolean;
     periods?: number[];
   };
+  super?: {
+    enabled?: boolean;
+    period?: number;
+    multiplier?: number;
+  };
   targetList?: IndicatorTargetList;
 };
 
@@ -235,6 +243,11 @@ export type MainIndicatorsConfig = {
   ema?: {
     enabled: boolean;
     periods: number[];
+  };
+  super?: {
+    enabled: boolean;
+    period?: number;
+    multiplier?: number;
   };
   boll?: {
     enabled: boolean;

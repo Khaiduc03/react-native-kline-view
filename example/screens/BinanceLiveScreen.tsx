@@ -87,6 +87,7 @@ export default function BinanceLiveScreen() {
 
   const [mainMAEnabled, setMainMAEnabled] = useState(true);
   const [mainBOLLEnabled, setMainBOLLEnabled] = useState(false);
+  const [mainSUPEREnabled, setMainSUPEREnabled] = useState(false);
   const [second, setSecond] = useState<-1 | 3 | 4 | 5>(3);
   const [emaEnabled, setEmaEnabled] = useState(true);
   const [controlsModalVisible, setControlsModalVisible] = useState(false);
@@ -106,9 +107,10 @@ export default function BinanceLiveScreen() {
     () => ({
       ma: { enabled: mainMAEnabled, periods: [5, 10, 20] },
       ema: { enabled: emaEnabled, periods: [10, 30, 60] },
+      super: { enabled: mainSUPEREnabled, period: 10, multiplier: 3 },
       boll: { enabled: mainBOLLEnabled, n: 20, p: 2 },
     }),
-    [emaEnabled, mainBOLLEnabled, mainMAEnabled],
+    [emaEnabled, mainBOLLEnabled, mainMAEnabled, mainSUPEREnabled],
   );
 
   const subChartsConfig = useMemo(
@@ -125,6 +127,7 @@ export default function BinanceLiveScreen() {
       indicatorColors: {
         ma: ['#eab308', '#22c55e', '#a855f7'],
         ema: ['#f97316', '#06b6d4', '#8b5cf6'],
+        super: ['#f43f5e'],
       },
     }),
     [],
@@ -388,6 +391,7 @@ export default function BinanceLiveScreen() {
             mainMAEnabled ? 'MA' : null,
             mainBOLLEnabled ? 'BOLL' : null,
             emaEnabled ? 'EMA' : null,
+            mainSUPEREnabled ? 'SUPER' : null,
           ].filter(Boolean) as string[]
         }
         subLabel={SUB_INDICATOR_LABEL[second] ?? 'None'}
@@ -448,6 +452,7 @@ export default function BinanceLiveScreen() {
         mainMAEnabled={mainMAEnabled}
         mainBOLLEnabled={mainBOLLEnabled}
         emaEnabled={emaEnabled}
+        superEnabled={mainSUPEREnabled}
         second={second}
         drawType={drawType}
         onClose={() => setControlsModalVisible(false)}
@@ -456,10 +461,12 @@ export default function BinanceLiveScreen() {
         onToggleMA={() => setMainMAEnabled(value => !value)}
         onToggleBOLL={() => setMainBOLLEnabled(value => !value)}
         onToggleEMA={() => setEmaEnabled(value => !value)}
+        onToggleSUPER={() => setMainSUPEREnabled(value => !value)}
         onClearMain={() => {
           setMainMAEnabled(false);
           setMainBOLLEnabled(false);
           setEmaEnabled(false);
+          setMainSUPEREnabled(false);
         }}
         onSelectSub={setSecond}
         onSelectDrawType={setDrawType}

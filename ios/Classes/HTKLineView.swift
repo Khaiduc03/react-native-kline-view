@@ -465,12 +465,18 @@ class HTKLineView: UIScrollView {
         }
 
         for (i, model) in visibleModelArray.enumerated() {
+            let lastIndex = i == 0 ? i : i - 1
+            let lastModel = visibleModelArray[lastIndex]
+            mainDraw.drawSuperFill(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
+        }
+
+        for (i, model) in visibleModelArray.enumerated() {
+            let lastIndex = i == 0 ? i : i - 1
+            let lastModel = visibleModelArray[lastIndex]
             mainDraw.drawCandle(model, i, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, context, configManager)
             volumeDraw.drawCandle(model, i, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, context, configManager)
             childDraw?.drawCandle(model, i, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, context, configManager)
 
-            let lastIndex = i == 0 ? i : i - 1
-            let lastModel = visibleModelArray[lastIndex]
             mainDraw.drawLine(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
             volumeDraw.drawLine(model, lastModel, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, i, lastIndex, context, configManager)
             childDraw?.drawLine(model, lastModel, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, i, lastIndex, context, configManager)

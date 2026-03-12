@@ -215,6 +215,8 @@ const DEFAULT_INDICATOR_PERIODS = {
   kdjN: 14,
   kdjM1: 1,
   kdjM2: 3,
+  superPeriod: 10,
+  superMultiplier: 3,
 };
 
 const PRESET_OVERRIDES = {
@@ -242,6 +244,7 @@ const PRESET_OVERRIDES = {
     },
     indicatorColors: {
       ema: ["#f97316", "#06b6d4", "#8b5cf6"],
+      super: ["#f43f5e"],
     },
     configList: {
       colorList: {
@@ -399,7 +402,10 @@ function listPeriodsFromItemsByKind(items, fallback, kind) {
   }
   const filtered = items.filter((item) => {
     const itemKind = String(item?.kind ?? "ma").toLowerCase();
-    return kind === "ma" ? itemKind !== "ema" : itemKind === kind;
+    if (kind === "ma") {
+      return itemKind !== "ema" && itemKind !== "super";
+    }
+    return itemKind === kind;
   });
   if (filtered.length === 0) {
     return fallback;
@@ -412,6 +418,28 @@ function listPeriodsFromItemsByKind(items, fallback, kind) {
   );
 }
 
+function pickSuperFromItems(items, fallbackPeriod, fallbackMultiplier) {
+  if (!Array.isArray(items)) {
+    return { period: fallbackPeriod, multiplier: fallbackMultiplier };
+  }
+  const superItem = items.find(
+    (item) => String(item?.kind ?? "").toLowerCase() === "super"
+  );
+  if (!superItem) {
+    return { period: fallbackPeriod, multiplier: fallbackMultiplier };
+  }
+  const period = toPeriod(
+    superItem?.period ?? superItem?.title ?? fallbackPeriod,
+    fallbackPeriod
+  );
+  const multiplierNumber = Number(superItem?.multiplier);
+  const multiplier =
+    Number.isFinite(multiplierNumber) && multiplierNumber > 0
+      ? multiplierNumber
+      : fallbackMultiplier;
+  return { period, multiplier };
+}
+
 function buildTargetItemsFromPeriods(periods, selected = true) {
   return periods.map((period, index) => ({
     title: String(period),
@@ -422,11 +450,26 @@ function buildTargetItemsFromPeriods(periods, selected = true) {
 
 function extractIndicatorPeriods(targetList, indicatorConfig) {
   const emaEnabled = indicatorConfig?.ema?.enabled === true;
+  const superEnabled = indicatorConfig?.super?.enabled === true;
   const mainConfig = isObject(indicatorConfig?.main) ? indicatorConfig.main : null;
   const maEnabled =
     typeof mainConfig?.ma === "boolean"
       ? mainConfig.ma
       : indicatorConfig?.primary === 1;
+  const superFromItems = pickSuperFromItems(
+    targetList?.maList,
+    DEFAULT_INDICATOR_PERIODS.superPeriod,
+    DEFAULT_INDICATOR_PERIODS.superMultiplier
+  );
+  const superPeriod = toPeriod(
+    indicatorConfig?.super?.period,
+    superFromItems.period
+  );
+  const superMultiplierNumber = Number(indicatorConfig?.super?.multiplier);
+  const superMultiplier =
+    Number.isFinite(superMultiplierNumber) && superMultiplierNumber > 0
+      ? superMultiplierNumber
+      : superFromItems.multiplier;
   const maPeriods = maEnabled
     ? listPeriodsFromItemsByKind(
         targetList?.maList,
@@ -456,11 +499,23 @@ function extractIndicatorPeriods(targetList, indicatorConfig) {
   return {
     maEnabled,
     emaEnabled,
+    superEnabled,
+    superPeriod,
+    superMultiplier,
     maPeriods,
     emaPeriods,
     mainLineDefs: [
       ...maPeriods.map((period) => ({ kind: "ma", period })),
       ...emaPeriods.map((period) => ({ kind: "ema", period })),
+      ...(superEnabled
+        ? [
+            {
+              kind: "super",
+              period: superPeriod,
+              multiplier: superMultiplier,
+            },
+          ]
+        : []),
     ].map((item, index) => ({ ...item, index })),
     maVolumePeriods,
     rsiPeriods,
@@ -490,7 +545,11 @@ function resolveTargetList(targetList, periods, autoCompute) {
         return;
       }
       const kind = String(item?.kind ?? "ma").toLowerCase() === "ema" ? "ema" : "ma";
-      selectedStateMap.set(`${kind}:${period}`, item?.selected !== false);
+      const normalizedKind =
+        String(item?.kind ?? "ma").toLowerCase() === "super"
+          ? "super"
+          : kind;
+      selectedStateMap.set(`${normalizedKind}:${period}`, item?.selected !== false);
     });
   }
 
@@ -498,9 +557,13 @@ function resolveTargetList(targetList, periods, autoCompute) {
     base.maList = periods.mainLineDefs.map((item) => {
       const key = `${item.kind}:${item.period}`;
       return {
-        title: String(item.period),
+        title:
+          item.kind === "super"
+            ? `${item.period},${Number(item.multiplier ?? 3)}`
+            : String(item.period),
         period: item.period,
         kind: item.kind,
+        multiplier: item.multiplier,
         selected: selectedStateMap.has(key) ? selectedStateMap.get(key) : true,
         index: item.index,
       };
@@ -682,7 +745,8 @@ function targetItemKey(item, fallbackIndex = 0) {
 }
 
 function mainLineKey(item) {
-  const kind = String(item?.kind ?? "ma").toLowerCase() === "ema" ? "ema" : "ma";
+  const rawKind = String(item?.kind ?? "ma").toLowerCase();
+  const kind = rawKind === "ema" ? "ema" : rawKind === "super" ? "super" : "ma";
   const period = toPeriod(item?.period ?? item?.title, 0);
   if (period <= 0) {
     return null;
@@ -715,9 +779,16 @@ function mergeMainLinePreferInput(inputList, computedList) {
       ...item,
       ...existing,
       value: nextValue,
-      title: String(item.period),
+      title:
+        item.kind === "super"
+          ? `${item.period},${Number(item.multiplier ?? existing?.multiplier ?? 3)}`
+          : String(item.period),
       period: item.period,
       kind: item.kind,
+      multiplier:
+        item.kind === "super"
+          ? Number(item.multiplier ?? existing?.multiplier ?? 3)
+          : item.multiplier,
       index: item.index,
     };
   });
@@ -756,15 +827,24 @@ function applyMainLineColors(configList, targetList, indicatorColors) {
     : [];
   const maColors = Array.isArray(indicatorColors?.ma) ? indicatorColors.ma : [];
   const emaColors = Array.isArray(indicatorColors?.ema) ? indicatorColors.ema : [];
+  const superColors = Array.isArray(indicatorColors?.super)
+    ? indicatorColors.super
+    : [];
   let maColorIndex = 0;
   let emaColorIndex = 0;
+  let superColorIndex = 0;
   (targetList?.maList ?? []).forEach((item) => {
     const index = toIndex(item?.index, -1);
     if (index < 0) {
       return;
     }
     const isEMA = String(item?.kind ?? "ma").toLowerCase() === "ema";
-    const colorValue = isEMA ? emaColors[emaColorIndex++] : maColors[maColorIndex++];
+    const isSUPER = String(item?.kind ?? "ma").toLowerCase() === "super";
+    const colorValue = isSUPER
+      ? superColors[superColorIndex++]
+      : isEMA
+      ? emaColors[emaColorIndex++]
+      : maColors[maColorIndex++];
     if (colorValue === undefined) {
       return;
     }
@@ -808,6 +888,67 @@ function computeIndicators(candles, indicatorConfig, targetList) {
     period,
     values: emaSeries(closes, period),
   }));
+  const supertrendSeries = (() => {
+    if (!periods.superEnabled) return [];
+    const length = closes.length;
+    const tr = new Array(length).fill(0);
+    const atr = new Array(length).fill(0);
+    const upperBasic = new Array(length).fill(0);
+    const lowerBasic = new Array(length).fill(0);
+    const upperFinal = new Array(length).fill(0);
+    const lowerFinal = new Array(length).fill(0);
+    const output = new Array(length).fill(0);
+    const period = periods.superPeriod;
+    const multiplier = periods.superMultiplier;
+
+    for (let i = 0; i < length; i += 1) {
+      const high = highs[i] ?? 0;
+      const low = lows[i] ?? 0;
+      const close = closes[i] ?? 0;
+      const prevClose = i > 0 ? closes[i - 1] ?? close : close;
+      const trHLC = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      tr[i] = trHLC;
+
+      if (i === 0) {
+        atr[i] = tr[i];
+      } else {
+        atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+      }
+
+      const hl2 = (high + low) / 2;
+      upperBasic[i] = hl2 + multiplier * atr[i];
+      lowerBasic[i] = hl2 - multiplier * atr[i];
+      if (i === 0) {
+        upperFinal[i] = upperBasic[i];
+        lowerFinal[i] = lowerBasic[i];
+        output[i] = lowerFinal[i];
+        continue;
+      }
+
+      upperFinal[i] =
+        upperBasic[i] < upperFinal[i - 1] || prevClose > upperFinal[i - 1]
+          ? upperBasic[i]
+          : upperFinal[i - 1];
+      lowerFinal[i] =
+        lowerBasic[i] > lowerFinal[i - 1] || prevClose < lowerFinal[i - 1]
+          ? lowerBasic[i]
+          : lowerFinal[i - 1];
+
+      output[i] =
+        output[i - 1] === upperFinal[i - 1]
+          ? close <= upperFinal[i]
+            ? upperFinal[i]
+            : lowerFinal[i]
+          : close >= lowerFinal[i]
+          ? lowerFinal[i]
+          : upperFinal[i];
+    }
+    return output;
+  })();
 
   return candles.map((item, index) => {
     const maList = periods.mainLineDefs.map((line) => {
@@ -815,11 +956,17 @@ function computeIndicators(candles, indicatorConfig, targetList) {
       const value =
         line.kind === "ema"
           ? emaSeriesValue?.values[index] ?? 0
+          : line.kind === "super"
+          ? supertrendSeries[index] ?? 0
           : smaAt(closes, index, line.period);
       return {
-        title: String(line.period),
+        title:
+          line.kind === "super"
+            ? `${line.period},${Number(line.multiplier ?? periods.superMultiplier ?? 3)}`
+            : String(line.period),
         period: line.period,
         kind: line.kind,
+        multiplier: line.multiplier,
         value,
         selected: true,
         index: line.index,
@@ -960,11 +1107,12 @@ function composeOptionList({
   const resolvedIndicator = deepMerge(presetConfig.indicator ?? {}, indicator ?? {});
   const mainConfig = isObject(resolvedIndicator?.main) ? resolvedIndicator.main : null;
   const emaOverlayEnabled = resolvedIndicator?.ema?.enabled === true;
+  const superOverlayEnabled = resolvedIndicator?.super?.enabled === true;
   const showMainMA =
     typeof mainConfig?.ma === "boolean"
       ? mainConfig.ma
-      : resolvedIndicator?.primary === 1 || emaOverlayEnabled;
-  const showMainMAResolved = showMainMA || emaOverlayEnabled;
+      : resolvedIndicator?.primary === 1 || emaOverlayEnabled || superOverlayEnabled;
+  const showMainMAResolved = showMainMA || emaOverlayEnabled || superOverlayEnabled;
   const showMainBOLL =
     typeof mainConfig?.boll === "boolean"
       ? mainConfig.boll
@@ -1063,8 +1211,10 @@ function toLegacyPropsConfig({
 
   const maEnabled = mainIndicators?.ma?.enabled !== false;
   const emaEnabled = mainIndicators?.ema?.enabled === true;
+  const superEnabled = mainIndicators?.super?.enabled === true;
   const bollEnabled = mainIndicators?.boll?.enabled === true;
-  const resolvedPrimary = maEnabled || emaEnabled ? 1 : bollEnabled ? 2 : -1;
+  const resolvedPrimary =
+    maEnabled || emaEnabled || superEnabled ? 1 : bollEnabled ? 2 : -1;
 
   const translatedTheme = {
     colorList: {
@@ -1080,6 +1230,7 @@ function toLegacyPropsConfig({
     indicatorColors: {
       ma: theme?.mainIndicator?.maColors,
       ema: theme?.mainIndicator?.emaColors,
+      super: theme?.mainIndicator?.superColors,
     },
     cursorStyleEnabled:
       typeof theme?.crosshair?.enabled === "boolean"
@@ -1106,6 +1257,16 @@ function toLegacyPropsConfig({
         periods: Array.isArray(mainIndicators?.ema?.periods)
           ? mainIndicators.ema.periods
           : DEFAULT_INDICATOR_PERIODS.ema,
+      },
+      super: {
+        enabled: superEnabled,
+        period: Number(
+          mainIndicators?.super?.period ?? DEFAULT_INDICATOR_PERIODS.superPeriod
+        ),
+        multiplier: Number(
+          mainIndicators?.super?.multiplier ??
+            DEFAULT_INDICATOR_PERIODS.superMultiplier
+        ),
       },
       targetList: {
         maList: buildTargetItemsFromPeriods(
@@ -1241,6 +1402,16 @@ const RNKLineView = forwardRef((props, ref) => {
             ema: {
               enabled: indicator?.ema?.enabled === true,
               periods: indicator?.ema?.periods ?? DEFAULT_INDICATOR_PERIODS.ema,
+            },
+            super: {
+              enabled: indicator?.super?.enabled === true,
+              period: Number(
+                indicator?.super?.period ?? DEFAULT_INDICATOR_PERIODS.superPeriod
+              ),
+              multiplier: Number(
+                indicator?.super?.multiplier ??
+                  DEFAULT_INDICATOR_PERIODS.superMultiplier
+              ),
             },
             boll: {
               enabled: indicator?.main?.boll === true,
