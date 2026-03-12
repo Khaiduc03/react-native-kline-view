@@ -29,8 +29,16 @@ class HTRsiDraw: NSObject, HTKLineDrawProtocol {
 
     func drawLine(_ model: HTKLineModel, _ lastModel: HTKLineModel, _ maxValue: CGFloat, _ minValue: CGFloat, _ baseY: CGFloat, _ height: CGFloat, _ index: Int, _ lastIndex: Int, _ context: CGContext, _ configManager: HTKLineConfigManager) {
         for itemModel in configManager.rsiList {
-            let color = configManager.targetColorList[itemModel.index]
-            drawLine(value: model.rsiList[itemModel.index].value, lastValue: lastModel.rsiList[itemModel.index].value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
+            let dataIndex = itemModel.index
+            guard
+                let currentItem = safeElement(model.rsiList, at: dataIndex),
+                let lastItem = safeElement(lastModel.rsiList, at: dataIndex)
+            else {
+                debugInvalidIndex(owner: "HTRsiDraw.drawLine.rsiList", index: dataIndex, count: model.rsiList.count)
+                continue
+            }
+            let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
+            drawLine(value: currentItem.value, lastValue: lastItem.value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
         }
     }
 
@@ -38,9 +46,13 @@ class HTRsiDraw: NSObject, HTKLineDrawProtocol {
         var x = baseX
         let font = configManager.createFont(configManager.headerTextFontSize)
         for itemModel in configManager.rsiList {
-            let item = model.rsiList[itemModel.index]
+            let dataIndex = itemModel.index
+            guard let item = safeElement(model.rsiList, at: dataIndex) else {
+                debugInvalidIndex(owner: "HTRsiDraw.drawText.rsiList", index: dataIndex, count: model.rsiList.count)
+                continue
+            }
             let title = String(format: "RSI(%@):%@", item.title, configManager.precision(item.value, -1))
-            let color = configManager.targetColorList[itemModel.index]
+            let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
             x += drawText(title: title, point: CGPoint.init(x: x, y: baseY), color: color, font: font, context: context, configManager: configManager)
             x += 5
         }

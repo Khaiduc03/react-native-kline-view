@@ -23,6 +23,25 @@ protocol HTKLineDrawProtocol: class {
 }
 
 extension HTKLineDrawProtocol {
+    func safeElement<T>(_ list: [T], at index: Int) -> T? {
+        guard index >= 0, index < list.count else {
+            return nil
+        }
+        return list[index]
+    }
+
+    func safeTargetColor(_ configManager: HTKLineConfigManager, at index: Int, fallback: UIColor) -> UIColor {
+        guard index >= 0, index < configManager.targetColorList.count else {
+            return fallback
+        }
+        return configManager.targetColorList[index]
+    }
+
+    func debugInvalidIndex(owner: String, index: Int, count: Int) {
+        #if DEBUG
+        print("[RNKLineView][\(owner)] Skip invalid index \(index), count=\(count)")
+        #endif
+    }
 
     func drawCandle(high: CGFloat, low: CGFloat, maxValue: CGFloat, minValue: CGFloat, baseY: CGFloat, height: CGFloat, index: Int, width: CGFloat, color: UIColor, verticalAlignBottom: Bool, minBodyHeightPx: CGFloat = 0, context: CGContext, configManager: HTKLineConfigManager) {
         let itemWidth = configManager.itemWidth

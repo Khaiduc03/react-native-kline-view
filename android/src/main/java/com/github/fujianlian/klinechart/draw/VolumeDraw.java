@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import com.github.fujianlian.klinechart.BuildConfig;
 import com.github.fujianlian.klinechart.HTKLineConfigManager;
 import com.github.fujianlian.klinechart.BaseKLineChartView;
 import com.github.fujianlian.klinechart.HTKLineTargetItem;
@@ -18,6 +19,7 @@ import com.github.fujianlian.klinechart.base.IValueFormatter;
 import com.github.fujianlian.klinechart.entity.IVolume;
 import com.github.fujianlian.klinechart.formatter.ValueFormatter;
 import com.github.fujianlian.klinechart.utils.ViewUtil;
+import android.util.Log;
 
 import static android.graphics.Typeface.NORMAL;
 
@@ -25,6 +27,7 @@ import static android.graphics.Typeface.NORMAL;
  * Created by hjm on 2017/11/14 17:49.
  */
 public class VolumeDraw implements IChartDraw<IVolume> {
+    private static final String TAG = "RNKLineView.VolumeDraw";
 
     private Context mContext;
 
@@ -49,12 +52,19 @@ public class VolumeDraw implements IChartDraw<IVolume> {
             @NonNull Canvas canvas, @NonNull BaseKLineChartView view, int position) {
 
         drawHistogram(canvas, curPoint, lastPoint, curX, view, position);
+        if (lastPoint == null) {
+            return;
+        }
         KLineEntity lastItem = (KLineEntity) lastPoint;
         KLineEntity currentItem = (KLineEntity) curPoint;
         for (int i = 0; i < view.configManager.maVolumeList.size(); i++) {
-            HTKLineTargetItem currentTargetItem = (HTKLineTargetItem) currentItem.maVolumeList.get(i);
-            HTKLineTargetItem lastTargetItem = (HTKLineTargetItem) lastItem.maVolumeList.get(i);
-            primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maVolumeList.get(i).index]);
+            HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maVolumeList.get(i);
+            HTKLineTargetItem currentTargetItem = safeTargetItem(currentItem.maVolumeList, configItem.index, "drawTranslated.current");
+            HTKLineTargetItem lastTargetItem = safeTargetItem(lastItem.maVolumeList, configItem.index, "drawTranslated.last");
+            if (currentTargetItem == null || lastTargetItem == null) {
+                continue;
+            }
+            primaryPaint.setColor(safeTargetColor(view, configItem.index, 5));
             view.drawVolLine(canvas, primaryPaint, lastX, lastTargetItem.value, curX, currentTargetItem.value);
         }
     }
@@ -87,12 +97,16 @@ public class VolumeDraw implements IChartDraw<IVolume> {
             ValueFormatter valueFormatter = (ValueFormatter)formatter;
             String space = "  ";
             String text = "VOL:" + valueFormatter.formatVolume(point.getVolume()) + "  ";
-            primaryPaint.setColor(view.configManager.targetColorList[5]);
+            primaryPaint.setColor(safeTargetColor(view, 5, 0));
             canvas.drawText(text, x, y, primaryPaint);
             x += view.getTextPaint().measureText(text);
             for (int i = 0; i < view.configManager.maVolumeList.size(); i++) {
-                HTKLineTargetItem targetItem = (HTKLineTargetItem) point.maVolumeList.get(i);
-                primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maVolumeList.get(i).index]);
+                HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maVolumeList.get(i);
+                HTKLineTargetItem targetItem = safeTargetItem(point.maVolumeList, configItem.index, "drawText");
+                if (targetItem == null) {
+                    continue;
+                }
+                primaryPaint.setColor(safeTargetColor(view, configItem.index, 5));
                 StringBuilder stringBuilder = new StringBuilder();
                 stringBuilder.append("MA");
                 stringBuilder.append(targetItem.title);
@@ -168,4 +182,33 @@ public class VolumeDraw implements IChartDraw<IVolume> {
         primaryPaint.setTypeface(typeface);
     }
 
+    private int safeTargetColor(BaseKLineChartView view, int index, int fallbackIndex) {
+        int[] list = view.configManager.targetColorList;
+        if (index >= 0 && index < list.length) {
+            return list[index];
+        }
+        if (fallbackIndex >= 0 && fallbackIndex < list.length) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Invalid targetColor index=" + index + ", fallback=" + fallbackIndex + ", count=" + list.length);
+            }
+            return list[fallbackIndex];
+        }
+        return Color.BLACK;
+    }
+
+    private HTKLineTargetItem safeTargetItem(java.util.List<HTKLineTargetItem> list, int index, String owner) {
+        if (list == null) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, owner + ": list null");
+            }
+            return null;
+        }
+        if (index >= 0 && index < list.size()) {
+            return list.get(index);
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, owner + ": skip invalid index=" + index + ", count=" + list.size());
+        }
+        return null;
+    }
 }

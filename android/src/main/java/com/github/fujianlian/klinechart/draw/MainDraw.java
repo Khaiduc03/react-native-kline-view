@@ -2,6 +2,7 @@ package com.github.fujianlian.klinechart.draw;
 
 import android.content.Context;
 import android.graphics.*;
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -22,6 +23,7 @@ import java.util.Map;
  * Created by tifezh on 2016/6/14.
  */
 public class MainDraw implements IChartDraw<ICandle> {
+    private static final String TAG = "RNKLineView.MainDraw";
 
     private float mCandleWidth = 0;
     private float mCandleLineWidth = 0;
@@ -127,26 +129,33 @@ public class MainDraw implements IChartDraw<ICandle> {
         }
         drawCandle(view, canvas, curX, curPoint.getHighPrice(), curPoint.getLowPrice(), curPoint.getOpenPrice(), curPoint.getClosePrice());
         if (primaryStatus == PrimaryStatus.MA) {
+            if (lastPoint == null) {
+                return;
+            }
             KLineEntity lastItem = (KLineEntity) lastPoint;
             KLineEntity currentItem = (KLineEntity) curPoint;
             for (int i = 0; i < view.configManager.maList.size(); i ++) {
-                HTKLineTargetItem currentTargetItem = (HTKLineTargetItem) currentItem.maList.get(i);
-                HTKLineTargetItem lastTargetItem = (HTKLineTargetItem) lastItem.maList.get(i);
-                primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maList.get(i).index]);
+                HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
+                HTKLineTargetItem currentTargetItem = safeTargetItem(currentItem.maList, configItem.index, "drawTranslated.current");
+                HTKLineTargetItem lastTargetItem = safeTargetItem(lastItem.maList, configItem.index, "drawTranslated.last");
+                if (currentTargetItem == null || lastTargetItem == null) {
+                    continue;
+                }
+                primaryPaint.setColor(safeTargetColor(view, configItem.index, 0));
                 view.drawMainLine(canvas, this.primaryPaint, lastX, lastTargetItem.value, curX, currentTargetItem.value);
             }
         } else if (primaryStatus == PrimaryStatus.BOLL) {
             //画boll
             if (lastPoint.getMb() != 0) {
-                primaryPaint.setColor(view.configManager.targetColorList[0]);
+                primaryPaint.setColor(safeTargetColor(view, 0, 0));
                 view.drawMainLine(canvas, primaryPaint, lastX, lastPoint.getMb(), curX, curPoint.getMb());
             }
             if (lastPoint.getUp() != 0) {
-                primaryPaint.setColor(view.configManager.targetColorList[1]);
+                primaryPaint.setColor(safeTargetColor(view, 1, 0));
                 view.drawMainLine(canvas, primaryPaint, lastX, lastPoint.getUp(), curX, curPoint.getUp());
             }
             if (lastPoint.getDn() != 0) {
-                primaryPaint.setColor(view.configManager.targetColorList[2]);
+                primaryPaint.setColor(safeTargetColor(view, 2, 0));
                 view.drawMainLine(canvas, primaryPaint, lastX, lastPoint.getDn(), curX, curPoint.getDn());
             }
         }
@@ -163,8 +172,12 @@ public class MainDraw implements IChartDraw<ICandle> {
         } else {
             if (primaryStatus == PrimaryStatus.MA) {
                 for (int i = 0; i < view.configManager.maList.size(); i ++) {
-                    HTKLineTargetItem targetItem = (HTKLineTargetItem) point.maList.get(i);
-                    this.primaryPaint.setColor(view.configManager.targetColorList[view.configManager.maList.get(i).index]);
+                    HTKLineTargetItem configItem = (HTKLineTargetItem) view.configManager.maList.get(i);
+                    HTKLineTargetItem targetItem = safeTargetItem(point.maList, configItem.index, "drawText");
+                    if (targetItem == null) {
+                        continue;
+                    }
+                    this.primaryPaint.setColor(safeTargetColor(view, configItem.index, 0));
                     StringBuilder stringBuilder = new StringBuilder();
                     stringBuilder.append("MA");
                     stringBuilder.append(targetItem.title);
@@ -178,15 +191,15 @@ public class MainDraw implements IChartDraw<ICandle> {
             } else if (primaryStatus == PrimaryStatus.BOLL) {
                 if (point.getMb() != 0) {
                     text = "BOLL:" + view.formatValue(point.getMb()) + space;
-                    this.primaryPaint.setColor(view.configManager.targetColorList[0]);
+                    this.primaryPaint.setColor(safeTargetColor(view, 0, 0));
                     canvas.drawText(text, x, y, primaryPaint);
                     x += ma5Paint.measureText(text);
                     text = "UB:" + view.formatValue(point.getUp()) + space;
-                    this.primaryPaint.setColor(view.configManager.targetColorList[1]);
+                    this.primaryPaint.setColor(safeTargetColor(view, 1, 0));
                     canvas.drawText(text, x, y, primaryPaint);
                     x += ma10Paint.measureText(text);
                     text = "LB:" + view.formatValue(point.getDn());
-                    this.primaryPaint.setColor(view.configManager.targetColorList[2]);
+                    this.primaryPaint.setColor(safeTargetColor(view, 2, 0));
                     canvas.drawText(text, x, y, primaryPaint);
                 }
             }
@@ -364,6 +377,36 @@ public class MainDraw implements IChartDraw<ICandle> {
             y += textHeight + lineHeight;
         }
 
+    }
+
+    private int safeTargetColor(BaseKLineChartView view, int index, int fallbackIndex) {
+        int[] list = view.configManager.targetColorList;
+        if (index >= 0 && index < list.length) {
+            return list[index];
+        }
+        if (fallbackIndex >= 0 && fallbackIndex < list.length) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Invalid targetColor index=" + index + ", fallback=" + fallbackIndex + ", count=" + list.length);
+            }
+            return list[fallbackIndex];
+        }
+        return Color.BLACK;
+    }
+
+    private HTKLineTargetItem safeTargetItem(List<HTKLineTargetItem> list, int index, String owner) {
+        if (list == null) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, owner + ": list null");
+            }
+            return null;
+        }
+        if (index >= 0 && index < list.size()) {
+            return list.get(index);
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, owner + ": skip invalid index=" + index + ", count=" + list.size());
+        }
+        return null;
     }
 
     /**

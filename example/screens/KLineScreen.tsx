@@ -28,6 +28,7 @@ import RNKLineView, {
   type DrawItemCompleteEvent,
   type DrawItemTouchEvent,
   type DrawPointCompleteEvent,
+  type PredictionSelectEvent,
   type RNKLineViewRef,
 } from 'react-native-kline-view';
 import { runSMCStrategyLux, SMCResult } from './smc-strategy';
@@ -2149,7 +2150,7 @@ const KLineScreen: React.FC = () => {
         onDrawItemDidTouch={handleDrawItemDidTouch}
         onDrawItemComplete={handleDrawItemComplete}
         onDrawPointComplete={handleDrawPointComplete}
-        onPredictionSelect={event => {
+        onPredictionSelect={(event: PredictionSelectEvent) => {
           console.log('Prediction Selected:', event.nativeEvent);
           const details = event.nativeEvent as unknown as PredictionDetails; // Assuming native event structure matches
           if (details) {

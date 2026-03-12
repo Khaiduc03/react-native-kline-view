@@ -1,6 +1,31 @@
 import * as React from "react";
 import type { NativeSyntheticEvent, ViewProps } from "react-native";
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonObject
+  | JsonValue[];
+
+export type JsonObject = {
+  [key: string]: JsonValue;
+};
+
+export type SelectedItem = {
+  title: string;
+  detail: string;
+  color?: number;
+};
+
+export type IndicatorItem = {
+  title: string;
+  value: number;
+  selected?: boolean;
+  index?: number;
+};
+
 export type Candle = {
   id: number;
   dateString: string;
@@ -9,16 +34,50 @@ export type Candle = {
   low: number;
   close: number;
   vol: number;
-
-  // Optional fields (indicators / info panel / etc.)
-  selectedItemList?: Array<Record<string, any>>;
-  [key: string]: any;
+  selectedItemList?: SelectedItem[];
+  maList?: IndicatorItem[];
+  maVolumeList?: IndicatorItem[];
+  rsiList?: IndicatorItem[];
+  wrList?: IndicatorItem[];
+  bollMb?: number;
+  bollUp?: number;
+  bollDn?: number;
+  macdDif?: number;
+  macdDea?: number;
+  macdValue?: number;
+  kdjK?: number;
+  kdjD?: number;
+  kdjJ?: number;
+  [key: string]: JsonValue | undefined;
 };
 
-export type DrawItemTouchEvent = NativeSyntheticEvent<Record<string, any>>;
-export type DrawItemCompleteEvent = NativeSyntheticEvent<Record<string, any>>;
-export type DrawPointCompleteEvent = NativeSyntheticEvent<Record<string, any>>;
-export type PredictionSelectEvent = NativeSyntheticEvent<Record<string, any>>;
+export type DrawItemTouchPayload = {
+  shouldReloadDrawItemIndex?: number;
+  drawType?: number;
+  drawLineHeight?: number;
+  drawDashWidth?: number;
+  drawDashSpace?: number;
+  drawIsLock?: boolean;
+  drawColor?: number[] | number;
+};
+
+export type DrawItemCompletePayload = JsonObject;
+
+export type DrawPointCompletePayload = {
+  pointCount?: number;
+};
+
+export type PredictionSelectPayload = {
+  type?: "entry" | "sl" | "tp" | string;
+  price?: number;
+  index?: number;
+  [key: string]: JsonValue | undefined;
+};
+
+export type DrawItemTouchEvent = NativeSyntheticEvent<DrawItemTouchPayload>;
+export type DrawItemCompleteEvent = NativeSyntheticEvent<DrawItemCompletePayload>;
+export type DrawPointCompleteEvent = NativeSyntheticEvent<DrawPointCompletePayload>;
+export type PredictionSelectEvent = NativeSyntheticEvent<PredictionSelectPayload>;
 
 export type CursorStyleConfig = {
   cursorStyleEnabled?: boolean;

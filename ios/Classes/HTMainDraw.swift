@@ -81,15 +81,23 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
             case .none:
                 break
             case .ma:
-                for (i, itemModel) in configManager.maList.enumerated() {
-                    let color = configManager.targetColorList[itemModel.index]
-                    drawLine(value: model.maList[i].value, lastValue: lastModel.maList[i].value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
+                for (configIndex, itemModel) in configManager.maList.enumerated() {
+                    let dataIndex = itemModel.index
+                    guard
+                        let currentItem = safeElement(model.maList, at: dataIndex) ?? safeElement(model.maList, at: configIndex),
+                        let lastItem = safeElement(lastModel.maList, at: dataIndex) ?? safeElement(lastModel.maList, at: configIndex)
+                    else {
+                        debugInvalidIndex(owner: "HTMainDraw.drawLine.maList", index: dataIndex, count: model.maList.count)
+                        continue
+                    }
+                    let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
+                    drawLine(value: currentItem.value, lastValue: lastItem.value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
                 }
             case .boll:
                 let itemList = [
-                    ["value": model.bollMb, "lastValue": lastModel.bollMb, "color": configManager.targetColorList[0]],
-                    ["value": model.bollUp, "lastValue": lastModel.bollUp, "color": configManager.targetColorList[1]],
-                    ["value": model.bollDn, "lastValue": lastModel.bollDn, "color": configManager.targetColorList[2]],
+                    ["value": model.bollMb, "lastValue": lastModel.bollMb, "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
+                    ["value": model.bollUp, "lastValue": lastModel.bollUp, "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
+                    ["value": model.bollDn, "lastValue": lastModel.bollDn, "color": safeTargetColor(configManager, at: 2, fallback: configManager.textColor)],
                 ]
                 for item in itemList {
                     drawLine(value: item["value"] as? CGFloat ?? 0, lastValue: item["lastValue"] as? CGFloat ?? 0, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: item["color"] as? UIColor ?? UIColor.orange, isBezier: false, context: context, configManager: configManager)
@@ -107,10 +115,14 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
                 break
             case .ma:
                 var x = baseX
-                for (i, itemModel) in configManager.maList.enumerated() {
-                    let item = model.maList[i]
+                for (configIndex, itemModel) in configManager.maList.enumerated() {
+                    let dataIndex = itemModel.index
+                    guard let item = safeElement(model.maList, at: dataIndex) ?? safeElement(model.maList, at: configIndex) else {
+                        debugInvalidIndex(owner: "HTMainDraw.drawText.maList", index: dataIndex, count: model.maList.count)
+                        continue
+                    }
                     let title = String(format: "MA%@:%@", item.title, configManager.precision(item.value, configManager.price))
-                    let color = configManager.targetColorList[itemModel.index]
+                    let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
                     let font = configManager.createFont(configManager.headerTextFontSize)
                     x += drawText(title: title, point: CGPoint.init(x: x, y: baseY), color: color, font: font, context: context, configManager: configManager)
                     x += 5
@@ -118,9 +130,9 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
             case .boll:
                 var x = baseX
                 let itemList = [
-                    ["title": String(format: "BOLL:%@", configManager.precision(model.bollMb, configManager.price)), "color": configManager.targetColorList[0]],
-                    ["title": String(format: "UB:%@", configManager.precision(model.bollUp, configManager.price)), "color": configManager.targetColorList[1]],
-                    ["title": String(format: "LB:%@", configManager.precision(model.bollDn, configManager.price)), "color": configManager.targetColorList[2]],
+                    ["title": String(format: "BOLL:%@", configManager.precision(model.bollMb, configManager.price)), "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
+                    ["title": String(format: "UB:%@", configManager.precision(model.bollUp, configManager.price)), "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
+                    ["title": String(format: "LB:%@", configManager.precision(model.bollDn, configManager.price)), "color": safeTargetColor(configManager, at: 2, fallback: configManager.textColor)],
                 ]
                 let font = configManager.createFont(configManager.headerTextFontSize)
                 for item in itemList {

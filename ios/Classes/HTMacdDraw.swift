@@ -32,8 +32,8 @@ class HTMacdDraw: NSObject, HTKLineDrawProtocol {
 
     func drawLine(_ model: HTKLineModel, _ lastModel: HTKLineModel, _ maxValue: CGFloat, _ minValue: CGFloat, _ baseY: CGFloat, _ height: CGFloat, _ index: Int, _ lastIndex: Int, _ context: CGContext, _ configManager: HTKLineConfigManager) {
         let itemList = [
-            ["value": model.macdDif, "lastValue": lastModel.macdDif, "color": configManager.targetColorList[0]],
-            ["value": model.macdDea, "lastValue": lastModel.macdDea, "color": configManager.targetColorList[1]],
+            ["value": model.macdDif, "lastValue": lastModel.macdDif, "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
+            ["value": model.macdDea, "lastValue": lastModel.macdDea, "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
         ]
         for item in itemList {
             drawLine(value: item["value"] as? CGFloat ?? 0, lastValue: item["lastValue"] as? CGFloat ?? 0, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: item["color"] as? UIColor ?? UIColor.orange, isBezier: false, context: context, configManager: configManager)
@@ -44,9 +44,9 @@ class HTMacdDraw: NSObject, HTKLineDrawProtocol {
         var x = baseX
         let itemList = [
             ["title": String(format: "MACD(%@,%@,%@)", configManager.macdS, configManager.macdL, configManager.macdM), "color": configManager.textColor],
-            ["title": String(format: "MACD:%@", configManager.precision(model.macdValue, -1)), "color": configManager.targetColorList[5]],
-            ["title": String(format: "DIF:%@", configManager.precision(model.macdDif, -1)), "color": configManager.targetColorList[0]],
-            ["title": String(format: "DEA:%@", configManager.precision(model.macdDea, -1)), "color": configManager.targetColorList[1]],
+            ["title": String(format: "MACD:%@", configManager.precision(model.macdValue, -1)), "color": safeTargetColor(configManager, at: 5, fallback: configManager.textColor)],
+            ["title": String(format: "DIF:%@", configManager.precision(model.macdDif, -1)), "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
+            ["title": String(format: "DEA:%@", configManager.precision(model.macdDea, -1)), "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
         ]
         let font = configManager.createFont(configManager.headerTextFontSize)
         for item in itemList {

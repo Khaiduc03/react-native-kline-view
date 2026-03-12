@@ -2,9 +2,11 @@ package com.github.fujianlian.klinechart.container;
 
 import android.content.Context;
 import android.graphics.*;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import com.github.fujianlian.klinechart.BaseKLineChartView;
+import com.github.fujianlian.klinechart.BuildConfig;
 import com.github.fujianlian.klinechart.HTKLineConfigManager;
 import com.github.fujianlian.klinechart.KLineChartView;
 
@@ -12,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class HTDrawContext {
+    private static final String TAG = "RNKLineView.DrawContext";
 
     public List<HTDrawItem> drawItemList = new ArrayList<HTDrawItem>();
 
@@ -28,6 +31,20 @@ public class HTDrawContext {
         this.configManager = configManager;
     }
 
+    private boolean isValidDrawItemIndex(int index) {
+        return index >= 0 && index < drawItemList.size();
+    }
+
+    private void normalizeReloadDrawItemIndex() {
+        int index = configManager.shouldReloadDrawItemIndex;
+        if (index > HTDrawState.showContext && !isValidDrawItemIndex(index)) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "normalizeReloadDrawItemIndex reset stale index=" + index + ", count=" + drawItemList.size());
+            }
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
+        }
+    }
+
     public void touchesGesture(HTPoint location, HTPoint translation, int state) {
         // 能够处理点击, 改变拖动的点, 重新绘制
         if (breakTouch == true) {
@@ -39,7 +56,15 @@ public class HTDrawContext {
         switch (state) {
             case MotionEvent.ACTION_DOWN: {
                 if (configManager.shouldReloadDrawItemIndex > HTDrawState.showContext) {
-                    HTDrawItem selectedDrawItem = drawItemList.get(configManager.shouldReloadDrawItemIndex);
+                    int selectedIndex = configManager.shouldReloadDrawItemIndex;
+                    if (!isValidDrawItemIndex(selectedIndex)) {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "ACTION_DOWN stale selectedIndex=" + selectedIndex + ", count=" + drawItemList.size());
+                        }
+                        configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
+                        break;
+                    }
+                    HTDrawItem selectedDrawItem = drawItemList.get(selectedIndex);
                     if (selectedDrawItem.pointList.size() >= selectedDrawItem.drawType.count()) {
                         if (HTDrawItem.canResponseLocation(drawItemList, location, klineView) != selectedDrawItem) {
                             configManager.onDrawItemDidTouch.invoke(null, HTDrawState.showPencil);
@@ -116,17 +141,27 @@ public class HTDrawContext {
     public void fixDrawItemList() {
         int size = drawItemList.size();
         if (size <= 0) {
+            normalizeReloadDrawItemIndex();
             return;
         }
         HTDrawItem drawItem = drawItemList.get(size - 1);
         if (drawItem.pointList.size() < drawItem.drawType.count()) {
+            int removedIndex = size - 1;
             drawItemList.remove(drawItem);
+            int selectedIndex = configManager.shouldReloadDrawItemIndex;
+            if (selectedIndex == removedIndex) {
+                configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
+            } else if (selectedIndex > removedIndex) {
+                configManager.shouldReloadDrawItemIndex = selectedIndex - 1;
+            }
         }
+        normalizeReloadDrawItemIndex();
         invalidate();
     }
 
     public void clearDrawItemList() {
         drawItemList = new ArrayList<>();
+        configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
         invalidate();
     }
 
@@ -147,6 +182,9 @@ public class HTDrawContext {
     }
 
     public void drawMapper(Canvas canvas, HTDrawItem drawItem, int index, int itemIndex) {
+        if (index < 0 || index >= drawItem.pointList.size()) {
+            return;
+        }
         HTPoint point = drawItem.pointList.get(index);
         List<List<HTPoint>> lineList = HTDrawItem.lineListWithIndex(drawItem, index, klineView);
         if (index == 2 && drawItem.drawType == HTDrawType.parallelLine) {
@@ -215,6 +253,7 @@ public class HTDrawContext {
 
 
     public void onDraw(Canvas canvas) {
+        normalizeReloadDrawItemIndex();
         for (int itemIndex = 0; itemIndex < drawItemList.size(); itemIndex ++) {
             HTDrawItem drawItem = drawItemList.get(itemIndex);
             for (int index = 0; index < drawItem.pointList.size(); index ++) {

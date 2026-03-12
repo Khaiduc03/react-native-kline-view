@@ -43,8 +43,16 @@ class HTVolumeDraw: NSObject, HTKLineDrawProtocol {
 
         } else {
             for itemModel in configManager.maVolumeList {
-                let color = configManager.targetColorList[itemModel.index]
-                drawLine(value: model.maVolumeList[itemModel.index].value, lastValue: lastModel.maVolumeList[itemModel.index].value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
+                let dataIndex = itemModel.index
+                guard
+                    let currentItem = safeElement(model.maVolumeList, at: dataIndex),
+                    let lastItem = safeElement(lastModel.maVolumeList, at: dataIndex)
+                else {
+                    debugInvalidIndex(owner: "HTVolumeDraw.drawLine.maVolumeList", index: dataIndex, count: model.maVolumeList.count)
+                    continue
+                }
+                let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
+                drawLine(value: currentItem.value, lastValue: lastItem.value, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: color, isBezier: false, context: context, configManager: configManager)
             }
         }
     }
@@ -52,12 +60,17 @@ class HTVolumeDraw: NSObject, HTKLineDrawProtocol {
     func drawText(_ model: HTKLineModel, _ baseX: CGFloat, _ baseY: CGFloat, _ context: CGContext, _ configManager: HTKLineConfigManager) {
         var x = baseX
         let font = configManager.createFont(configManager.headerTextFontSize)
-        x += drawText(title: String(format: "VOL:%@", configManager.precision(model.volume, configManager.volume)), point: CGPoint.init(x: x, y: baseY), color: configManager.targetColorList[5], font: font, context: context, configManager: configManager)
+        let volumeColor = safeTargetColor(configManager, at: 5, fallback: configManager.textColor)
+        x += drawText(title: String(format: "VOL:%@", configManager.precision(model.volume, configManager.volume)), point: CGPoint.init(x: x, y: baseY), color: volumeColor, font: font, context: context, configManager: configManager)
         x += 5
         for itemModel in configManager.maVolumeList {
-            let item = model.maVolumeList[itemModel.index]
+            let dataIndex = itemModel.index
+            guard let item = safeElement(model.maVolumeList, at: dataIndex) else {
+                debugInvalidIndex(owner: "HTVolumeDraw.drawText.maVolumeList", index: dataIndex, count: model.maVolumeList.count)
+                continue
+            }
             let title = String(format: "MA%@:%@", item.title, configManager.precision(item.value, configManager.volume))
-            let color = configManager.targetColorList[itemModel.index]
+            let color = safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor)
             x += drawText(title: title, point: CGPoint.init(x: x, y: baseY), color: color, font: font, context: context, configManager: configManager)
             x += 5
         }

@@ -181,6 +181,8 @@ public class HTKLineContainerView extends RelativeLayout {
                 configManager.drawShouldTrash = false;
             }
             klineView.drawContext.invalidate();
+        } else if (reloadIndex > HTDrawState.showContext) {
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
         }
 
 
@@ -189,7 +191,7 @@ public class HTKLineContainerView extends RelativeLayout {
             klineView.drawContext.fixDrawItemList();
         }
         if (configManager.shouldClearDraw) {
-            configManager.shouldReloadDrawItemIndex = HTDrawState.none;
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
             configManager.shouldClearDraw = false;
             klineView.drawContext.clearDrawItemList();
         }
