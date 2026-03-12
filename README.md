@@ -94,6 +94,26 @@ No additional setup required for Android.
 
 For a comprehensive implementation with all features, please check **[example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**.
 
+You can now pass only `candles` (without manually building `optionList` JSON):
+
+```tsx
+import RNKLineView, { type Candle } from "react-native-kline-view";
+
+const candles: Candle[] = [
+  {
+    id: 1710000000000,
+    dateString: "2024-03-09 10:00",
+    open: 100,
+    high: 110,
+    low: 98,
+    close: 108,
+    vol: 1200,
+  },
+];
+
+<RNKLineView style={{ flex: 1 }} candles={candles} />;
+```
+
 > Note: The example has been migrated to TypeScript, so `example/App.js` is no longer the main reference.
 
 The example app demonstrates:
@@ -117,10 +137,13 @@ If you fork/customize this library, keep the example updated first — it double
 
 | Property              | Type     | Required | Default | Description                                             |
 | --------------------- | -------- | -------- | ------- | ------------------------------------------------------- |
-| `optionList`          | string   | ✅       | -       | JSON string containing all chart configuration and data |
+| `optionList`          | string   | ✅*      | -       | JSON string containing all chart configuration and data |
+| `candles`             | Candle[] | ✅*      | -       | Simplified input. Required when `optionList` is omitted |
 | `onDrawItemDidTouch`  | function | ❌       | -       | Callback when a drawing item is touched                 |
 | `onDrawItemComplete`  | function | ❌       | -       | Callback when a drawing item is completed               |
 | `onDrawPointComplete` | function | ❌       | -       | Callback when drawing point is completed                |
+
+`*` Requirement rule: pass either `optionList` or `candles`. If both are passed, `optionList` takes priority.
 
 ### Event Callbacks Detail
 

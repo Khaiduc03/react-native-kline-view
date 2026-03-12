@@ -29,6 +29,17 @@ class HTDrawContext {
     }
     
     var breakTouch = false
+
+    private func isValidDrawItemIndex(_ index: Int) -> Bool {
+        return index >= 0 && index < drawItemList.count
+    }
+
+    private func normalizeReloadDrawItemIndex() {
+        let index = configManager.shouldReloadDrawItemIndex
+        if index > HTDrawState.showContext.rawValue && !isValidDrawItemIndex(index) {
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
+        }
+    }
     
     func touchesGesture(_ location: CGPoint, _ translation: CGPoint, _ state: UIGestureRecognizerState) {
         guard let klineView = klineView, breakTouch == false else {
@@ -40,7 +51,12 @@ class HTDrawContext {
         switch state {
         case .began:
             if (configManager.shouldReloadDrawItemIndex > HTDrawState.showContext.rawValue) {
-                let selectedDrawItem = drawItemList[configManager.shouldReloadDrawItemIndex]
+                let selectedIndex = configManager.shouldReloadDrawItemIndex
+                guard isValidDrawItemIndex(selectedIndex) else {
+                    configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
+                    break
+                }
+                let selectedDrawItem = drawItemList[selectedIndex]
                 if (selectedDrawItem.pointList.count >= selectedDrawItem.drawType.count) {
                     if (HTDrawItem.canResponseLocation(drawItemList, location, klineView) != selectedDrawItem) {
                         configManager.onDrawItemDidTouch?(nil, HTDrawState.showPencil.rawValue)
@@ -141,16 +157,44 @@ class HTDrawContext {
     
     func fixDrawItemList() {
         guard let drawItem = drawItemList.last else {
+            normalizeReloadDrawItemIndex()
             return
         }
         if drawItem.pointList.count < drawItem.drawType.count {
+            let removedIndex = drawItemList.count - 1
             drawItemList.removeLast()
+            let selectedIndex = configManager.shouldReloadDrawItemIndex
+            if selectedIndex == removedIndex {
+                configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
+            } else if selectedIndex > removedIndex {
+                configManager.shouldReloadDrawItemIndex = selectedIndex - 1
+            }
         }
+        normalizeReloadDrawItemIndex()
         setNeedsDisplay()
     }
     
     func clearDrawItemList() {
         drawItemList = []
+        configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
+        setNeedsDisplay()
+    }
+
+    func removeDrawItem(at index: Int) {
+        guard isValidDrawItemIndex(index) else {
+            normalizeReloadDrawItemIndex()
+            return
+        }
+        drawItemList.remove(at: index)
+
+        let selectedIndex = configManager.shouldReloadDrawItemIndex
+        if selectedIndex == index {
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
+        } else if selectedIndex > index {
+            configManager.shouldReloadDrawItemIndex = selectedIndex - 1
+        } else {
+            normalizeReloadDrawItemIndex()
+        }
         setNeedsDisplay()
     }
     
@@ -173,6 +217,9 @@ class HTDrawContext {
 
     func drawMapper(_ context: CGContext, _ drawItem: HTDrawItem, _ index: Int, _ itemIndex: Int) {
         guard let klineView = klineView else {
+            return
+        }
+        guard index >= 0, index < drawItem.pointList.count else {
             return
         }
         let lineList = HTDrawItem.lineListWithIndex(drawItem, index, klineView)
@@ -216,6 +263,7 @@ class HTDrawContext {
         guard let context = UIGraphicsGetCurrentContext() else {
             return
         }
+        normalizeReloadDrawItemIndex()
         for (itemIndex, drawItem) in drawItemList.enumerated() {
             for (index, _) in drawItem.pointList.enumerated() {
                 drawMapper(context, drawItem, index, itemIndex)

@@ -195,11 +195,12 @@ class HTKLineContainerView: UIView {
             drawItem.drawDashSpace = configManager.drawDashSpace
             drawItem.drawIsLock = configManager.drawIsLock
             if (configManager.drawShouldTrash) {
-                configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
-                klineView.drawContext.drawItemList.remove(at: reloadIndex)
+                klineView.drawContext.removeDrawItem(at: reloadIndex)
                 configManager.drawShouldTrash = false
             }
             klineView.drawContext.setNeedsDisplay()
+        } else if reloadIndex > HTDrawState.showContext.rawValue {
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil.rawValue
         }
         
         klineView.reloadConfigManager(configManager)
@@ -285,4 +286,3 @@ class HTKLineContainerView: UIView {
     }
     
 }
-

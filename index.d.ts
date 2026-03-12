@@ -33,7 +33,20 @@ export type CursorStyleConfig = {
   cursorInnerBorderColor?: number;
 };
 
-export interface RNKLineViewProps extends ViewProps {
+type RNKLineViewBaseProps = ViewProps & {
+  /**
+   * Candle list used by the simplified JS API.
+   * Required when `optionList` is not provided.
+   */
+  candles?: Candle[];
+
+  onDrawItemDidTouch?: (event: DrawItemTouchEvent) => void;
+  onDrawItemComplete?: (event: DrawItemCompleteEvent) => void;
+  onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
+  onPredictionSelect?: (event: PredictionSelectEvent) => void;
+};
+
+type RNKLineViewPropsWithOptionList = RNKLineViewBaseProps & {
   /**
    * JSON string for optionList config.
    * Cursor style keys inside configList:
@@ -42,13 +55,22 @@ export interface RNKLineViewProps extends ViewProps {
    * cursorBorderWidthPx, cursorBorderColor,
    * cursorInnerBorderWidthPx, cursorInnerBorderColor.
    */
-  optionList?: string;
+  optionList: string;
+  candles?: Candle[];
+};
 
-  onDrawItemDidTouch?: (event: DrawItemTouchEvent) => void;
-  onDrawItemComplete?: (event: DrawItemCompleteEvent) => void;
-  onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
-  onPredictionSelect?: (event: PredictionSelectEvent) => void;
-}
+type RNKLineViewPropsWithCandles = RNKLineViewBaseProps & {
+  /**
+   * Omit optionList to use simplified API.
+   * In this mode, `candles` is required.
+   */
+  optionList?: undefined;
+  candles: Candle[];
+};
+
+export type RNKLineViewProps =
+  | RNKLineViewPropsWithOptionList
+  | RNKLineViewPropsWithCandles;
 
 export interface RNKLineViewRef {
   /**

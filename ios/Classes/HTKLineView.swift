@@ -122,6 +122,27 @@ class HTKLineView: UIScrollView {
 
     private var priceGridLevels: [CGFloat] = []
 
+    private func safeVisibleRange() -> ClosedRange<Int>? {
+        let count = configManager.modelArray.count
+        guard count > 0 else { return nil }
+
+        let lower = min(max(0, visibleRange.lowerBound), count - 1)
+        let upper = min(max(lower, visibleRange.upperBound), count - 1)
+        return lower...upper
+    }
+
+    private func localSelectedIndex() -> Int? {
+        guard let range = safeVisibleRange(), range.contains(selectedIndex) else {
+            return nil
+        }
+
+        let local = selectedIndex - range.lowerBound
+        guard local >= 0, local < visibleModelArray.count else {
+            return nil
+        }
+        return local
+    }
+
     // MARK: - Helpers cho lưới
     @inline(__always)
     private func hairlineWidth() -> CGFloat {
@@ -305,7 +326,12 @@ class HTKLineView: UIScrollView {
     }
 
     func calculateBaseHeight() {
-        self.visibleModelArray = configManager.modelArray.count > 0 ? Array(configManager.modelArray[visibleRange]) : configManager.modelArray
+        if let range = safeVisibleRange() {
+            self.visibleRange = range
+            self.visibleModelArray = Array(configManager.modelArray[range])
+        } else {
+            self.visibleModelArray = []
+        }
         self.volumeRange = configManager.mainFlex...configManager.mainFlex + configManager.volumeFlex
 
         self.allHeight = self.bounds.size.height - configManager.paddingBottom
@@ -446,8 +472,8 @@ class HTKLineView: UIScrollView {
 
     func drawText(_ context: CGContext) {
         var model = visibleModelArray.last
-        if visibleRange.contains(selectedIndex) {
-            model = visibleModelArray[selectedIndex - visibleRange.lowerBound]
+        if let local = localSelectedIndex() {
+            model = visibleModelArray[local]
         }
         if let model = model {
             let baseX: CGFloat = 5
@@ -1305,9 +1331,9 @@ class HTKLineView: UIScrollView {
     }
 
     func drawSelectedBoard(_ context: CGContext) {
-        guard visibleRange.contains(selectedIndex) else { return }
+        guard let local = localSelectedIndex() else { return }
         guard !configManager.isMinute else { return }
-        let itemList = visibleModelArray[selectedIndex - visibleRange.lowerBound].selectedItemList
+        let itemList = visibleModelArray[local].selectedItemList
 
         let font = configManager.createFont(configManager.panelTextFontSize)
         let color = configManager.candleTextColor
@@ -1355,8 +1381,8 @@ class HTKLineView: UIScrollView {
     }
 
     func drawSelectedTime(_ context: CGContext) {
-        guard visibleRange.contains(selectedIndex) else { return }
-        let value = visibleModelArray[selectedIndex - visibleRange.lowerBound].dateString
+        guard let local = localSelectedIndex() else { return }
+        let value = visibleModelArray[local].dateString
         let color = configManager.candleTextColor
         let x = (CGFloat(selectedIndex) + 0.5) * configManager.itemWidth - contentOffset.x
         let font = configManager.createFont(configManager.candleTextFontSize)
@@ -1386,6 +1412,13 @@ class HTKLineView: UIScrollView {
 extension HTKLineView: UIScrollViewDelegate {
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard configManager.modelArray.count > 0, configManager.itemWidth > 0 else {
+            visibleRange = 0...0
+            visibleModelArray = []
+            self.setNeedsDisplay()
+            return
+        }
+
         let contentOffsetX = scrollView.contentOffset.x
         var visibleStartIndex = Int(floor(contentOffsetX / configManager.itemWidth))
         var visibleEndIndex = Int(ceil((contentOffsetX + scrollView.bounds.size.width) / configManager.itemWidth))
@@ -1412,6 +1445,13 @@ extension HTKLineView: UIScrollViewDelegate {
         let point = gesture.location(in: self)
         selectedLocation = point
 
+        guard configManager.modelArray.count > 0, configManager.itemWidth > 0 else {
+            selectedIndex = -1
+            return
+        }
+
+        // `location(in: self)` on UIScrollView is already in the scroll-view content
+        // coordinate space (bounds origin tracks contentOffset), so do not add contentOffset again.
         var index = Int(floor(point.x / configManager.itemWidth))
         index = max(0, min(index, configManager.modelArray.count - 1))
         selectedIndex = index

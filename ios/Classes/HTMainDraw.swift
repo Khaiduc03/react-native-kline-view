@@ -46,7 +46,9 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         if (configManager.isMinute) {
 
         } else {
-            drawCandle(high: findValue(true), low: findValue(false), maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, width: configManager.candleWidth, color: color, verticalAlignBottom: false, context: context, configManager: configManager)
+            // Keep doji bodies visibly thick enough in UI (logical points, not physical pixel).
+            let minBodyHeightPx: CGFloat = 1.5
+            drawCandle(high: findValue(true), low: findValue(false), maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, width: configManager.candleWidth, color: color, verticalAlignBottom: false, minBodyHeightPx: minBodyHeightPx, context: context, configManager: configManager)
             drawCandle(high: model.high, low: model.low, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, width: configManager.candleLineWidth, color: color, verticalAlignBottom: false, context: context, configManager: configManager)
         }
     }

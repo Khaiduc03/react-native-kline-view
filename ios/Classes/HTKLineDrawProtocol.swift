@@ -24,13 +24,29 @@ protocol HTKLineDrawProtocol: class {
 
 extension HTKLineDrawProtocol {
 
-    func drawCandle(high: CGFloat, low: CGFloat, maxValue: CGFloat, minValue: CGFloat, baseY: CGFloat, height: CGFloat, index: Int, width: CGFloat, color: UIColor, verticalAlignBottom: Bool, context: CGContext, configManager: HTKLineConfigManager) {
+    func drawCandle(high: CGFloat, low: CGFloat, maxValue: CGFloat, minValue: CGFloat, baseY: CGFloat, height: CGFloat, index: Int, width: CGFloat, color: UIColor, verticalAlignBottom: Bool, minBodyHeightPx: CGFloat = 0, context: CGContext, configManager: HTKLineConfigManager) {
         let itemWidth = configManager.itemWidth
         let scale = (maxValue - minValue) / height
+        if scale == 0 {
+            return
+        }
         let paddingHorizontal = (itemWidth - width) / 2.0
         let x = CGFloat(index) * itemWidth + paddingHorizontal
-        let y = baseY + (maxValue - high) / scale
-        let height = (high - (!verticalAlignBottom ? low : minValue)) / scale
+        let drawLow = !verticalAlignBottom ? low : minValue
+        var yTop = baseY + (maxValue - high) / scale
+        var yBottom = baseY + (maxValue - drawLow) / scale
+
+        if !verticalAlignBottom && minBodyHeightPx > 0 {
+            let currentHeight = abs(yBottom - yTop)
+            if currentHeight < minBodyHeightPx {
+                let mid = (yTop + yBottom) / 2.0
+                yTop = mid - minBodyHeightPx / 2.0
+                yBottom = mid + minBodyHeightPx / 2.0
+            }
+        }
+
+        let y = min(yTop, yBottom)
+        let height = abs(yBottom - yTop)
         context.setFillColor(color.cgColor)
         context.fill(CGRect.init(x: x, y: y, width: width, height: height))
     }
