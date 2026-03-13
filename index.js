@@ -415,6 +415,11 @@ function toIndex(value, fallback) {
   return parsed;
 }
 
+function toFiniteOptionalNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function uniqPositiveIntegers(list, fallback) {
   const values = Array.from(
     new Set(
@@ -1140,6 +1145,9 @@ function composeOptionList({
   showVolume,
   maStyle,
   bollStyle,
+  srStyle,
+  supportLevel,
+  resistanceLevel,
   draw,
   prediction,
   interaction,
@@ -1163,6 +1171,13 @@ function composeOptionList({
   const resolvedShowVolume = showVolume !== false;
   const resolvedMaStyle = maStyle === "line_labels" ? "line_labels" : "default";
   const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
+  const resolvedSrStyle = srStyle === "line_labels" ? "line_labels" : "default";
+  const support = toFiniteOptionalNumber(supportLevel);
+  const resistance = toFiniteOptionalNumber(resistanceLevel);
+  const hasValidSrLevels =
+    typeof support === "number" &&
+    typeof resistance === "number" &&
+    support < resistance;
   const resolvedPrimary = showMainMAResolved ? 1 : showMainBOLL ? 2 : -1;
   const autoCompute = resolvedIndicator?.autoCompute !== false;
   const periods = extractIndicatorPeriods(
@@ -1220,6 +1235,13 @@ function composeOptionList({
     showVolume: resolvedShowVolume,
     maStyle: resolvedMaStyle,
     bollStyle: resolvedBollStyle,
+    srStyle: resolvedSrStyle,
+    ...(resolvedSrStyle === "line_labels" && hasValidSrLevels
+      ? {
+          supportLevel: support,
+          resistanceLevel: resistance,
+        }
+      : {}),
     second: resolvedIndicator?.second ?? 0,
     time: format?.time ?? resolvedIndicator?.time ?? 1,
     configList,
@@ -1268,6 +1290,13 @@ function toLegacyPropsConfig({
   const emaEnabled = mainIndicators?.ema?.enabled === true;
   const superEnabled = mainIndicators?.super?.enabled === true;
   const bollEnabled = mainIndicators?.boll?.enabled === true;
+  const srEnabled = mainIndicators?.sr?.enabled === true;
+  const srSupportLevel = srEnabled
+    ? toFiniteOptionalNumber(mainIndicators?.sr?.supportLevel)
+    : undefined;
+  const srResistanceLevel = srEnabled
+    ? toFiniteOptionalNumber(mainIndicators?.sr?.resistanceLevel)
+    : undefined;
   const resolvedPrimary =
     maEnabled || emaEnabled || superEnabled ? 1 : bollEnabled ? 2 : -1;
 
@@ -1302,6 +1331,12 @@ function toLegacyPropsConfig({
     showVolume: volume?.enabled !== false,
     maStyle: mainIndicators?.ma?.style === "line_labels" ? "line_labels" : "default",
     bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
+    srStyle:
+      srEnabled && mainIndicators?.sr?.style === "line_labels"
+        ? "line_labels"
+        : "default",
+    supportLevel: srSupportLevel,
+    resistanceLevel: srResistanceLevel,
     theme: translatedTheme,
     indicator: {
       primary: resolvedPrimary,
@@ -1490,6 +1525,10 @@ const RNKLineView = forwardRef((props, ref) => {
               n: Number(indicator?.targetList?.bollN ?? DEFAULT_INDICATOR_PERIODS.bollN),
               p: Number(indicator?.targetList?.bollP ?? DEFAULT_INDICATOR_PERIODS.bollP),
             },
+            sr: {
+              enabled: false,
+              style: "default",
+            },
           }
         : undefined);
     const legacy = toLegacyPropsConfig({
@@ -1530,6 +1569,9 @@ const RNKLineView = forwardRef((props, ref) => {
       showVolume: legacy.showVolume,
       maStyle: legacy.maStyle,
       bollStyle: legacy.bollStyle,
+      srStyle: legacy.srStyle,
+      supportLevel: legacy.supportLevel,
+      resistanceLevel: legacy.resistanceLevel,
       draw,
       prediction,
       interaction: legacy.interaction,

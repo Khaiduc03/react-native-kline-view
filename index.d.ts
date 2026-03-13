@@ -264,6 +264,14 @@ export type MainIndicatorsConfig = {
     p?: number;
     style?: "default" | "band_labels";
   };
+  sr?: {
+    enabled: boolean;
+    style?: "default" | "line_labels";
+    /** Optional explicit support level for SR overlay line labels. */
+    supportLevel?: number;
+    /** Optional explicit resistance level for SR overlay line labels. */
+    resistanceLevel?: number;
+  };
 };
 
 export type SubChartConfig = {

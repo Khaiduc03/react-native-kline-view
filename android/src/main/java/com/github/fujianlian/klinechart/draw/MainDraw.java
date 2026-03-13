@@ -42,6 +42,9 @@ public class MainDraw implements IChartDraw<ICandle> {
     private Paint maLabelTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint maLabelBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint maGuidePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint srLabelTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint srLabelBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint srGuidePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Paint minuteGradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -53,6 +56,9 @@ public class MainDraw implements IChartDraw<ICandle> {
 
     private PrimaryStatus primaryStatus = PrimaryStatus.MA;
     private KLineChartView kChartView;
+
+    private final int srResistanceColor = Color.parseColor("#EF4444");
+    private final int srSupportColor = Color.parseColor("#14B8A6");
 
     public MainDraw(BaseKLineChartView view) {
         Context context = view.getContext();
@@ -80,6 +86,11 @@ public class MainDraw implements IChartDraw<ICandle> {
         maLabelBgPaint.setAntiAlias(true);
         maGuidePaint.setStyle(Paint.Style.STROKE);
         maGuidePaint.setAntiAlias(true);
+        srLabelTextPaint.setAntiAlias(true);
+        srLabelBgPaint.setStyle(Paint.Style.FILL);
+        srLabelBgPaint.setAntiAlias(true);
+        srGuidePaint.setStyle(Paint.Style.STROKE);
+        srGuidePaint.setAntiAlias(true);
     }
 
     public void reloadColor(BaseKLineChartView view) {
@@ -110,6 +121,27 @@ public class MainDraw implements IChartDraw<ICandle> {
 
     private boolean shouldDrawMaLineLabels(@NonNull BaseKLineChartView view) {
         return shouldDrawMA(view) && "line_labels".equals(view.configManager.maStyle);
+    }
+
+    private boolean shouldDrawSupportResistanceLabels(@NonNull BaseKLineChartView view) {
+        if (view.isMinute) {
+            return false;
+        }
+        if (!"line_labels".equals(view.configManager.srStyle)) {
+            return false;
+        }
+        Float support = view.configManager.supportLevel;
+        Float resistance = view.configManager.resistanceLevel;
+        if (support == null || resistance == null) {
+            return false;
+        }
+        if (Float.isNaN(support) || Float.isInfinite(support)) {
+            return false;
+        }
+        if (Float.isNaN(resistance) || Float.isInfinite(resistance)) {
+            return false;
+        }
+        return support < resistance;
     }
 
     private boolean isBollValueValid(float value) {
@@ -523,7 +555,84 @@ public class MainDraw implements IChartDraw<ICandle> {
                 }
                 drawBollRightLabels(canvas, view);
             }
+            drawSupportResistanceRightLabels(canvas, view);
         }
+    }
+
+    private void drawSupportResistanceRightLabels(@NonNull Canvas canvas, @NonNull BaseKLineChartView view) {
+        if (!shouldDrawSupportResistanceLabels(view)) {
+            return;
+        }
+
+        Float supportRaw = view.configManager.supportLevel;
+        Float resistanceRaw = view.configManager.resistanceLevel;
+        if (supportRaw == null || resistanceRaw == null) {
+            return;
+        }
+        float support = supportRaw;
+        float resistance = resistanceRaw;
+
+        String[] titles = {"Resistance", "Support"};
+        float[] values = {resistance, support};
+        int[] bgColors = {srResistanceColor, srSupportColor};
+        float[] yTargets = {view.yFromValue(resistance), view.yFromValue(support)};
+        int[] order = {0, 1};
+        if (yTargets[order[1]] < yTargets[order[0]]) {
+            int tmp = order[0];
+            order[0] = order[1];
+            order[1] = tmp;
+        }
+
+        float fontSize = Math.max(ViewUtil.Dp2Px(mContext, 10f), view.configManager.rightTextFontSize);
+        srLabelTextPaint.setTextSize(fontSize);
+        srLabelTextPaint.setColor(Color.WHITE);
+        Paint.FontMetrics fm = srLabelTextPaint.getFontMetrics();
+        float textHeight = fm.descent - fm.ascent;
+        float paddingX = ViewUtil.Dp2Px(mContext, 6f);
+        float paddingY = ViewUtil.Dp2Px(mContext, 3f);
+        float labelHeight = textHeight + paddingY * 2f;
+        float gap = ViewUtil.Dp2Px(mContext, 4f);
+        float minTop = ViewUtil.Dp2Px(mContext, 2f);
+        float maxTop = view.getMainBottom() - labelHeight - ViewUtil.Dp2Px(mContext, 2f);
+        if (maxTop < minTop) {
+            return;
+        }
+
+        float[] topByIndex = new float[2];
+        float previousBottom = minTop - gap;
+        for (int orderedIndex : order) {
+            float rawTop = yTargets[orderedIndex] - labelHeight / 2f;
+            float top = Math.max(minTop, Math.min(maxTop, rawTop));
+            if (top < previousBottom + gap) {
+                top = previousBottom + gap;
+            }
+            top = Math.min(maxTop, top);
+            topByIndex[orderedIndex] = top;
+            previousBottom = top + labelHeight;
+        }
+
+        float rightInset = ViewUtil.Dp2Px(mContext, 6f);
+        srGuidePaint.setStrokeWidth(ViewUtil.Dp2Px(mContext, 0.9f));
+        srGuidePaint.setPathEffect(new DashPathEffect(new float[]{10f, 6f}, 0));
+        for (int i = 0; i < values.length; i++) {
+            String text = titles[i] + " " + view.formatValue(values[i]);
+            float textWidth = srLabelTextPaint.measureText(text);
+            float width = textWidth + paddingX * 2f;
+            float left = view.getWidth() - rightInset - width;
+            float top = topByIndex[i];
+            float yValue = yTargets[i];
+            int color = bgColors[i];
+
+            srGuidePaint.setColor(withAlpha(color, 160));
+            canvas.drawLine(0f, yValue, view.getWidth(), yValue, srGuidePaint);
+
+            RectF rect = new RectF(left, top, left + width, top + labelHeight);
+            srLabelBgPaint.setColor(color);
+            canvas.drawRoundRect(rect, ViewUtil.Dp2Px(mContext, 3f), ViewUtil.Dp2Px(mContext, 3f), srLabelBgPaint);
+            float textBaseline = top + paddingY - fm.ascent;
+            canvas.drawText(text, left + paddingX, textBaseline, srLabelTextPaint);
+        }
+        srGuidePaint.setPathEffect(null);
     }
 
     private void drawMaRightLabels(@NonNull Canvas canvas, @NonNull BaseKLineChartView view) {

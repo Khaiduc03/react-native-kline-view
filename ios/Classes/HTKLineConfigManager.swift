@@ -114,6 +114,12 @@ class HTKLineConfigManager: NSObject {
 
     var bollStyle = "default"
 
+    var srStyle = "default"
+
+    var supportLevel: CGFloat?
+
+    var resistanceLevel: CGFloat?
+
     var mainType: HTKLineMainType {
         get {
             return HTKLineMainType(rawValue: self.primary) ?? HTKLineMainType.none
@@ -584,6 +590,35 @@ class HTKLineConfigManager: NSObject {
             bollStyle = "band_labels"
         } else {
             bollStyle = "default"
+        }
+        if let value = optionList["srStyle"] as? String, value == "line_labels" {
+            srStyle = "line_labels"
+        } else {
+            srStyle = "default"
+        }
+        if let value = optionList["supportLevel"] as? NSNumber {
+            supportLevel = CGFloat(value.doubleValue)
+        } else if let value = optionList["supportLevel"] as? Double {
+            supportLevel = CGFloat(value)
+        } else {
+            supportLevel = nil
+        }
+        if let value = optionList["resistanceLevel"] as? NSNumber {
+            resistanceLevel = CGFloat(value.doubleValue)
+        } else if let value = optionList["resistanceLevel"] as? Double {
+            resistanceLevel = CGFloat(value)
+        } else {
+            resistanceLevel = nil
+        }
+        if let support = supportLevel, (!support.isFinite || support.isNaN) {
+            supportLevel = nil
+        }
+        if let resistance = resistanceLevel, (!resistance.isFinite || resistance.isNaN) {
+            resistanceLevel = nil
+        }
+        if let support = supportLevel, let resistance = resistanceLevel, support >= resistance {
+            supportLevel = nil
+            resistanceLevel = nil
         }
 
         _itemWidth = configList["itemWidth"] as? CGFloat ?? 0

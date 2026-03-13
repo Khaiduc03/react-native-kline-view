@@ -349,6 +349,15 @@ class HTKLineView: UIScrollView {
                     context,
                     configManager
                 )
+                mainDraw.drawSupportResistanceRightLabels(
+                    allWidth,
+                    mainMinMaxRange.upperBound,
+                    mainMinMaxRange.lowerBound,
+                    mainBaseY,
+                    mainHeight,
+                    context,
+                    configManager
+                )
             }
             drawSelectedLine(context)
             drawSelectedBoard(context)

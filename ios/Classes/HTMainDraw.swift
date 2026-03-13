@@ -28,6 +28,17 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         return shouldDrawMA(configManager) && configManager.maStyle == "line_labels"
     }
 
+    private func shouldDrawSupportResistanceLabels(_ configManager: HTKLineConfigManager) -> Bool {
+        if configManager.isMinute { return false }
+        if configManager.srStyle != "line_labels" { return false }
+        guard let support = configManager.supportLevel, let resistance = configManager.resistanceLevel else {
+            return false
+        }
+        if !support.isFinite || support.isNaN { return false }
+        if !resistance.isFinite || resistance.isNaN { return false }
+        return support < resistance
+    }
+
     private func isBollValueValid(_ value: CGFloat) -> Bool {
         return value.isFinite && !value.isNaN && value != 0
     }
@@ -460,7 +471,7 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
             previousBottom = top + labelHeight
         }
 
-        let rightInset = max(configManager.paddingRight, 4)
+        let rightInset: CGFloat = 4
         for i in 0..<values.count {
             let text = "\(titles[i]) \(configManager.precision(values[i], configManager.price))"
             let size = (text as NSString).size(withAttributes: textAttributes)
@@ -541,7 +552,7 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
             previousBottom = top + labelHeight
         }
 
-        let rightInset = max(configManager.paddingRight, 4)
+        let rightInset: CGFloat = 4
         for i in 0..<titles.count {
             let text = "\(titles[i]) \(configManager.precision(values[i], configManager.price))"
             let size = (text as NSString).size(withAttributes: textAttributes)
@@ -557,6 +568,90 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
             let lineEnd = max(0, left - 4)
             context.move(to: CGPoint(x: 0, y: yTargets[i]))
             context.addLine(to: CGPoint(x: lineEnd, y: yTargets[i]))
+            context.strokePath()
+            context.restoreGState()
+
+            context.setFillColor(colors[i].cgColor)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (text as NSString).draw(
+                at: CGPoint(x: left + paddingX, y: top + paddingY),
+                withAttributes: textAttributes
+            )
+        }
+    }
+
+    func drawSupportResistanceRightLabels(
+        _ allWidth: CGFloat,
+        _ maxValue: CGFloat,
+        _ minValue: CGFloat,
+        _ baseY: CGFloat,
+        _ height: CGFloat,
+        _ context: CGContext,
+        _ configManager: HTKLineConfigManager
+    ) {
+        if !shouldDrawSupportResistanceLabels(configManager) { return }
+        guard
+            let support = configManager.supportLevel,
+            let resistance = configManager.resistanceLevel
+        else {
+            return
+        }
+
+        let titles = ["Resistance", "Support"]
+        let values = [resistance, support]
+        let colors = [
+            UIColor(red: 239 / 255, green: 68 / 255, blue: 68 / 255, alpha: 1),
+            UIColor(red: 20 / 255, green: 184 / 255, blue: 166 / 255, alpha: 1),
+        ]
+        var yTargets = [
+            pointY(resistance, maxValue, minValue, baseY, height),
+            pointY(support, maxValue, minValue, baseY, height),
+        ]
+        var order = [0, 1]
+        order.sort { yTargets[$0] < yTargets[$1] }
+
+        let font = configManager.createFont(max(configManager.rightTextFontSize, 10))
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.white,
+        ]
+        let paddingX: CGFloat = 6
+        let paddingY: CGFloat = 3
+        let lineHeight = textHeight(font: font)
+        let labelHeight = lineHeight + paddingY * 2
+        let gap: CGFloat = 4
+        let minTop: CGFloat = 2
+        let maxTop = max(minTop, baseY + height - labelHeight - 2)
+
+        var topByIndex = [CGFloat](repeating: minTop, count: titles.count)
+        var previousBottom = minTop - gap
+        for idx in order {
+            var top = max(minTop, min(maxTop, yTargets[idx] - labelHeight / 2))
+            if top < previousBottom + gap {
+                top = previousBottom + gap
+            }
+            top = min(maxTop, top)
+            topByIndex[idx] = top
+            previousBottom = top + labelHeight
+        }
+
+        let rightInset: CGFloat = 4
+        for i in 0..<titles.count {
+            let text = "\(titles[i]) \(configManager.precision(values[i], configManager.price))"
+            let size = (text as NSString).size(withAttributes: textAttributes)
+            let width = size.width + paddingX * 2
+            let left = allWidth - rightInset - width
+            let top = topByIndex[i]
+            let rect = CGRect(x: left, y: top, width: width, height: labelHeight)
+
+            context.saveGState()
+            context.setStrokeColor(colors[i].withAlphaComponent(0.6).cgColor)
+            context.setLineWidth(0.9)
+            context.setLineDash(phase: 0, lengths: [8, 6])
+            context.move(to: CGPoint(x: 0, y: yTargets[i]))
+            context.addLine(to: CGPoint(x: allWidth, y: yTargets[i]))
             context.strokePath()
             context.restoreGState()
 

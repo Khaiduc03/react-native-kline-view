@@ -13,6 +13,10 @@ export interface ChartAIData {
 
 export interface MarketData {
   candles?: Candle[];
+  support?: number;
+  resistance?: number;
+  support_level?: number;
+  resistance_level?: number;
   boll_mb?: number[];
   boll_up?: number[];
   boll_dn?: number[];

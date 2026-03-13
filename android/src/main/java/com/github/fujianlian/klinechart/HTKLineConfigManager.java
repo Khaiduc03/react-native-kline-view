@@ -77,6 +77,12 @@ public class HTKLineConfigManager {
 
     public String bollStyle = "default";
 
+    public String srStyle = "default";
+
+    public Float supportLevel = null;
+
+    public Float resistanceLevel = null;
+
 	public SecondStatus secondStatus = SecondStatus.MACD;
 
 	public Boolean isMinute = false;
@@ -242,6 +248,14 @@ public class HTKLineConfigManager {
             return ((Number) value).floatValue();
         }
         return defaultValue;
+    }
+
+    private static Float readNullableFloat(Map map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).floatValue();
+        }
+        return null;
     }
 
     private static int readColor(Map map, String key, int defaultValue) {
@@ -513,6 +527,24 @@ public class HTKLineConfigManager {
             this.bollStyle = "band_labels";
         } else {
             this.bollStyle = "default";
+        }
+        Object srStyleValue = optionList.get("srStyle");
+        if (srStyleValue instanceof String && "line_labels".equals(srStyleValue)) {
+            this.srStyle = "line_labels";
+        } else {
+            this.srStyle = "default";
+        }
+        this.supportLevel = readNullableFloat(optionList, "supportLevel");
+        this.resistanceLevel = readNullableFloat(optionList, "resistanceLevel");
+        if (this.supportLevel != null && (Float.isNaN(this.supportLevel) || Float.isInfinite(this.supportLevel))) {
+            this.supportLevel = null;
+        }
+        if (this.resistanceLevel != null && (Float.isNaN(this.resistanceLevel) || Float.isInfinite(this.resistanceLevel))) {
+            this.resistanceLevel = null;
+        }
+        if (this.supportLevel != null && this.resistanceLevel != null && this.supportLevel >= this.resistanceLevel) {
+            this.supportLevel = null;
+            this.resistanceLevel = null;
         }
         this.secondStatus = secondStatus;
         this.isMinute = time == -1;
