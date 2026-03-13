@@ -511,6 +511,29 @@ function normalizeRsiCurrentTag(currentTag, defaultPeriod = 14, enabledByDefault
   };
 }
 
+function normalizeMacdPeriods(periods, fallback = DEFAULT_INDICATOR_PERIODS) {
+  const defaults = {
+    macdS: toPeriod(fallback?.macdS, DEFAULT_INDICATOR_PERIODS.macdS),
+    macdL: toPeriod(fallback?.macdL, DEFAULT_INDICATOR_PERIODS.macdL),
+    macdM: toPeriod(fallback?.macdM, DEFAULT_INDICATOR_PERIODS.macdM),
+  };
+  if (Array.isArray(periods) && periods.length >= 3) {
+    return {
+      macdS: toPeriod(periods[0], defaults.macdS),
+      macdL: toPeriod(periods[1], defaults.macdL),
+      macdM: toPeriod(periods[2], defaults.macdM),
+    };
+  }
+  if (isObject(periods)) {
+    return {
+      macdS: toPeriod(periods.short ?? periods.macdS, defaults.macdS),
+      macdL: toPeriod(periods.long ?? periods.macdL, defaults.macdL),
+      macdM: toPeriod(periods.signal ?? periods.macdM, defaults.macdM),
+    };
+  }
+  return defaults;
+}
+
 function uniqPositiveIntegers(list, fallback) {
   const values = Array.from(
     new Set(
@@ -1236,6 +1259,7 @@ function composeOptionList({
   showVolume,
   maStyle,
   bollStyle,
+  macdStyle,
   srStyle,
   supportLevel,
   resistanceLevel,
@@ -1244,6 +1268,7 @@ function composeOptionList({
   rsiLevels,
   rsiCurrentTag,
   rsiOnly,
+  macdOnly,
   draw,
   prediction,
   interaction,
@@ -1267,12 +1292,14 @@ function composeOptionList({
   const resolvedShowVolume = showVolume !== false;
   const resolvedMaStyle = maStyle === "line_labels" ? "line_labels" : "default";
   const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
+  const resolvedMacdStyle = macdStyle === "line_labels" ? "line_labels" : "default";
   const resolvedSrStyle = srStyle === "line_labels" ? "line_labels" : "default";
   const resolvedRsiStyle = rsiStyle === "line_labels" ? "line_labels" : "default";
   const resolvedRsiAxisMode = normalizeRsiAxisMode(rsiAxisMode, "adaptive");
   const resolvedRsiLevels = Array.isArray(rsiLevels) ? rsiLevels : [];
   const resolvedRsiCurrentTag = isObject(rsiCurrentTag) ? rsiCurrentTag : undefined;
   const resolvedRsiOnly = rsiOnly === true;
+  const resolvedMacdOnly = macdOnly === true;
   const support = toFiniteOptionalNumber(supportLevel);
   const resistance = toFiniteOptionalNumber(resistanceLevel);
   const hasValidSrLevels =
@@ -1336,11 +1363,13 @@ function composeOptionList({
     showVolume: resolvedShowVolume,
     maStyle: resolvedMaStyle,
     bollStyle: resolvedBollStyle,
+    macdStyle: resolvedMacdStyle,
     rsiStyle: resolvedRsiStyle,
     rsiAxisMode: resolvedRsiAxisMode,
     ...(resolvedRsiLevels.length > 0 ? { rsiLevels: resolvedRsiLevels } : {}),
     ...(resolvedRsiCurrentTag ? { rsiCurrentTag: resolvedRsiCurrentTag } : {}),
     rsiOnly: resolvedRsiOnly,
+    macdOnly: resolvedMacdOnly,
     srStyle: resolvedSrStyle,
     ...(resolvedSrStyle === "line_labels" && hasValidSrLevels
       ? {
@@ -1391,9 +1420,12 @@ function toLegacyPropsConfig({
   const enabledSub = (Array.isArray(subCharts) ? subCharts : []).filter(
     (item) => item && item.enabled !== false
   );
+  const macdSubIndicatorEnabled = subIndicators?.macd?.enabled === true;
   const rsiSubIndicatorEnabled = subIndicators?.rsi?.enabled === true;
   const second = rsiSubIndicatorEnabled
     ? 5
+    : macdSubIndicatorEnabled
+    ? 3
     : enabledSub.length > 0
     ? mapSubTypeToSecond(enabledSub[0].type)
     : -1;
@@ -1403,6 +1435,19 @@ function toLegacyPropsConfig({
   const superEnabled = mainIndicators?.super?.enabled === true;
   const bollEnabled = mainIndicators?.boll?.enabled === true;
   const srEnabled = mainIndicators?.sr?.enabled === true;
+  const macdPeriods = macdSubIndicatorEnabled
+    ? normalizeMacdPeriods(subIndicators?.macd?.periods)
+    : {
+        macdS: DEFAULT_INDICATOR_PERIODS.macdS,
+        macdL: DEFAULT_INDICATOR_PERIODS.macdL,
+        macdM: DEFAULT_INDICATOR_PERIODS.macdM,
+      };
+  const macdStyle =
+    macdSubIndicatorEnabled && subIndicators?.macd?.style === "line_labels"
+      ? "line_labels"
+      : "default";
+  const macdOnly =
+    macdSubIndicatorEnabled && subIndicators?.macd?.macdOnly === true;
   const rsiPeriods = rsiSubIndicatorEnabled
     ? uniqPositiveIntegers(subIndicators?.rsi?.periods, [14])
     : DEFAULT_INDICATOR_PERIODS.rsi;
@@ -1464,11 +1509,13 @@ function toLegacyPropsConfig({
     showVolume: volume?.enabled !== false,
     maStyle: mainIndicators?.ma?.style === "line_labels" ? "line_labels" : "default",
     bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
+    macdStyle,
     rsiStyle,
     rsiAxisMode,
     rsiLevels,
     rsiCurrentTag,
     rsiOnly,
+    macdOnly,
     srStyle:
       srEnabled && mainIndicators?.sr?.style === "line_labels"
         ? "line_labels"
@@ -1518,6 +1565,9 @@ function toLegacyPropsConfig({
         ),
         bollN: String(mainIndicators?.boll?.n ?? DEFAULT_INDICATOR_PERIODS.bollN),
         bollP: String(mainIndicators?.boll?.p ?? DEFAULT_INDICATOR_PERIODS.bollP),
+        macdS: String(macdPeriods.macdS),
+        macdL: String(macdPeriods.macdL),
+        macdM: String(macdPeriods.macdM),
         rsiList: buildTargetItemsFromPeriods(rsiPeriods, true),
       },
       autoCompute: true,
@@ -1714,6 +1764,7 @@ const RNKLineView = forwardRef((props, ref) => {
       showVolume: legacy.showVolume,
       maStyle: legacy.maStyle,
       bollStyle: legacy.bollStyle,
+      macdStyle: legacy.macdStyle,
       srStyle: legacy.srStyle,
       supportLevel: legacy.supportLevel,
       resistanceLevel: legacy.resistanceLevel,
@@ -1722,6 +1773,7 @@ const RNKLineView = forwardRef((props, ref) => {
       rsiLevels: legacy.rsiLevels,
       rsiCurrentTag: legacy.rsiCurrentTag,
       rsiOnly: legacy.rsiOnly,
+      macdOnly: legacy.macdOnly,
       draw,
       prediction,
       interaction: legacy.interaction,

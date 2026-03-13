@@ -312,7 +312,24 @@ export type RsiSubIndicatorConfig = {
   currentTag?: RsiCurrentTagConfig;
 };
 
+export type MacdPeriodsConfig =
+  | [number, number, number]
+  | {
+      short?: number;
+      long?: number;
+      signal?: number;
+    };
+
+export type MacdSubIndicatorConfig = {
+  enabled: boolean;
+  /** Native MACD-only mode: skips main chart draw/calc pipeline and renders MACD pane as primary. */
+  macdOnly?: boolean;
+  periods?: MacdPeriodsConfig;
+  style?: "default" | "line_labels";
+};
+
 export type SubIndicatorsConfig = {
+  macd?: MacdSubIndicatorConfig;
   rsi?: RsiSubIndicatorConfig;
 };
 

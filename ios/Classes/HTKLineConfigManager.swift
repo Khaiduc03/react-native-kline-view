@@ -130,6 +130,10 @@ class HTKLineConfigManager: NSObject {
 
     var rsiOnly = false
 
+    var macdStyle = "default"
+
+    var macdOnly = false
+
     var mainType: HTKLineMainType {
         get {
             return HTKLineMainType(rawValue: self.primary) ?? HTKLineMainType.none
@@ -655,6 +659,16 @@ class HTKLineConfigManager: NSObject {
             rsiOnly = value
         } else {
             rsiOnly = false
+        }
+        if let value = optionList["macdStyle"] as? String, value == "line_labels" {
+            macdStyle = "line_labels"
+        } else {
+            macdStyle = "default"
+        }
+        if let value = optionList["macdOnly"] as? Bool {
+            macdOnly = value
+        } else {
+            macdOnly = false
         }
 
         _itemWidth = configList["itemWidth"] as? CGFloat ?? 0

@@ -93,6 +93,10 @@ public class HTKLineConfigManager {
 
     public boolean rsiOnly = false;
 
+    public String macdStyle = "default";
+
+    public boolean macdOnly = false;
+
 	public SecondStatus secondStatus = SecondStatus.MACD;
 
 	public Boolean isMinute = false;
@@ -591,6 +595,13 @@ public class HTKLineConfigManager {
             this.rsiCurrentTag = null;
         }
         this.rsiOnly = readBoolean(optionList, "rsiOnly", false);
+        Object macdStyleValue = optionList.get("macdStyle");
+        if (macdStyleValue instanceof String && "line_labels".equals(macdStyleValue)) {
+            this.macdStyle = "line_labels";
+        } else {
+            this.macdStyle = "default";
+        }
+        this.macdOnly = readBoolean(optionList, "macdOnly", false);
         this.secondStatus = secondStatus;
         this.isMinute = time == -1;
 
