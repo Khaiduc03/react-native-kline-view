@@ -329,6 +329,16 @@ class HTKLineView: UIScrollView {
             drawPrediction(context)
             drawClosePrice(context)
             if let latestVisible = visibleModelArray.last {
+                mainDraw.drawMaRightLabels(
+                    latestVisible,
+                    allWidth,
+                    mainMinMaxRange.upperBound,
+                    mainMinMaxRange.lowerBound,
+                    mainBaseY,
+                    mainHeight,
+                    context,
+                    configManager
+                )
                 mainDraw.drawBollRightLabels(
                     latestVisible,
                     allWidth,

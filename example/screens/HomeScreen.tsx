@@ -31,6 +31,12 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.buttonText}>ChartAI: server snapshot + BOLL</Text>
       </TouchableOpacity>
       <TouchableOpacity
+        style={[styles.button, styles.chartAiTrendButton]}
+        onPress={() => navigation.navigate('ChartAITrendDemo')}
+      >
+        <Text style={styles.buttonText}>ChartAI: trend EMA 50/200</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
         style={[styles.button, styles.tertiaryButton]}
         onPress={() => navigation.navigate('KLineDemo')}
       >
@@ -79,6 +85,9 @@ const styles = StyleSheet.create({
   },
   chartAiButton: {
     backgroundColor: '#0ea5a4',
+  },
+  chartAiTrendButton: {
+    backgroundColor: '#7c3aed',
   },
   buttonText: {
     color: '#ffffff',

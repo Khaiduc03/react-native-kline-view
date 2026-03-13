@@ -1138,6 +1138,7 @@ function composeOptionList({
   layout,
   indicator,
   showVolume,
+  maStyle,
   bollStyle,
   draw,
   prediction,
@@ -1160,6 +1161,7 @@ function composeOptionList({
       ? mainConfig.boll
       : resolvedIndicator?.primary === 2;
   const resolvedShowVolume = showVolume !== false;
+  const resolvedMaStyle = maStyle === "line_labels" ? "line_labels" : "default";
   const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
   const resolvedPrimary = showMainMAResolved ? 1 : showMainBOLL ? 2 : -1;
   const autoCompute = resolvedIndicator?.autoCompute !== false;
@@ -1216,6 +1218,7 @@ function composeOptionList({
     showMainMA: showMainMAResolved,
     showMainBOLL,
     showVolume: resolvedShowVolume,
+    maStyle: resolvedMaStyle,
     bollStyle: resolvedBollStyle,
     second: resolvedIndicator?.second ?? 0,
     time: format?.time ?? resolvedIndicator?.time ?? 1,
@@ -1297,6 +1300,7 @@ function toLegacyPropsConfig({
   return {
     candles: Array.isArray(initialData) ? initialData : [],
     showVolume: volume?.enabled !== false,
+    maStyle: mainIndicators?.ma?.style === "line_labels" ? "line_labels" : "default",
     bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
     theme: translatedTheme,
     indicator: {
@@ -1524,6 +1528,7 @@ const RNKLineView = forwardRef((props, ref) => {
       layout,
       indicator: legacy.indicator,
       showVolume: legacy.showVolume,
+      maStyle: legacy.maStyle,
       bollStyle: legacy.bollStyle,
       draw,
       prediction,

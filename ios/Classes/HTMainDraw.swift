@@ -24,8 +24,20 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         return shouldDrawBOLL(configManager) && configManager.bollStyle == "band_labels"
     }
 
+    private func shouldDrawMaLineLabels(_ configManager: HTKLineConfigManager) -> Bool {
+        return shouldDrawMA(configManager) && configManager.maStyle == "line_labels"
+    }
+
     private func isBollValueValid(_ value: CGFloat) -> Bool {
         return value.isFinite && !value.isNaN && value != 0
+    }
+
+    private func parsePeriod(_ value: String, fallback: Int) -> Int {
+        let digits = value.filter { $0.isNumber }
+        guard !digits.isEmpty, let parsed = Int(digits) else {
+            return fallback
+        }
+        return parsed
     }
 
     private func pointY(
@@ -458,6 +470,97 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
             let rect = CGRect(x: left, y: top, width: width, height: labelHeight)
 
             context.setFillColor(bgColors[i].cgColor)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (text as NSString).draw(
+                at: CGPoint(x: left + paddingX, y: top + paddingY),
+                withAttributes: textAttributes
+            )
+        }
+    }
+
+    func drawMaRightLabels(
+        _ model: HTKLineModel,
+        _ allWidth: CGFloat,
+        _ maxValue: CGFloat,
+        _ minValue: CGFloat,
+        _ baseY: CGFloat,
+        _ height: CGFloat,
+        _ context: CGContext,
+        _ configManager: HTKLineConfigManager
+    ) {
+        if !shouldDrawMaLineLabels(configManager) { return }
+
+        var titles = [String]()
+        var values = [CGFloat]()
+        var colors = [UIColor]()
+        var yTargets = [CGFloat]()
+
+        for (configIndex, itemModel) in configManager.maList.enumerated() {
+            if itemModel.kind.lowercased() != "ema" { continue }
+            let dataIndex = itemModel.index
+            guard let item = safeElement(model.maList, at: dataIndex) ?? safeElement(model.maList, at: configIndex) else {
+                continue
+            }
+            if !item.value.isFinite || item.value.isNaN || item.value == 0 { continue }
+            let fallbackPeriod = dataIndex > 0 ? dataIndex : configIndex
+            let period = parsePeriod(itemModel.title, fallback: parsePeriod(item.title, fallback: fallbackPeriod))
+            let title = period > 0 ? "EMA \(period)" : "EMA \(itemModel.title)"
+            titles.append(title)
+            values.append(item.value)
+            colors.append(safeTargetColor(configManager, at: dataIndex, fallback: configManager.textColor))
+            yTargets.append(pointY(item.value, maxValue, minValue, baseY, height))
+        }
+        if titles.isEmpty { return }
+
+        let font = configManager.createFont(max(configManager.rightTextFontSize, 10))
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.white,
+        ]
+        let paddingX: CGFloat = 6
+        let paddingY: CGFloat = 3
+        let lineHeight = textHeight(font: font)
+        let labelHeight = lineHeight + paddingY * 2
+        let gap: CGFloat = 4
+        let minTop: CGFloat = 2
+        let maxTop = max(minTop, baseY + height - labelHeight - 2)
+
+        var order = Array(0..<titles.count)
+        order.sort { yTargets[$0] < yTargets[$1] }
+        var topByIndex = [CGFloat](repeating: minTop, count: titles.count)
+        var previousBottom = minTop - gap
+        for idx in order {
+            var top = max(minTop, min(maxTop, yTargets[idx] - labelHeight / 2))
+            if top < previousBottom + gap {
+                top = previousBottom + gap
+            }
+            top = min(maxTop, top)
+            topByIndex[idx] = top
+            previousBottom = top + labelHeight
+        }
+
+        let rightInset = max(configManager.paddingRight, 4)
+        for i in 0..<titles.count {
+            let text = "\(titles[i]) \(configManager.precision(values[i], configManager.price))"
+            let size = (text as NSString).size(withAttributes: textAttributes)
+            let width = size.width + paddingX * 2
+            let left = allWidth - rightInset - width
+            let top = topByIndex[i]
+            let rect = CGRect(x: left, y: top, width: width, height: labelHeight)
+
+            context.saveGState()
+            context.setStrokeColor(colors[i].withAlphaComponent(0.45).cgColor)
+            context.setLineWidth(0.8)
+            context.setLineDash(phase: 0, lengths: [6, 5])
+            let lineEnd = max(0, left - 4)
+            context.move(to: CGPoint(x: 0, y: yTargets[i]))
+            context.addLine(to: CGPoint(x: lineEnd, y: yTargets[i]))
+            context.strokePath()
+            context.restoreGState()
+
+            context.setFillColor(colors[i].cgColor)
             let path = UIBezierPath(roundedRect: rect, cornerRadius: 3)
             context.addPath(path.cgPath)
             context.fillPath()

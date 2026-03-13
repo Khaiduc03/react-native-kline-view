@@ -110,6 +110,8 @@ class HTKLineConfigManager: NSObject {
 
     var showVolume = true
 
+    var maStyle = "default"
+
     var bollStyle = "default"
 
     var mainType: HTKLineMainType {
@@ -572,6 +574,11 @@ class HTKLineConfigManager: NSObject {
             showVolume = value
         } else {
             showVolume = true
+        }
+        if let value = optionList["maStyle"] as? String, value == "line_labels" {
+            maStyle = "line_labels"
+        } else {
+            maStyle = "default"
         }
         if let value = optionList["bollStyle"] as? String, value == "band_labels" {
             bollStyle = "band_labels"

@@ -140,6 +140,7 @@ Lưu ý:
 - rà lại parity iOS/Android
 - đảm bảo không đổi payload contract ngoài ý muốn
 - nếu có thay đổi contract, cập nhật `README.md` và `index.d.ts`
+- **Mặc định không chạy compile/check native lib tốn thời gian** (`xcodebuild`, `./gradlew ...compile...`) trừ khi user yêu cầu rõ; ưu tiên check nhẹ (syntax/lint/file-level) và để user tự verify native build.
 
 ## 7) Rủi ro đã biết (ưu tiên chú ý)
 

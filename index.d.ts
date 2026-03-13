@@ -247,6 +247,7 @@ export type MainIndicatorsConfig = {
   ma?: {
     enabled: boolean;
     periods: number[];
+    style?: "default" | "line_labels";
   };
   ema?: {
     enabled: boolean;

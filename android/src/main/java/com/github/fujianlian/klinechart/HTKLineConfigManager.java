@@ -73,6 +73,8 @@ public class HTKLineConfigManager {
 
     public boolean showVolume = true;
 
+    public String maStyle = "default";
+
     public String bollStyle = "default";
 
 	public SecondStatus secondStatus = SecondStatus.MACD;
@@ -500,6 +502,12 @@ public class HTKLineConfigManager {
             this.showMainBOLL = readBoolean(optionList, "showMainBOLL", this.showMainBOLL);
         }
         this.showVolume = readBoolean(optionList, "showVolume", true);
+        Object maStyleValue = optionList.get("maStyle");
+        if (maStyleValue instanceof String && "line_labels".equals(maStyleValue)) {
+            this.maStyle = "line_labels";
+        } else {
+            this.maStyle = "default";
+        }
         Object bollStyleValue = optionList.get("bollStyle");
         if (bollStyleValue instanceof String && "band_labels".equals(bollStyleValue)) {
             this.bollStyle = "band_labels";

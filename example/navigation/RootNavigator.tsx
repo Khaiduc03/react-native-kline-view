@@ -5,6 +5,7 @@ import KLineScreen from '../screens/KLineScreen';
 import SimpleKLineScreen from '../screens/SimpleKLineScreen';
 import BinanceLiveScreen from '../screens/BinanceLiveScreen';
 import ChartAIDemoScreen from '../screens/ChartAIDemoScreen';
+import ChartAITrendDemoScreen from '../screens/ChartAITrendDemoScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -12,6 +13,7 @@ export type RootStackParamList = {
   BinanceLiveDemo: undefined;
   KLineDemo: undefined;
   ChartAIDemo: undefined;
+  ChartAITrendDemo: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -49,6 +51,11 @@ export default function RootNavigator() {
         name="ChartAIDemo"
         component={ChartAIDemoScreen}
         options={{ title: 'ChartAI Demo' }}
+      />
+      <Stack.Screen
+        name="ChartAITrendDemo"
+        component={ChartAITrendDemoScreen}
+        options={{ title: 'ChartAI Trend Demo' }}
       />
     </Stack.Navigator>
   );
