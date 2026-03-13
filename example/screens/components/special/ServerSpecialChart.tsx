@@ -167,7 +167,6 @@ export function ChartAIServerChart({ data, title }: ChartAIServerChartProps) {
             itemWidth: fitItemWidth,
             candleWidth: fitCandleWidth,
             mainFlex: 0.97,
-            volumeFlex: 0.01,
           }}
         />
       </View>

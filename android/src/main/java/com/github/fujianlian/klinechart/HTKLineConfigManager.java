@@ -71,6 +71,8 @@ public class HTKLineConfigManager {
 
     public boolean showMainBOLL = false;
 
+    public boolean showVolume = true;
+
     public String bollStyle = "default";
 
 	public SecondStatus secondStatus = SecondStatus.MACD;
@@ -497,6 +499,7 @@ public class HTKLineConfigManager {
         if (optionList.containsKey("showMainBOLL")) {
             this.showMainBOLL = readBoolean(optionList, "showMainBOLL", this.showMainBOLL);
         }
+        this.showVolume = readBoolean(optionList, "showVolume", true);
         Object bollStyleValue = optionList.get("bollStyle");
         if (bollStyleValue instanceof String && "band_labels".equals(bollStyleValue)) {
             this.bollStyle = "band_labels";

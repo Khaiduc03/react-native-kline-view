@@ -111,6 +111,10 @@ class HTKLineView: UIScrollView {
     var selectedPredictionType: String? = nil // "entry", "sl", "tp"
     var selectedPredictionIndex: Int? = nil // Index for TP list
 
+    var shouldShowVolume: Bool {
+        return configManager.showVolume
+    }
+
     func unPredictionSelect() {
         self.selectedPredictionType = nil
         self.selectedPredictionIndex = nil
@@ -351,7 +355,19 @@ class HTKLineView: UIScrollView {
         } else {
             self.visibleModelArray = []
         }
-        self.volumeRange = configManager.mainFlex...configManager.mainFlex + configManager.volumeFlex
+
+        let hasChildPane = childDraw != nil
+        let showVolumePane = shouldShowVolume
+        let baseMainFlex = min(max(configManager.mainFlex, 0), 1)
+        let effectiveMainFlex: CGFloat = (!showVolumePane && !hasChildPane) ? 1 : baseMainFlex
+        let volumeEnd: CGFloat
+        if showVolumePane {
+            let safeVolumeFlex = max(configManager.volumeFlex, 0)
+            volumeEnd = min(1, max(effectiveMainFlex, effectiveMainFlex + safeVolumeFlex))
+        } else {
+            volumeEnd = effectiveMainFlex
+        }
+        self.volumeRange = effectiveMainFlex...volumeEnd
 
         self.allHeight = self.bounds.size.height - configManager.paddingBottom
         self.allWidth = self.bounds.size.width
@@ -373,15 +389,28 @@ class HTKLineView: UIScrollView {
 
         self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
         self.mainBaseY = configManager.paddingTop - textHeight
-        self.mainHeight = allHeight * volumeRange.lowerBound - mainBaseY - textHeight
+        self.mainHeight = max(0, allHeight * volumeRange.lowerBound - mainBaseY - textHeight)
 
-        self.volumeMinMaxRange = volumeDraw.minMaxRange(visibleModelArray, configManager)
+        if showVolumePane {
+            self.volumeMinMaxRange = volumeDraw.minMaxRange(visibleModelArray, configManager)
+        } else {
+            self.volumeMinMaxRange = 0..<0
+        }
         self.volumeBaseY = allHeight * volumeRange.lowerBound + configManager.headerHeight + textHeight
-        self.volumeHeight = allHeight * (volumeRange.upperBound - volumeRange.lowerBound) - configManager.headerHeight - textHeight
+        self.volumeHeight = showVolumePane
+            ? max(0, allHeight * (volumeRange.upperBound - volumeRange.lowerBound) - configManager.headerHeight - textHeight)
+            : 0
 
-        self.childMinMaxRange = childDraw?.minMaxRange(visibleModelArray, configManager) ?? Range<CGFloat>.init(uncheckedBounds: (lower: 0, upper: 0))
-        self.childBaseY = allHeight * volumeRange.upperBound + configManager.headerHeight + textHeight
-        self.childHeight = allHeight * (1 - volumeRange.upperBound) - configManager.headerHeight - textHeight
+        let childStart = showVolumePane ? volumeRange.upperBound : volumeRange.lowerBound
+        if hasChildPane {
+            self.childMinMaxRange = childDraw?.minMaxRange(visibleModelArray, configManager) ?? 0..<0
+            self.childBaseY = allHeight * childStart + configManager.headerHeight + textHeight
+            self.childHeight = max(0, allHeight * (1 - childStart) - configManager.headerHeight - textHeight)
+        } else {
+            self.childMinMaxRange = 0..<0
+            self.childHeight = 0
+            self.childBaseY = showVolumePane ? (volumeBaseY + volumeHeight) : (mainBaseY + mainHeight)
+        }
     }
 
     func yFromValue(_ value: CGFloat) -> CGFloat {
@@ -486,11 +515,15 @@ class HTKLineView: UIScrollView {
             let lastIndex = i == 0 ? i : i - 1
             let lastModel = visibleModelArray[lastIndex]
             mainDraw.drawCandle(model, i, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, context, configManager)
-            volumeDraw.drawCandle(model, i, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, context, configManager)
+            if shouldShowVolume {
+                volumeDraw.drawCandle(model, i, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, context, configManager)
+            }
             childDraw?.drawCandle(model, i, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, context, configManager)
 
             mainDraw.drawLine(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
-            volumeDraw.drawLine(model, lastModel, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, i, lastIndex, context, configManager)
+            if shouldShowVolume {
+                volumeDraw.drawLine(model, lastModel, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, i, lastIndex, context, configManager)
+            }
             childDraw?.drawLine(model, lastModel, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, i, lastIndex, context, configManager)
         }
     }
@@ -503,7 +536,9 @@ class HTKLineView: UIScrollView {
         if let model = model {
             let baseX: CGFloat = 5
             mainDraw.drawText(model, baseX, 10, context, configManager)
-            volumeDraw.drawText(model, baseX, volumeBaseY - configManager.headerHeight, context, configManager)
+            if shouldShowVolume {
+                volumeDraw.drawText(model, baseX, volumeBaseY - configManager.headerHeight, context, configManager)
+            }
             childDraw?.drawText(model, baseX, childBaseY - configManager.headerHeight, context, configManager)
         }
     }
@@ -534,7 +569,9 @@ class HTKLineView: UIScrollView {
         } else {
             mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
         }
-        volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
+        if shouldShowVolume {
+            volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
+        }
         childDraw?.drawValue(childMinMaxRange.upperBound, childMinMaxRange.lowerBound, baseX, childBaseY, childHeight, context, configManager)
     }
 

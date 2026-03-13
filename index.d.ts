@@ -273,6 +273,7 @@ export type SubChartConfig = {
 };
 
 export type VolumeConfig = {
+  /** `false` hides the entire volume pane and reclaims chart height. */
   enabled: boolean;
   maPeriods?: number[];
 };

@@ -1137,6 +1137,7 @@ function composeOptionList({
   theme,
   layout,
   indicator,
+  showVolume,
   bollStyle,
   draw,
   prediction,
@@ -1158,6 +1159,7 @@ function composeOptionList({
     typeof mainConfig?.boll === "boolean"
       ? mainConfig.boll
       : resolvedIndicator?.primary === 2;
+  const resolvedShowVolume = showVolume !== false;
   const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
   const resolvedPrimary = showMainMAResolved ? 1 : showMainBOLL ? 2 : -1;
   const autoCompute = resolvedIndicator?.autoCompute !== false;
@@ -1195,6 +1197,12 @@ function composeOptionList({
     targetList,
     deepMerge(presetIndicatorColors, themeIndicatorColors)
   );
+  if (!resolvedShowVolume) {
+    configList.volumeFlex = 0;
+    if (Number(resolvedIndicator?.second ?? 0) <= 0) {
+      configList.mainFlex = 1;
+    }
+  }
   const drawList = deepMerge(DEFAULT_DRAW_LIST, draw ?? {});
 
   const baseOptionList = {
@@ -1207,6 +1215,7 @@ function composeOptionList({
     primary: resolvedPrimary,
     showMainMA: showMainMAResolved,
     showMainBOLL,
+    showVolume: resolvedShowVolume,
     bollStyle: resolvedBollStyle,
     second: resolvedIndicator?.second ?? 0,
     time: format?.time ?? resolvedIndicator?.time ?? 1,
@@ -1287,6 +1296,7 @@ function toLegacyPropsConfig({
 
   return {
     candles: Array.isArray(initialData) ? initialData : [],
+    showVolume: volume?.enabled !== false,
     bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
     theme: translatedTheme,
     indicator: {
@@ -1513,6 +1523,7 @@ const RNKLineView = forwardRef((props, ref) => {
       theme: legacy.theme,
       layout,
       indicator: legacy.indicator,
+      showVolume: legacy.showVolume,
       bollStyle: legacy.bollStyle,
       draw,
       prediction,

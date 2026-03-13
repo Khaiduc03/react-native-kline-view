@@ -284,17 +284,41 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
 
         int allHeight = this.getHeight() - mBottomPadding;
-        int mMainHeight = (int) (allHeight * configManager.mainFlex);
-        int mVolHeight = (int) (allHeight * configManager.volumeFlex);
-        int mChildHeight = (int) (allHeight * (1 - configManager.mainFlex - configManager.volumeFlex));
-        mMainRect = new Rect(0, mTopPadding - textHeight, mWidth, mMainHeight - textHeight);
-        mVolRect = new Rect(0, mMainRect.bottom + textHeight + mChildPadding, mWidth, mMainRect.bottom + textHeight + mVolHeight);
-        mChildRect = new Rect(0, mVolRect.bottom + mChildPadding, mWidth, mVolRect.bottom + mChildHeight);
-        if (!isShowChild) {
-            mChildRect.top = mVolRect.bottom;
-            mChildRect.bottom = mVolRect.bottom;
+        boolean showVolumePane = shouldShowVolumePane();
+        boolean hasChildPanel = hasChildPane();
+
+        int mainHeight = (int) (allHeight * configManager.mainFlex);
+        if (!showVolumePane && !hasChildPanel) {
+            mainHeight = allHeight;
         }
-        
+        int mainBottom = Math.max(mTopPadding - textHeight, mainHeight - textHeight);
+        mMainRect = new Rect(0, mTopPadding - textHeight, mWidth, mainBottom);
+
+        if (showVolumePane) {
+            int volumeHeight = (int) (allHeight * configManager.volumeFlex);
+            mVolRect = new Rect(
+                    0,
+                    mMainRect.bottom + textHeight + mChildPadding,
+                    mWidth,
+                    mMainRect.bottom + textHeight + Math.max(0, volumeHeight)
+            );
+        } else {
+            mVolRect = new Rect(0, mMainRect.bottom, mWidth, mMainRect.bottom);
+        }
+
+        if (hasChildPanel) {
+            int childTop = showVolumePane
+                    ? mVolRect.bottom + mChildPadding
+                    : mMainRect.bottom + textHeight + mChildPadding;
+            int childHeight = showVolumePane
+                    ? (int) (allHeight * (1 - configManager.mainFlex - configManager.volumeFlex))
+                    : (int) (allHeight * (1 - configManager.mainFlex));
+            int childBottom = Math.max(childTop, childTop + Math.max(0, childHeight));
+            mChildRect = new Rect(0, childTop, mWidth, childBottom);
+        } else {
+            int collapsed = showVolumePane ? mVolRect.bottom : mMainRect.bottom;
+            mChildRect = new Rect(0, collapsed, mWidth, collapsed);
+        }
     }
 
     @Override
@@ -383,6 +407,14 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         return mMainRect.bottom;
     }
 
+    private boolean shouldShowVolumePane() {
+        return configManager.showVolume && mVolDraw != null;
+    }
+
+    private boolean hasChildPane() {
+        return mChildDraw != null;
+    }
+
     public float getVolY(float value) {
         return (mVolMaxValue - value) * mVolScaleY + mVolRect.top;
     }
@@ -434,7 +466,9 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         }
 
         // Separators main/vol/child
-        canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
+        if (shouldShowVolumePane()) {
+            canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
+        }
         if (mChildDraw != null && mChildRect != null) {
             canvas.drawLine(0, mChildRect.bottom, mWidth, mChildRect.bottom, mGridPaint);
         }
@@ -451,8 +485,6 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         int verticalColor = Color.argb(alpha, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor));
         Paint verticalPaint = new Paint(mGridPaint);
         verticalPaint.setColor(verticalColor);
-
-        int bottom = mChildRect != null ? mChildRect.bottom : mVolRect.bottom;
 
         for (int i = firstIndex; i <= mStopIndex; i += step) {
             float centerScrollX = getItemMiddleScrollX(i);
@@ -735,7 +767,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             if (mMainDraw != null) {
                 mMainDraw.drawTranslated(lastPoint, currentPoint, lastX, currentPointX, canvas, this, i);
             }
-            if (mVolDraw != null) {
+            if (shouldShowVolumePane()) {
                 mVolDraw.drawTranslated(lastPoint, currentPoint, lastX, currentPointX, canvas, this, i);
             }
             if (mChildDraw != null) {
@@ -792,7 +824,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             }
         }
         //--------------画中间子图的值-------------
-        if (mVolDraw != null) {
+        if (shouldShowVolumePane()) {
             IValueFormatter formatter = mVolDraw.getValueFormatter();
             if (formatter instanceof ValueFormatter) {
                 ValueFormatter valueFormatter = (ValueFormatter)formatter;
@@ -809,8 +841,9 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             if (formatter instanceof ValueFormatter) {
                 ValueFormatter valueFormatter = (ValueFormatter)formatter;
                 String formatValue = valueFormatter.format(mChildMaxValue);
+                float childTopY = shouldShowVolumePane() ? mVolRect.bottom + baseLine : mChildRect.top + baseLine;
                 canvas.drawText(formatValue,
-                        mWidth - calculateWidth(formatValue), mVolRect.bottom + baseLine, mTextPaint);
+                        mWidth - calculateWidth(formatValue), childTopY, mTextPaint);
             }
             /*canvas.drawText(mChildDraw.getValueFormatter().format(mChildMinValue),
                     mWidth - calculateWidth(formatValue(mChildMinValue)), mChildRect.bottom, mTextPaint);*/
@@ -1069,12 +1102,12 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                 float y = textHeight + 15;
                 mMainDraw.drawText(canvas, this, position, x, y);
             }
-            if (mVolDraw != null) {
+            if (shouldShowVolumePane()) {
                 float y = mVolRect.top - mChildPadding + textHeight;
                 mVolDraw.drawText(canvas, this, position, x, y);
             }
             if (mChildDraw != null) {
-                float y = mVolRect.bottom + textHeight;
+                float y = shouldShowVolumePane() ? mVolRect.bottom + textHeight : mChildRect.top + textHeight;
                 mChildDraw.drawText(canvas, this, position, x, y);
             }
         }
@@ -1228,7 +1261,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                     mMainMinIndex = i;
                 }
             }
-            if (mVolDraw != null) {
+            if (shouldShowVolumePane()) {
                 mVolMaxValue = Math.max(mVolMaxValue, mVolDraw.getMaxValue(point));
                 mVolMinValue = Math.min(mVolMinValue, mVolDraw.getMinValue(point));
                 // 成交量最小应该是 0 或者比最小成交量大一点点
@@ -1269,7 +1302,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 //            }
         }
 
-        if (Math.abs(mVolMaxValue) < 0.01) {
+        if (shouldShowVolumePane() && Math.abs(mVolMaxValue) < 0.01) {
             mVolMaxValue = 15.00f;
         }
 
@@ -1323,9 +1356,16 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         }
 
         mMainScaleY = mMainRect.height() * 1f / (mMainMaxValue - mMainMinValue);
-        mVolScaleY = mVolRect.height() * 1f / (mVolMaxValue - mVolMinValue);
-        if (mChildRect != null)
+        if (shouldShowVolumePane() && mVolRect.height() > 0 && (mVolMaxValue - mVolMinValue) != 0f) {
+            mVolScaleY = mVolRect.height() * 1f / (mVolMaxValue - mVolMinValue);
+        } else {
+            mVolScaleY = 0f;
+        }
+        if (mChildRect != null && mChildDraw != null && (mChildMaxValue - mChildMinValue) != 0f) {
             mChildScaleY = mChildRect.height() * 1f / (mChildMaxValue - mChildMinValue);
+        } else {
+            mChildScaleY = 0f;
+        }
         if (mAnimator.isRunning()) {
             float value = (float) mAnimator.getAnimatedValue();
             mStopIndex = mStartIndex + Math.round(value * (mStopIndex - mStartIndex));
