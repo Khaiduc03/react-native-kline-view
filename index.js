@@ -1137,6 +1137,7 @@ function composeOptionList({
   theme,
   layout,
   indicator,
+  bollStyle,
   draw,
   prediction,
   interaction,
@@ -1157,6 +1158,7 @@ function composeOptionList({
     typeof mainConfig?.boll === "boolean"
       ? mainConfig.boll
       : resolvedIndicator?.primary === 2;
+  const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
   const resolvedPrimary = showMainMAResolved ? 1 : showMainBOLL ? 2 : -1;
   const autoCompute = resolvedIndicator?.autoCompute !== false;
   const periods = extractIndicatorPeriods(
@@ -1205,6 +1207,7 @@ function composeOptionList({
     primary: resolvedPrimary,
     showMainMA: showMainMAResolved,
     showMainBOLL,
+    bollStyle: resolvedBollStyle,
     second: resolvedIndicator?.second ?? 0,
     time: format?.time ?? resolvedIndicator?.time ?? 1,
     configList,
@@ -1284,6 +1287,7 @@ function toLegacyPropsConfig({
 
   return {
     candles: Array.isArray(initialData) ? initialData : [],
+    bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
     theme: translatedTheme,
     indicator: {
       primary: resolvedPrimary,
@@ -1509,6 +1513,7 @@ const RNKLineView = forwardRef((props, ref) => {
       theme: legacy.theme,
       layout,
       indicator: legacy.indicator,
+      bollStyle: legacy.bollStyle,
       draw,
       prediction,
       interaction: legacy.interaction,

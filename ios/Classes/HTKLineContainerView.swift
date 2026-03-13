@@ -91,7 +91,7 @@ class HTKLineContainerView: UIView {
                     : ((CGFloat(safeVisibleStart) + 0.5) * oldItemWidth - oldOffset)
 
                 let previousSelectedIndex = self.klineView.selectedIndex
-                let selectedId: Int? = {
+                let selectedId: CGFloat? = {
                     if previousSelectedIndex < 0 || previousSelectedIndex >= previousModels.count {
                         return nil
                     }

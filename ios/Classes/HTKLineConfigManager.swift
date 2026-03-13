@@ -108,6 +108,8 @@ class HTKLineConfigManager: NSObject {
 
     var showMainBOLL = false
 
+    var bollStyle = "default"
+
     var mainType: HTKLineMainType {
         get {
             return HTKLineMainType(rawValue: self.primary) ?? HTKLineMainType.none
@@ -563,6 +565,11 @@ class HTKLineConfigManager: NSObject {
         }
         if let value = optionList["showMainBOLL"] as? Bool {
             showMainBOLL = value
+        }
+        if let value = optionList["bollStyle"] as? String, value == "band_labels" {
+            bollStyle = "band_labels"
+        } else {
+            bollStyle = "default"
         }
 
         _itemWidth = configList["itemWidth"] as? CGFloat ?? 0

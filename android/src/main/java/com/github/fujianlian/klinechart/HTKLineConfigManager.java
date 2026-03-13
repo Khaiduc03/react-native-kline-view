@@ -71,6 +71,8 @@ public class HTKLineConfigManager {
 
     public boolean showMainBOLL = false;
 
+    public String bollStyle = "default";
+
 	public SecondStatus secondStatus = SecondStatus.MACD;
 
 	public Boolean isMinute = false;
@@ -494,6 +496,12 @@ public class HTKLineConfigManager {
         }
         if (optionList.containsKey("showMainBOLL")) {
             this.showMainBOLL = readBoolean(optionList, "showMainBOLL", this.showMainBOLL);
+        }
+        Object bollStyleValue = optionList.get("bollStyle");
+        if (bollStyleValue instanceof String && "band_labels".equals(bollStyleValue)) {
+            this.bollStyle = "band_labels";
+        } else {
+            this.bollStyle = "default";
         }
         this.secondStatus = secondStatus;
         this.isMinute = time == -1;

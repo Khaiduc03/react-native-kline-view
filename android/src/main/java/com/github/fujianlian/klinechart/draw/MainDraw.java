@@ -36,6 +36,9 @@ public class MainDraw implements IChartDraw<ICandle> {
     private Paint ma30Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint primaryPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint superFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint bollBandFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint bollLabelTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint bollLabelBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Paint minuteGradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -63,6 +66,12 @@ public class MainDraw implements IChartDraw<ICandle> {
         minuteGradientPaint.setStrokeJoin(Paint.Join.ROUND);
         minuteGradientPaint.setStrokeCap(Paint.Cap.ROUND);
         minuteGradientPaint.setStyle(Paint.Style.FILL);
+
+        bollBandFillPaint.setStyle(Paint.Style.FILL);
+        bollBandFillPaint.setAntiAlias(true);
+        bollLabelTextPaint.setAntiAlias(true);
+        bollLabelBgPaint.setStyle(Paint.Style.FILL);
+        bollLabelBgPaint.setAntiAlias(true);
     }
 
     public void reloadColor(BaseKLineChartView view) {
@@ -85,6 +94,14 @@ public class MainDraw implements IChartDraw<ICandle> {
 
     private boolean shouldDrawBOLL(@NonNull BaseKLineChartView view) {
         return !view.isMinute && view.configManager.showMainBOLL;
+    }
+
+    private boolean shouldDrawBollBandLabels(@NonNull BaseKLineChartView view) {
+        return shouldDrawBOLL(view) && "band_labels".equals(view.configManager.bollStyle);
+    }
+
+    private boolean isBollValueValid(float value) {
+        return !Float.isNaN(value) && !Float.isInfinite(value) && value != 0f;
     }
 
     private float drawIndicatorRow(
@@ -197,7 +214,60 @@ public class MainDraw implements IChartDraw<ICandle> {
         if (lastPoint == null) {
             return;
         }
+        drawBollBandFill(lastPoint, curPoint, lastX, curX, canvas, view);
         drawSuperFill(lastPoint, curPoint, lastX, curX, canvas, view);
+    }
+
+    private void drawBollBandFill(
+            @NonNull ICandle lastPoint,
+            @NonNull ICandle curPoint,
+            float lastX,
+            float curX,
+            @NonNull Canvas canvas,
+            @NonNull BaseKLineChartView view
+    ) {
+        if (!shouldDrawBollBandLabels(view)) {
+            return;
+        }
+        float lastUp = lastPoint.getUp();
+        float lastDn = lastPoint.getDn();
+        float curUp = curPoint.getUp();
+        float curDn = curPoint.getDn();
+        if (!isBollValueValid(lastUp) || !isBollValueValid(lastDn)
+                || !isBollValueValid(curUp) || !isBollValueValid(curDn)) {
+            return;
+        }
+
+        float lastUpY = view.yFromValue(lastUp);
+        float lastDnY = view.yFromValue(lastDn);
+        float curUpY = view.yFromValue(curUp);
+        float curDnY = view.yFromValue(curDn);
+
+        float minY = Math.min(Math.min(lastUpY, lastDnY), Math.min(curUpY, curDnY));
+        float maxY = Math.max(Math.max(lastUpY, lastDnY), Math.max(curUpY, curDnY));
+        if (Math.abs(maxY - minY) < 0.5f) {
+            return;
+        }
+
+        Path bandPath = new Path();
+        bandPath.moveTo(lastX, lastUpY);
+        bandPath.lineTo(curX, curUpY);
+        bandPath.lineTo(curX, curDnY);
+        bandPath.lineTo(lastX, lastDnY);
+        bandPath.close();
+
+        int upperColor = withAlpha(safeTargetColor(view, 1, view.configManager.textColor), 42);
+        int lowerColor = withAlpha(safeTargetColor(view, 2, view.configManager.textColor), 14);
+        Shader gradient = new LinearGradient(
+                lastX, minY,
+                lastX, maxY,
+                upperColor,
+                lowerColor,
+                Shader.TileMode.CLAMP
+        );
+        bollBandFillPaint.setShader(gradient);
+        canvas.drawPath(bandPath, bollBandFillPaint);
+        bollBandFillPaint.setShader(null);
     }
 
     private HTKLineTargetItem resolveSuperItem(KLineEntity item, BaseKLineChartView view) {
@@ -423,7 +493,90 @@ public class MainDraw implements IChartDraw<ICandle> {
                 if (!bollTexts.isEmpty()) {
                     drawIndicatorRow(canvas, bollTexts, bollColors, x, rowY);
                 }
+                drawBollRightLabels(canvas, view);
             }
+        }
+    }
+
+    private void drawBollRightLabels(@NonNull Canvas canvas, @NonNull BaseKLineChartView view) {
+        if (!shouldDrawBollBandLabels(view)) {
+            return;
+        }
+        int stopIndex = view.getVisibleStopIndex();
+        if (stopIndex < 0 || stopIndex >= view.configManager.modelArray.size()) {
+            return;
+        }
+        KLineEntity point = view.getItem(stopIndex);
+        float upper = point.getUp();
+        float base = point.getMb();
+        float lower = point.getDn();
+        if (!isBollValueValid(upper) || !isBollValueValid(base) || !isBollValueValid(lower)) {
+            return;
+        }
+
+        String[] titles = {"Upper", "Base", "Lower"};
+        float[] values = {upper, base, lower};
+        int[] bgColors = {
+                safeTargetColor(view, 1, view.configManager.increaseColor),
+                safeTargetColor(view, 0, view.configManager.increaseColor),
+                safeTargetColor(view, 2, view.configManager.decreaseColor),
+        };
+        float[] yTargets = {
+                view.yFromValue(upper),
+                view.yFromValue(base),
+                view.yFromValue(lower),
+        };
+        int[] order = {0, 1, 2};
+        for (int i = 0; i < order.length; i++) {
+            for (int j = i + 1; j < order.length; j++) {
+                if (yTargets[order[j]] < yTargets[order[i]]) {
+                    int tmp = order[i];
+                    order[i] = order[j];
+                    order[j] = tmp;
+                }
+            }
+        }
+
+        float fontSize = Math.max(ViewUtil.Dp2Px(mContext, 10f), view.configManager.rightTextFontSize);
+        bollLabelTextPaint.setTextSize(fontSize);
+        bollLabelTextPaint.setColor(Color.WHITE);
+        Paint.FontMetrics fm = bollLabelTextPaint.getFontMetrics();
+        float textHeight = fm.descent - fm.ascent;
+        float paddingX = ViewUtil.Dp2Px(mContext, 6f);
+        float paddingY = ViewUtil.Dp2Px(mContext, 3f);
+        float labelHeight = textHeight + paddingY * 2f;
+        float gap = ViewUtil.Dp2Px(mContext, 4f);
+        float minTop = ViewUtil.Dp2Px(mContext, 2f);
+        float maxTop = view.getMainBottom() - labelHeight - ViewUtil.Dp2Px(mContext, 2f);
+        if (maxTop < minTop) {
+            return;
+        }
+
+        float[] topByIndex = new float[3];
+        float previousBottom = minTop - gap;
+        for (int orderedIndex : order) {
+            float rawTop = yTargets[orderedIndex] - labelHeight / 2f;
+            float top = Math.max(minTop, Math.min(maxTop, rawTop));
+            if (top < previousBottom + gap) {
+                top = previousBottom + gap;
+            }
+            top = Math.min(maxTop, top);
+            topByIndex[orderedIndex] = top;
+            previousBottom = top + labelHeight;
+        }
+
+        float rightInset = Math.max(view.configManager.paddingRight, ViewUtil.Dp2Px(mContext, 4f));
+        for (int i = 0; i < values.length; i++) {
+            String text = titles[i] + " " + view.formatValue(values[i]);
+            float textWidth = bollLabelTextPaint.measureText(text);
+            float width = textWidth + paddingX * 2f;
+            float left = view.getWidth() - rightInset - width;
+            float top = topByIndex[i];
+            RectF rect = new RectF(left, top, left + width, top + labelHeight);
+            bollLabelBgPaint.setColor(bgColors[i]);
+            canvas.drawRoundRect(rect, ViewUtil.Dp2Px(mContext, 3f), ViewUtil.Dp2Px(mContext, 3f), bollLabelBgPaint);
+            float textBaseline = top + paddingY - fm.ascent;
+            canvas.drawText(text, left + paddingX, textBaseline, bollLabelTextPaint);
         }
     }
 

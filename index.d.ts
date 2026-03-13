@@ -261,6 +261,7 @@ export type MainIndicatorsConfig = {
     enabled: boolean;
     n?: number;
     p?: number;
+    style?: "default" | "band_labels";
   };
 };
 

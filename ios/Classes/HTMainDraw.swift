@@ -20,6 +20,14 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
         return configManager.showMainBOLL
     }
 
+    private func shouldDrawBollBandLabels(_ configManager: HTKLineConfigManager) -> Bool {
+        return shouldDrawBOLL(configManager) && configManager.bollStyle == "band_labels"
+    }
+
+    private func isBollValueValid(_ value: CGFloat) -> Bool {
+        return value.isFinite && !value.isNaN && value != 0
+    }
+
     private func pointY(
         _ value: CGFloat,
         _ maxValue: CGFloat,
@@ -294,6 +302,18 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
                 }
             }
             if shouldDrawBOLL(configManager) {
+                drawBollBandFill(
+                    model,
+                    lastModel,
+                    maxValue,
+                    minValue,
+                    baseY,
+                    height,
+                    index,
+                    lastIndex,
+                    context,
+                    configManager
+                )
                 let itemList = [
                     ["value": model.bollMb, "lastValue": lastModel.bollMb, "color": safeTargetColor(configManager, at: 0, fallback: configManager.textColor)],
                     ["value": model.bollUp, "lastValue": lastModel.bollUp, "color": safeTargetColor(configManager, at: 1, fallback: configManager.textColor)],
@@ -303,6 +323,148 @@ class HTMainDraw: NSObject, HTKLineDrawProtocol {
                     drawLine(value: item["value"] as? CGFloat ?? 0, lastValue: item["lastValue"] as? CGFloat ?? 0, maxValue: maxValue, minValue: minValue, baseY: baseY, height: height, index: index, lastIndex: lastIndex, color: item["color"] as? UIColor ?? UIColor.orange, isBezier: false, context: context, configManager: configManager)
                 }
             }
+        }
+    }
+
+    private func drawBollBandFill(
+        _ model: HTKLineModel,
+        _ lastModel: HTKLineModel,
+        _ maxValue: CGFloat,
+        _ minValue: CGFloat,
+        _ baseY: CGFloat,
+        _ height: CGFloat,
+        _ index: Int,
+        _ lastIndex: Int,
+        _ context: CGContext,
+        _ configManager: HTKLineConfigManager
+    ) {
+        if !shouldDrawBollBandLabels(configManager) { return }
+        if index == lastIndex { return }
+
+        let currentUp = model.bollUp
+        let currentDn = model.bollDn
+        let previousUp = lastModel.bollUp
+        let previousDn = lastModel.bollDn
+        if !isBollValueValid(currentUp) || !isBollValueValid(currentDn)
+            || !isBollValueValid(previousUp) || !isBollValueValid(previousDn) {
+            return
+        }
+
+        let currentX = xForIndex(index, configManager)
+        let previousX = xForIndex(lastIndex, configManager)
+        let currentUpY = pointY(currentUp, maxValue, minValue, baseY, height)
+        let currentDnY = pointY(currentDn, maxValue, minValue, baseY, height)
+        let previousUpY = pointY(previousUp, maxValue, minValue, baseY, height)
+        let previousDnY = pointY(previousDn, maxValue, minValue, baseY, height)
+
+        let minY = min(min(currentUpY, currentDnY), min(previousUpY, previousDnY))
+        let maxY = max(max(currentUpY, currentDnY), max(previousUpY, previousDnY))
+        if abs(maxY - minY) < 0.5 { return }
+
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: previousX, y: previousUpY))
+        path.addLine(to: CGPoint(x: currentX, y: currentUpY))
+        path.addLine(to: CGPoint(x: currentX, y: currentDnY))
+        path.addLine(to: CGPoint(x: previousX, y: previousDnY))
+        path.close()
+
+        let upper = safeTargetColor(configManager, at: 1, fallback: configManager.textColor).withAlphaComponent(0.16).cgColor
+        let lower = safeTargetColor(configManager, at: 2, fallback: configManager.textColor).withAlphaComponent(0.06).cgColor
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [upper, lower] as CFArray,
+            locations: [0.0, 1.0]
+        ) else {
+            return
+        }
+
+        context.saveGState()
+        context.addPath(path.cgPath)
+        context.clip()
+        context.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: previousX, y: minY),
+            end: CGPoint(x: previousX, y: maxY),
+            options: []
+        )
+        context.restoreGState()
+    }
+
+    func drawBollRightLabels(
+        _ model: HTKLineModel,
+        _ allWidth: CGFloat,
+        _ maxValue: CGFloat,
+        _ minValue: CGFloat,
+        _ baseY: CGFloat,
+        _ height: CGFloat,
+        _ context: CGContext,
+        _ configManager: HTKLineConfigManager
+    ) {
+        if !shouldDrawBollBandLabels(configManager) { return }
+        let upper = model.bollUp
+        let base = model.bollMb
+        let lower = model.bollDn
+        if !isBollValueValid(upper) || !isBollValueValid(base) || !isBollValueValid(lower) {
+            return
+        }
+
+        let titles = ["Upper", "Base", "Lower"]
+        let values = [upper, base, lower]
+        let bgColors = [
+            safeTargetColor(configManager, at: 1, fallback: configManager.increaseColor),
+            safeTargetColor(configManager, at: 0, fallback: configManager.increaseColor),
+            safeTargetColor(configManager, at: 2, fallback: configManager.decreaseColor),
+        ]
+        var yTargets = [
+            pointY(upper, maxValue, minValue, baseY, height),
+            pointY(base, maxValue, minValue, baseY, height),
+            pointY(lower, maxValue, minValue, baseY, height),
+        ]
+        var order = [0, 1, 2]
+        order.sort { yTargets[$0] < yTargets[$1] }
+
+        let font = configManager.createFont(max(configManager.rightTextFontSize, 10))
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.white,
+        ]
+        let paddingX: CGFloat = 6
+        let paddingY: CGFloat = 3
+        let lineHeight = textHeight(font: font)
+        let labelHeight = lineHeight + paddingY * 2
+        let gap: CGFloat = 4
+        let minTop: CGFloat = 2
+        let maxTop = max(minTop, baseY + height - labelHeight - 2)
+
+        var topByIndex = [CGFloat](repeating: minTop, count: 3)
+        var previousBottom = minTop - gap
+        for idx in order {
+            var top = max(minTop, min(maxTop, yTargets[idx] - labelHeight / 2))
+            if top < previousBottom + gap {
+                top = previousBottom + gap
+            }
+            top = min(maxTop, top)
+            topByIndex[idx] = top
+            previousBottom = top + labelHeight
+        }
+
+        let rightInset = max(configManager.paddingRight, 4)
+        for i in 0..<values.count {
+            let text = "\(titles[i]) \(configManager.precision(values[i], configManager.price))"
+            let size = (text as NSString).size(withAttributes: textAttributes)
+            let width = size.width + paddingX * 2
+            let left = allWidth - rightInset - width
+            let top = topByIndex[i]
+            let rect = CGRect(x: left, y: top, width: width, height: labelHeight)
+
+            context.setFillColor(bgColors[i].cgColor)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 3)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            (text as NSString).draw(
+                at: CGPoint(x: left + paddingX, y: top + paddingY),
+                withAttributes: textAttributes
+            )
         }
     }
 
