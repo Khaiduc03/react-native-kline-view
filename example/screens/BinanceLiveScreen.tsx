@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -9,7 +9,12 @@ import {
   processColor,
 } from 'react-native';
 import RNKLineView, { type DrawItemTouchEvent } from 'react-native-kline-view';
-import type { Candle, RNKLineViewRef } from 'react-native-kline-view';
+import type {
+  Candle,
+  LoadMoreContext,
+  LoadMoreResult,
+  RNKLineViewRef,
+} from 'react-native-kline-view';
 import {
   buildBinanceWsUrl,
   fetchBinanceKLineData,
@@ -31,6 +36,7 @@ const INTERVAL_OPTIONS: BinanceInterval[] = [
   '1d',
 ];
 const EMPTY_CANDLES: Candle[] = [];
+const LOAD_MORE_PAGE_SIZE = 200;
 const SUB_INDICATOR_LABEL: Record<number, string> = {
   [-1]: 'None',
   3: 'MACD',
@@ -173,6 +179,48 @@ export default function BinanceLiveScreen() {
       reconnectTimerRef.current = null;
     }
   };
+
+  const handleLoadMore = useCallback(
+    async (ctx: LoadMoreContext): Promise<LoadMoreResult> => {
+      const sessionIdAtRequest = sessionRef.current;
+      const earliestId = Number(
+        ctx?.earliestId ?? rawCandlesRef.current[0]?.time ?? 0,
+      );
+      if (!Number.isFinite(earliestId) || earliestId <= 0) {
+        return { candles: [], hasMore: false };
+      }
+
+      const normalizedInterval = normalizeBinanceInterval(interval);
+      const raw = await fetchBinanceKLineData(
+        symbol,
+        normalizedInterval,
+        LOAD_MORE_PAGE_SIZE,
+        earliestId - 1,
+      );
+
+      if (sessionIdAtRequest !== sessionRef.current) {
+        return { candles: [], hasMore: true };
+      }
+
+      const currentFirstId =
+        rawCandlesRef.current.length > 0
+          ? rawCandlesRef.current[0].time
+          : Number.MAX_SAFE_INTEGER;
+      const olderRaw = raw
+        .filter(item => item.time < currentFirstId)
+        .sort((a, b) => a.time - b.time);
+
+      if (olderRaw.length > 0) {
+        rawCandlesRef.current = [...olderRaw, ...rawCandlesRef.current];
+      }
+
+      return {
+        candles: olderRaw.map(buildCandle),
+        hasMore: olderRaw.length > 0 && raw.length >= LOAD_MORE_PAGE_SIZE,
+      };
+    },
+    [interval, symbol],
+  );
 
   const closeSocket = () => {
     const socket = wsRef.current;
@@ -431,7 +479,7 @@ export default function BinanceLiveScreen() {
           theme={themeConfig}
           draw={drawConfig}
           interaction={{ autoFollow: false, loadMoreThreshold: 48 }}
-          onLoadMore={async () => []}
+          onLoadMore={handleLoadMore}
           onDrawItemDidTouch={onDrawItemDidTouch}
         />
       </View>

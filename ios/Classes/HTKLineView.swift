@@ -1442,8 +1442,10 @@ extension HTKLineView: UIScrollViewDelegate {
             if !didTriggerLoadMore {
                 didTriggerLoadMore = true
                 let earliestId = configManager.modelArray.first?.id ?? 0
+                let firstVisibleId = configManager.modelArray[visibleStartIndex].id
                 onReachLeftThreshold?([
                     "earliestId": Double(earliestId),
+                    "firstVisibleId": Double(firstVisibleId),
                     "visibleRange": [
                         "from": visibleStartIndex,
                         "to": visibleEndIndex,

@@ -101,6 +101,46 @@ function candlesSignature(candles) {
   ].join(":");
 }
 
+function normalizeLoadMoreResult(result) {
+  if (Array.isArray(result)) {
+    return {
+      candles: result,
+      hasMore: undefined,
+    };
+  }
+  if (result && typeof result === "object" && Array.isArray(result.candles)) {
+    return {
+      candles: result.candles,
+      hasMore:
+        typeof result.hasMore === "boolean" ? result.hasMore : undefined,
+    };
+  }
+  return {
+    candles: [],
+    hasMore: undefined,
+  };
+}
+
+function pickUniquePrependCandles(incoming, existing) {
+  const normalizedIncoming = normalizeCandles(Array.isArray(incoming) ? incoming : []);
+  if (normalizedIncoming.length === 0) {
+    return [];
+  }
+  const existingFirstId =
+    existing.length > 0 ? Number(existing[0]?.id ?? Number.MAX_SAFE_INTEGER) : null;
+  const existingIds = new Set(existing.map((item) => Number(item?.id ?? 0)));
+  const unique = [];
+  for (const candle of normalizedIncoming) {
+    const id = Number(candle?.id ?? 0);
+    if (!Number.isFinite(id)) continue;
+    if (existingIds.has(id)) continue;
+    if (existingFirstId !== null && id >= existingFirstId) continue;
+    unique.push(candle);
+  }
+  unique.sort((a, b) => Number(a.id ?? 0) - Number(b.id ?? 0));
+  return unique;
+}
+
 const DEFAULT_TARGET_LIST = {
   maList: [],
   maVolumeList: [],
@@ -1378,9 +1418,23 @@ const RNKLineView = forwardRef((props, ref) => {
   const lastComputeSignatureRef = useRef("");
   const lastPropsDataSignatureRef = useRef(null);
   const loadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const lastLoadCursorRef = useRef(null);
+  const loadRequestSeqRef = useRef(0);
+  const loadMoreRecomputeTimerRef = useRef(null);
   const emitError = useCallback((error) => {
     if (typeof onErrorRef.current !== "function") return;
     onErrorRef.current(error);
+  }, []);
+  const invalidateLoadMoreState = useCallback(() => {
+    loadRequestSeqRef.current += 1;
+    loadingMoreRef.current = false;
+    hasMoreRef.current = true;
+    lastLoadCursorRef.current = null;
+    if (loadMoreRecomputeTimerRef.current) {
+      clearTimeout(loadMoreRecomputeTimerRef.current);
+      loadMoreRecomputeTimerRef.current = null;
+    }
   }, []);
   const runtimeConfig = useMemo(() => {
     if (typeof optionList === "string" && optionList.trim().length > 0) {
@@ -1501,22 +1555,86 @@ const RNKLineView = forwardRef((props, ref) => {
     [runtimeConfig]
   );
 
+  const scheduleLoadMoreRecompute = useCallback(() => {
+    if (loadMoreRecomputeTimerRef.current) {
+      clearTimeout(loadMoreRecomputeTimerRef.current);
+    }
+    const scheduledSeq = loadRequestSeqRef.current;
+    loadMoreRecomputeTimerRef.current = setTimeout(() => {
+      if (scheduledSeq !== loadRequestSeqRef.current) {
+        return;
+      }
+      if (dataCacheRef.current.length === 0) {
+        return;
+      }
+      const recomputed = computeCandlesForRuntime(dataCacheRef.current, true);
+      runCommand(nativeRef, "setData", recomputed);
+      loadMoreRecomputeTimerRef.current = null;
+    }, 180);
+  }, [computeCandlesForRuntime]);
+
   const handleLoadMore = useCallback(
     async (event) => {
       if (loadingMoreRef.current) return;
+      if (!hasMoreRef.current) return;
       if (typeof onLoadMoreRef.current !== "function") return;
+      const payload = event?.nativeEvent ?? event ?? {};
+      const cursor = Number(payload?.earliestId ?? 0);
+      if (Number.isFinite(cursor) && lastLoadCursorRef.current === cursor) {
+        return;
+      }
+
+      const requestId = loadRequestSeqRef.current + 1;
+      loadRequestSeqRef.current = requestId;
       loadingMoreRef.current = true;
+      if (Number.isFinite(cursor) && cursor > 0) {
+        lastLoadCursorRef.current = cursor;
+      }
       try {
-        const payload = event?.nativeEvent ?? event ?? {};
-        const candles = await onLoadMoreRef.current(payload);
-        if (Array.isArray(candles) && candles.length > 0) {
-          const normalized = normalizeCandles(candles);
-          dataCacheRef.current = [...normalized, ...dataCacheRef.current];
-          const computed = computeCandlesForRuntime(dataCacheRef.current, true);
-          const prependItems = computed.slice(0, normalized.length);
+        const firstVisibleId = Number(payload?.firstVisibleId);
+        const callbackPayload = {
+          ...payload,
+          firstVisibleId: Number.isFinite(firstVisibleId)
+            ? firstVisibleId
+            : undefined,
+        };
+        const loadResult = await onLoadMoreRef.current(callbackPayload);
+        if (requestId !== loadRequestSeqRef.current) {
+          emitError({
+            code: "E_LOAD_MORE_RACE_DROPPED",
+            message: "Dropped stale load-more response.",
+            source: "js",
+            fatal: false,
+          });
+          return;
+        }
+        const normalizedResult = normalizeLoadMoreResult(loadResult);
+        const prependRaw = pickUniquePrependCandles(
+          normalizedResult.candles,
+          dataCacheRef.current
+        );
+        if (typeof normalizedResult.hasMore === "boolean") {
+          hasMoreRef.current = normalizedResult.hasMore;
+        }
+        if (prependRaw.length > 0) {
+          dataCacheRef.current = [...prependRaw, ...dataCacheRef.current];
+          const prependItems = runtimeConfig.autoCompute
+            ? computeIndicators(
+                prependRaw,
+                runtimeConfig.resolvedIndicator,
+                runtimeConfig.targetList
+              )
+            : prependRaw;
           runCommand(nativeRef, "prependData", prependItems);
+          scheduleLoadMoreRecompute();
+        } else if (normalizedResult.hasMore !== true) {
+          hasMoreRef.current = false;
+        } else {
+          // Allow retry if backend responded "hasMore=true" but returned no usable candles.
+          lastLoadCursorRef.current = null;
         }
       } catch (err) {
+        lastLoadCursorRef.current = null;
         emitError({
           code: "E_LOAD_MORE",
           message: err instanceof Error ? err.message : "Failed to load more candles",
@@ -1524,14 +1642,17 @@ const RNKLineView = forwardRef((props, ref) => {
           fatal: false,
         });
       } finally {
-        loadingMoreRef.current = false;
+        if (requestId === loadRequestSeqRef.current) {
+          loadingMoreRef.current = false;
+        }
       }
     },
-    [emitError, computeCandlesForRuntime]
+    [emitError, runtimeConfig, scheduleLoadMoreRecompute]
   );
 
   useImperativeHandle(ref, () => ({
     setData: (nextCandles) => {
+      invalidateLoadMoreState();
       const normalized = normalizeCandles(Array.isArray(nextCandles) ? nextCandles : []);
       dataCacheRef.current = normalized;
       lastPropsDataSignatureRef.current = candlesSignature(normalized);
@@ -1580,6 +1701,7 @@ const RNKLineView = forwardRef((props, ref) => {
       const computed = computeCandlesForRuntime(dataCacheRef.current, true);
       const prependItems = computed.slice(0, normalized.length);
       runCommand(nativeRef, "prependData", prependItems);
+      scheduleLoadMoreRecompute();
     },
     unPredictionSelect: () => runCommand(nativeRef, "unPredictionSelect", null),
   }));
@@ -1616,9 +1738,16 @@ const RNKLineView = forwardRef((props, ref) => {
 
     dataCacheRef.current = normalized;
     lastPropsDataSignatureRef.current = nextSignature;
+    invalidateLoadMoreState();
     const computed = computeCandlesForRuntime(normalized, true);
     runCommand(nativeRef, "setData", computed);
-  }, [initialData, candles, emitError, computeCandlesForRuntime]);
+  }, [
+    initialData,
+    candles,
+    emitError,
+    computeCandlesForRuntime,
+    invalidateLoadMoreState,
+  ]);
 
   useEffect(() => {
     const signature = runtimeConfig.computeSignature;
@@ -1648,6 +1777,15 @@ const RNKLineView = forwardRef((props, ref) => {
       });
     }
   }, [subCharts, emitError]);
+
+  useEffect(() => {
+    return () => {
+      if (loadMoreRecomputeTimerRef.current) {
+        clearTimeout(loadMoreRecomputeTimerRef.current);
+        loadMoreRecomputeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <NativeRNKLineView

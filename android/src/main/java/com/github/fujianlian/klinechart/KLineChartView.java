@@ -27,6 +27,7 @@ public class KLineChartView extends BaseKLineChartView {
     ProgressBar mProgressBar;
     private boolean isRefreshing = false;
     private boolean isLoadMoreEnd = false;
+    private boolean didTriggerNearLeftLoadMore = false;
     private boolean mLastScrollEnable;
     private boolean mLastScaleEnable;
 
@@ -173,6 +174,20 @@ public class KLineChartView extends BaseKLineChartView {
 
     @Override
     public void onRightSide() {
+    }
+
+    @Override
+    protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+        super.onScrollChanged(l, t, oldl, oldt);
+        int threshold = Math.max(0, Math.round(configManager.loadMoreThreshold));
+        if (mScrollX <= threshold) {
+            if (!didTriggerNearLeftLoadMore) {
+                didTriggerNearLeftLoadMore = true;
+                justShowLoading();
+            }
+        } else {
+            didTriggerNearLeftLoadMore = false;
+        }
     }
 
     public void showLoading() {

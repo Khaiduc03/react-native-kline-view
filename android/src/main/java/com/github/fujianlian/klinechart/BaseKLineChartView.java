@@ -1637,6 +1637,22 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         return mSelectedIndex;
     }
 
+    public void setSelectedIndexIfLongPress(int index) {
+        if (!isLongPress || mItemCount <= 0) {
+            return;
+        }
+        mSelectedIndex = Math.max(0, Math.min(index, mItemCount - 1));
+        invalidate();
+    }
+
+    public void offsetSelectedIndexIfLongPress(int delta) {
+        if (!isLongPress || mItemCount <= 0 || mSelectedIndex < 0) {
+            return;
+        }
+        mSelectedIndex = Math.max(0, Math.min(mSelectedIndex + delta, mItemCount - 1));
+        invalidate();
+    }
+
     public Rect getChildRect() {
         return mChildRect;
     }

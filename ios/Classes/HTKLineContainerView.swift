@@ -77,12 +77,60 @@ class HTKLineContainerView: UIView {
             let models = HTKLineModel.packModelArray(candles)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                if models.isEmpty {
+                    return
+                }
+                let previousModels = self.configManager.modelArray
                 let oldOffset = self.klineView.contentOffset.x
-                let deltaX = CGFloat(models.count) * self.configManager.itemWidth
+                let oldItemWidth = self.configManager.itemWidth
+                let oldVisibleStart = self.klineView.visibleRange.lowerBound
+                let safeVisibleStart = max(0, min(oldVisibleStart, max(previousModels.count - 1, 0)))
+                let anchorId = previousModels.isEmpty ? nil : previousModels[safeVisibleStart].id
+                let anchorScreenX = anchorId == nil
+                    ? nil
+                    : ((CGFloat(safeVisibleStart) + 0.5) * oldItemWidth - oldOffset)
+
+                let previousSelectedIndex = self.klineView.selectedIndex
+                let selectedId: Int? = {
+                    if previousSelectedIndex < 0 || previousSelectedIndex >= previousModels.count {
+                        return nil
+                    }
+                    return previousModels[previousSelectedIndex].id
+                }()
+
                 self.configManager.modelArray.insert(contentsOf: models, at: 0)
                 self.configManager.shouldScrollToEnd = false
                 self.reloadConfigManager(self.configManager)
-                self.klineView.reloadContentOffset(oldOffset + deltaX)
+
+                if let anchorId = anchorId, let oldAnchorScreenX = anchorScreenX {
+                    if let newAnchorIndex = self.configManager.modelArray.firstIndex(where: { $0.id == anchorId }) {
+                        let newItemWidth = self.configManager.itemWidth
+                        let newAnchorCenter = (CGFloat(newAnchorIndex) + 0.5) * newItemWidth
+                        self.klineView.reloadContentOffset(newAnchorCenter - oldAnchorScreenX)
+                    } else {
+                        let fallbackDelta = CGFloat(models.count) * self.configManager.itemWidth
+                        self.klineView.reloadContentOffset(oldOffset + fallbackDelta)
+                        self.onChartError?([
+                            "code": "E_PREPEND_ANCHOR_MISS",
+                            "message": "Anchor candle missing after prependData on iOS.",
+                            "source": "ios",
+                            "fatal": false,
+                        ])
+                    }
+                } else {
+                    let fallbackDelta = CGFloat(models.count) * self.configManager.itemWidth
+                    self.klineView.reloadContentOffset(oldOffset + fallbackDelta)
+                }
+
+                if let selectedId = selectedId,
+                   self.klineView.selectedIndex >= 0,
+                   let newSelectedIndex = self.configManager.modelArray.firstIndex(where: { $0.id == selectedId }) {
+                    self.klineView.selectedIndex = newSelectedIndex
+                    self.klineView.setNeedsDisplay()
+                } else if self.klineView.selectedIndex >= 0 {
+                    self.klineView.selectedIndex += models.count
+                    self.klineView.setNeedsDisplay()
+                }
             }
         }
     }

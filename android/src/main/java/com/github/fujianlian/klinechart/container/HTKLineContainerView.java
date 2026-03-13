@@ -223,11 +223,53 @@ public class HTKLineContainerView extends RelativeLayout {
 
     public void prependData(java.util.List<KLineEntity> entities) {
         if (entities == null || entities.isEmpty()) return;
+        int previousCount = configManager.modelArray.size();
         int oldScroll = klineView.getScrollOffset();
+        float oldScale = klineView.getScaleX() == 0 ? 1f : klineView.getScaleX();
+        int oldVisibleStart = klineView.getVisibleStartIndex();
+        int anchorIndex = previousCount > 0
+                ? Math.max(0, Math.min(oldVisibleStart, previousCount - 1))
+                : -1;
+        Long anchorId = anchorIndex >= 0 ? configManager.modelArray.get(anchorIndex).id : null;
+        float oldAnchorScreenX = anchorIndex >= 0
+                ? (klineView.getItemMiddleScrollX(anchorIndex) - oldScroll) * oldScale
+                : 0f;
+
+        int oldSelectedIndex = klineView.getSelectedIndex();
+        Long selectedId = null;
+        if (oldSelectedIndex >= 0 && oldSelectedIndex < previousCount) {
+            selectedId = configManager.modelArray.get(oldSelectedIndex).id;
+        }
+
         configManager.modelArray.addAll(0, entities);
         reloadConfigManager();
-        int delta = Math.round(configManager.itemWidth * entities.size());
-        klineView.setScrollX(oldScroll + delta);
+        boolean anchorRestored = false;
+        if (anchorId != null) {
+            int newAnchorIndex = findIndexById(anchorId.longValue());
+            if (newAnchorIndex >= 0) {
+                float newScale = klineView.getScaleX() == 0 ? 1f : klineView.getScaleX();
+                float desiredScroll = klineView.getItemMiddleScrollX(newAnchorIndex) - (oldAnchorScreenX / newScale);
+                klineView.setScrollX(Math.round(desiredScroll));
+                anchorRestored = true;
+            } else {
+                emitError("E_PREPEND_ANCHOR_MISS", "Anchor candle missing after prependData on Android.", false);
+            }
+        }
+        if (!anchorRestored) {
+            int delta = Math.round(configManager.itemWidth * entities.size());
+            klineView.setScrollX(oldScroll + delta);
+        }
+
+        if (selectedId != null) {
+            int newSelectedIndex = findIndexById(selectedId.longValue());
+            if (newSelectedIndex >= 0) {
+                klineView.setSelectedIndexIfLongPress(newSelectedIndex);
+            } else {
+                klineView.offsetSelectedIndexIfLongPress(entities.size());
+            }
+        } else {
+            klineView.offsetSelectedIndexIfLongPress(entities.size());
+        }
     }
 
 
@@ -294,8 +336,15 @@ public class HTKLineContainerView extends RelativeLayout {
         WritableMap map = Arguments.createMap();
         double earliestId = configManager.modelArray.isEmpty() ? 0 : configManager.modelArray.get(0).id;
         map.putDouble("earliestId", earliestId);
+        int visibleFrom = klineView.getVisibleStartIndex();
+        if (!configManager.modelArray.isEmpty()) {
+            int safeVisibleFrom = Math.max(0, Math.min(visibleFrom, configManager.modelArray.size() - 1));
+            map.putDouble("firstVisibleId", configManager.modelArray.get(safeVisibleFrom).id);
+        } else {
+            map.putDouble("firstVisibleId", 0);
+        }
         WritableMap range = Arguments.createMap();
-        range.putInt("from", klineView.getVisibleStartIndex());
+        range.putInt("from", visibleFrom);
         range.putInt("to", klineView.getVisibleStopIndex());
         map.putMap("visibleRange", range);
         reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
@@ -303,6 +352,15 @@ public class HTKLineContainerView extends RelativeLayout {
                 RNKLineView.onLoadMoreKey,
                 map
         );
+    }
+
+    private int findIndexById(long id) {
+        for (int i = 0; i < configManager.modelArray.size(); i++) {
+            if (configManager.modelArray.get(i).id == id) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public void emitError(String code, String message, boolean fatal) {

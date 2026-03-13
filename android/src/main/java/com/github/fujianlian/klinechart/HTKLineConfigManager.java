@@ -25,6 +25,8 @@ public class HTKLineConfigManager {
 
 	public Boolean shouldScrollToEnd = true;
 
+	public float loadMoreThreshold = 48f;
+
 
 	public int shotBackgroundColor = Color.RED;
 
@@ -433,6 +435,10 @@ public class HTKLineConfigManager {
         Boolean shouldScrollToEnd = (Boolean)optionList.get("shouldScrollToEnd");
         if (shouldScrollToEnd != null) {
             this.shouldScrollToEnd = shouldScrollToEnd;
+        }
+        Number loadMoreThreshold = (Number) optionList.get("loadMoreThreshold");
+        if (loadMoreThreshold != null) {
+            this.loadMoreThreshold = Math.max(0f, loadMoreThreshold.floatValue());
         }
 
         if (shouldReloadDrawItemIndex >= HTDrawState.showPencil) {

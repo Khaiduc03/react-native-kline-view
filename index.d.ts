@@ -90,6 +90,14 @@ export type DrawItemCompleteEvent = NativeSyntheticEvent<DrawItemCompletePayload
 export type DrawPointCompleteEvent = NativeSyntheticEvent<DrawPointCompletePayload>;
 export type PredictionSelectEvent = NativeSyntheticEvent<PredictionSelectPayload>;
 
+export type LoadMoreContext = {
+  earliestId: number;
+  visibleRange: { from: number; to: number };
+  firstVisibleId?: number;
+};
+
+export type LoadMoreResult = Candle[] | { candles: Candle[]; hasMore?: boolean };
+
 export type CursorStyleConfig = {
   cursorStyleEnabled?: boolean;
   cursorInnerRadiusPx?: number;
@@ -327,10 +335,7 @@ type RNKLineViewBaseProps = ViewProps & {
   onDrawItemComplete?: (event: DrawItemCompleteEvent) => void;
   onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
   onPredictionSelect?: (event: PredictionSelectEvent) => void;
-  onLoadMore?: (ctx: {
-    earliestId: number;
-    visibleRange: { from: number; to: number };
-  }) => Promise<Candle[]>;
+  onLoadMore?: (ctx: LoadMoreContext) => Promise<LoadMoreResult>;
   onError?: (error: {
     code: string;
     message: string;

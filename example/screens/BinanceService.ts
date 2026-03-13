@@ -114,12 +114,21 @@ export const fetchBinanceKLineData = async (
   symbol: string,
   interval: string,
   limit: number = 200,
+  endTime?: number,
 ): Promise<KLineRawPoint[]> => {
   try {
     const normalizedInterval = normalizeBinanceInterval(interval);
     const normalizedLimit = Math.max(10, Math.min(1000, limit));
     const normalizedSymbol = symbol.toUpperCase();
-    const url = `https://api.binance.com/api/v3/klines?symbol=${normalizedSymbol}&interval=${normalizedInterval}&limit=${normalizedLimit}`;
+    const params = new URLSearchParams({
+      symbol: normalizedSymbol,
+      interval: normalizedInterval,
+      limit: String(normalizedLimit),
+    });
+    if (typeof endTime === 'number' && Number.isFinite(endTime)) {
+      params.set('endTime', String(Math.max(0, Math.floor(endTime))));
+    }
+    const url = `https://api.binance.com/api/v3/klines?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
