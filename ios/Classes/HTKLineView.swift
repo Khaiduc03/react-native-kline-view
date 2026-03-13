@@ -115,6 +115,10 @@ class HTKLineView: UIScrollView {
         return configManager.showVolume
     }
 
+    var isRsiOnlyMode: Bool {
+        return configManager.rsiOnly && configManager.childType == .rsi
+    }
+
     func unPredictionSelect() {
         self.selectedPredictionType = nil
         self.selectedPredictionIndex = nil
@@ -324,43 +328,63 @@ class HTKLineView: UIScrollView {
             drawText(context)
             drawValue(context)
 
-            drawHighLow(context)
+            if !isRsiOnlyMode {
+                drawHighLow(context)
+            }
             drawTime(context)
-            drawPrediction(context)
-            drawClosePrice(context)
+            if !isRsiOnlyMode {
+                drawPrediction(context)
+                drawClosePrice(context)
+            }
             if let latestVisible = visibleModelArray.last {
-                mainDraw.drawMaRightLabels(
-                    latestVisible,
-                    allWidth,
-                    mainMinMaxRange.upperBound,
-                    mainMinMaxRange.lowerBound,
-                    mainBaseY,
-                    mainHeight,
-                    context,
-                    configManager
-                )
-                mainDraw.drawBollRightLabels(
-                    latestVisible,
-                    allWidth,
-                    mainMinMaxRange.upperBound,
-                    mainMinMaxRange.lowerBound,
-                    mainBaseY,
-                    mainHeight,
-                    context,
-                    configManager
-                )
-                mainDraw.drawSupportResistanceRightLabels(
-                    allWidth,
-                    mainMinMaxRange.upperBound,
-                    mainMinMaxRange.lowerBound,
-                    mainBaseY,
-                    mainHeight,
-                    context,
-                    configManager
-                )
+                if !isRsiOnlyMode {
+                    mainDraw.drawMaRightLabels(
+                        latestVisible,
+                        allWidth,
+                        mainMinMaxRange.upperBound,
+                        mainMinMaxRange.lowerBound,
+                        mainBaseY,
+                        mainHeight,
+                        context,
+                        configManager
+                    )
+                    mainDraw.drawBollRightLabels(
+                        latestVisible,
+                        allWidth,
+                        mainMinMaxRange.upperBound,
+                        mainMinMaxRange.lowerBound,
+                        mainBaseY,
+                        mainHeight,
+                        context,
+                        configManager
+                    )
+                    mainDraw.drawSupportResistanceRightLabels(
+                        allWidth,
+                        mainMinMaxRange.upperBound,
+                        mainMinMaxRange.lowerBound,
+                        mainBaseY,
+                        mainHeight,
+                        context,
+                        configManager
+                    )
+                }
+                if let rsiChildDraw = childDraw as? HTRsiDraw {
+                    rsiChildDraw.drawLevelOverlays(
+                        latestVisible,
+                        allWidth,
+                        childMinMaxRange.upperBound,
+                        childMinMaxRange.lowerBound,
+                        childBaseY,
+                        childHeight,
+                        context,
+                        configManager
+                    )
+                }
             }
             drawSelectedLine(context)
-            drawSelectedBoard(context)
+            if !isRsiOnlyMode {
+                drawSelectedBoard(context)
+            }
             drawSelectedTime(context)
 
             drawContext.draw(contentOffset.x)
@@ -390,6 +414,21 @@ class HTKLineView: UIScrollView {
 
         self.allHeight = self.bounds.size.height - configManager.paddingBottom
         self.allWidth = self.bounds.size.width
+        self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
+
+        if isRsiOnlyMode && hasChildPane {
+            self.volumeRange = 0...0
+            self.mainMinMaxRange = 0..<100
+            self.mainBaseY = configManager.paddingTop - textHeight
+            self.mainHeight = 0
+            self.volumeMinMaxRange = 0..<0
+            self.volumeBaseY = mainBaseY
+            self.volumeHeight = 0
+            self.childMinMaxRange = childDraw?.minMaxRange(visibleModelArray, configManager) ?? 0..<100
+            self.childBaseY = configManager.paddingTop + configManager.headerHeight
+            self.childHeight = max(0, allHeight - childBaseY)
+            return
+        }
 
         var mainMinMax = mainDraw.minMaxRange(visibleModelArray, configManager)
         // Include prediction targets in min/max range
@@ -406,7 +445,6 @@ class HTKLineView: UIScrollView {
         }
         self.mainMinMaxRange = mainMinMax
 
-        self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
         self.mainBaseY = configManager.paddingTop - textHeight
         self.mainHeight = max(0, allHeight * volumeRange.lowerBound - mainBaseY - textHeight)
 
@@ -450,6 +488,24 @@ class HTKLineView: UIScrollView {
         return value
     }
 
+    func childYFromValue(_ value: CGFloat) -> CGFloat {
+        let scale = (childMinMaxRange.upperBound - childMinMaxRange.lowerBound) / max(childHeight, 0.0001)
+        var y = childBaseY + childHeight * 0.5
+        if scale != 0 {
+            y = childBaseY + (childMinMaxRange.upperBound - value) / scale
+        }
+        return y
+    }
+
+    func childValueFromY(_ y: CGFloat) -> CGFloat {
+        let scale = (childMinMaxRange.upperBound - childMinMaxRange.lowerBound) / max(childHeight, 0.0001)
+        var value = childMinMaxRange.lowerBound + (childMinMaxRange.upperBound - childMinMaxRange.lowerBound) * 0.5
+        if scale != 0 {
+            value = childMinMaxRange.upperBound - (y - childBaseY) * scale
+        }
+        return value
+    }
+
     func xFromValue(_ value: CGFloat) -> CGFloat {
         guard let firstItem = configManager.modelArray.first, let lastItem = configManager.modelArray.last else {
             return 0
@@ -473,8 +529,8 @@ class HTKLineView: UIScrollView {
         guard configManager.gridEnabled else { return }
 
         let baseColor = configManager.gridColor
-        let minPrice = mainMinMaxRange.lowerBound
-        let maxPrice = mainMinMaxRange.upperBound
+        let minPrice = isRsiOnlyMode ? childMinMaxRange.lowerBound : mainMinMaxRange.lowerBound
+        let maxPrice = isRsiOnlyMode ? childMinMaxRange.upperBound : mainMinMaxRange.upperBound
         let range = maxPrice - minPrice
         guard range > 0, PRICE_TICK_COUNT >= 2 else { return }
 
@@ -490,8 +546,17 @@ class HTKLineView: UIScrollView {
         for i in 0..<levelsCount {
             let value = minPrice + CGFloat(i) * step
             priceGridLevels.append(value)
-
-            let y = alignToPixel(yFromValue(value))
+            let y: CGFloat
+            if isRsiOnlyMode {
+                let childScale = (childMinMaxRange.upperBound - childMinMaxRange.lowerBound) / max(childHeight, 0.0001)
+                if childScale == 0 {
+                    y = alignToPixel(childBaseY + childHeight / 2)
+                } else {
+                    y = alignToPixel(childBaseY + (childMinMaxRange.upperBound - value) / childScale)
+                }
+            } else {
+                y = alignToPixel(yFromValue(value))
+            }
             context.move(to: CGPoint(x: 0, y: y))
             context.addLine(to: CGPoint(x: allWidth, y: y))
             context.strokePath()
@@ -520,27 +585,33 @@ class HTKLineView: UIScrollView {
     }
 
     func drawCandle(_ context: CGContext) {
-        if (configManager.isMinute) {
+        if !isRsiOnlyMode && (configManager.isMinute) {
             mainDraw.drawGradient(visibleModelArray, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, allWidth, mainBaseY, mainHeight, context, configManager)
         }
 
-        for (i, model) in visibleModelArray.enumerated() {
-            let lastIndex = i == 0 ? i : i - 1
-            let lastModel = visibleModelArray[lastIndex]
-            mainDraw.drawSuperFill(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
+        if !isRsiOnlyMode {
+            for (i, model) in visibleModelArray.enumerated() {
+                let lastIndex = i == 0 ? i : i - 1
+                let lastModel = visibleModelArray[lastIndex]
+                mainDraw.drawSuperFill(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
+            }
         }
 
         for (i, model) in visibleModelArray.enumerated() {
             let lastIndex = i == 0 ? i : i - 1
             let lastModel = visibleModelArray[lastIndex]
-            mainDraw.drawCandle(model, i, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, context, configManager)
-            if shouldShowVolume {
+            if !isRsiOnlyMode {
+                mainDraw.drawCandle(model, i, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, context, configManager)
+            }
+            if !isRsiOnlyMode && shouldShowVolume {
                 volumeDraw.drawCandle(model, i, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, context, configManager)
             }
             childDraw?.drawCandle(model, i, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, context, configManager)
 
-            mainDraw.drawLine(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
-            if shouldShowVolume {
+            if !isRsiOnlyMode {
+                mainDraw.drawLine(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
+            }
+            if !isRsiOnlyMode && shouldShowVolume {
                 volumeDraw.drawLine(model, lastModel, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, i, lastIndex, context, configManager)
             }
             childDraw?.drawLine(model, lastModel, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, i, lastIndex, context, configManager)
@@ -554,8 +625,10 @@ class HTKLineView: UIScrollView {
         }
         if let model = model {
             let baseX: CGFloat = 5
-            mainDraw.drawText(model, baseX, 10, context, configManager)
-            if shouldShowVolume {
+            if !isRsiOnlyMode {
+                mainDraw.drawText(model, baseX, 10, context, configManager)
+            }
+            if !isRsiOnlyMode && shouldShowVolume {
                 volumeDraw.drawText(model, baseX, volumeBaseY - configManager.headerHeight, context, configManager)
             }
             childDraw?.drawText(model, baseX, childBaseY - configManager.headerHeight, context, configManager)
@@ -564,7 +637,25 @@ class HTKLineView: UIScrollView {
 
     func drawValue(_ context: CGContext) {
         let baseX = self.allWidth
-        if !priceGridLevels.isEmpty, mainHeight > 0 {
+        if isRsiOnlyMode, !priceGridLevels.isEmpty, childHeight > 0 {
+            let font = configManager.createFont(configManager.rightTextFontSize)
+            let color = configManager.textColor
+
+            for value in priceGridLevels {
+                let y = alignToPixel(childYFromValue(value))
+                let title = configManager.precision(value, configManager.price)
+                let width = mainDraw.textWidth(title: title, font: font)
+                let height = mainDraw.textHeight(font: font)
+                let x = baseX - width - 4
+                let textY = y - height / 2 - PRICE_LABEL_VERTICAL_OFFSET
+                mainDraw.drawText(title: title,
+                                  point: CGPoint(x: x, y: textY),
+                                  color: color,
+                                  font: font,
+                                  context: context,
+                                  configManager: configManager)
+            }
+        } else if !isRsiOnlyMode, !priceGridLevels.isEmpty, mainHeight > 0 {
             let font = configManager.createFont(configManager.rightTextFontSize)
             let color = configManager.textColor
 
@@ -585,10 +676,10 @@ class HTKLineView: UIScrollView {
                                   context: context,
                                   configManager: configManager)
             }
-        } else {
+        } else if !isRsiOnlyMode {
             mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
         }
-        if shouldShowVolume {
+        if !isRsiOnlyMode && shouldShowVolume {
             volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
         }
         childDraw?.drawValue(childMinMaxRange.upperBound, childMinMaxRange.lowerBound, baseX, childBaseY, childHeight, context, configManager)
@@ -1222,14 +1313,35 @@ class HTKLineView: UIScrollView {
         // X bám tâm nến (snap)
         let x = (CGFloat(selectedIndex) + 0.5) * configManager.itemWidth - contentOffset.x
 
-        // Y tự do theo tay, giới hạn trong vùng main chart
-        var y = loc.y
-        let minY = mainBaseY
-        let maxY = mainBaseY + mainHeight
-        y = max(minY, min(y, maxY))
-
-        // Giá tại vị trí Y của cursor (dùng cho label)
-        let value = valueFromY(y)
+        // Y/value theo mode (main chart hoặc RSI-only child pane)
+        let minY: CGFloat
+        let maxY: CGFloat
+        let verticalStartY: CGFloat
+        let verticalEndY: CGFloat
+        var y: CGFloat
+        let value: CGFloat
+        if isRsiOnlyMode {
+            guard childHeight > 0 else { return }
+            minY = childBaseY
+            maxY = childBaseY + childHeight
+            verticalStartY = childBaseY
+            verticalEndY = childBaseY + childHeight
+            if let selectedRsiValue = resolveSelectedRsiValue() {
+                value = selectedRsiValue
+                y = childYFromValue(selectedRsiValue)
+            } else {
+                y = max(minY, min(loc.y, maxY))
+                value = childValueFromY(y)
+            }
+            y = max(minY, min(y, maxY))
+        } else {
+            minY = mainBaseY
+            maxY = mainBaseY + mainHeight
+            verticalStartY = mainBaseY
+            verticalEndY = childBaseY + childHeight
+            y = max(minY, min(loc.y, maxY))
+            value = valueFromY(y)
+        }
 
         // === 1) Crosshair lines: ngang + dọc, mỏng và đứt đoạn ===
         context.saveGState()
@@ -1243,11 +1355,9 @@ class HTKLineView: UIScrollView {
         context.addLine(to: CGPoint(x: allWidth, y: y))
         context.strokePath()
 
-        // Dọc: từ mainBaseY xuống hết vùng child chart
-        let startY = mainBaseY
-        let endY = childBaseY + childHeight
-        context.move(to: CGPoint(x: x, y: startY))
-        context.addLine(to: CGPoint(x: x, y: endY))
+        // Dọc: theo pane đang active
+        context.move(to: CGPoint(x: x, y: verticalStartY))
+        context.addLine(to: CGPoint(x: x, y: verticalEndY))
         context.strokePath()
 
         context.restoreGState() // reset dash để các phần vẽ khác không bị đứt đoạn
@@ -1479,6 +1589,48 @@ class HTKLineView: UIScrollView {
         context.fill(rect)
         context.stroke(rect)
         mainDraw.drawText(title: title, point: CGPoint.init(x: x - width / 2.0, y: y + (configManager.paddingBottom - height) / 2), color: color, font: font, context: context, configManager: configManager)
+    }
+
+    private func resolveSelectedRsiValue() -> CGFloat? {
+        guard let local = localSelectedIndex(), local >= 0, local < visibleModelArray.count else {
+            return nil
+        }
+        let model = visibleModelArray[local]
+        let preferredPeriod = resolvedRsiCurrentPeriod()
+        if let period = preferredPeriod {
+            if let item = model.rsiList.first(where: { parseRsiPeriod($0.title) == period && $0.value.isFinite && !$0.value.isNaN }) {
+                return item.value
+            }
+        }
+        return model.rsiList.first(where: { $0.value.isFinite && !$0.value.isNaN })?.value
+    }
+
+    private func resolvedRsiCurrentPeriod() -> Int? {
+        if let currentTag = configManager.rsiCurrentTag {
+            if let period = currentTag["period"] as? Int, period > 0 {
+                return period
+            }
+            if let number = currentTag["period"] as? NSNumber {
+                let value = number.intValue
+                return value > 0 ? value : nil
+            }
+        }
+        return nil
+    }
+
+    private func parseRsiPeriod(_ title: String) -> Int? {
+        let raw = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty {
+            return nil
+        }
+        if let value = Int(raw) {
+            return value
+        }
+        let digits = raw.filter { $0.isNumber }
+        if digits.isEmpty {
+            return nil
+        }
+        return Int(digits)
     }
 
     func valuePointFromViewPoint(_ point: CGPoint) -> CGPoint {

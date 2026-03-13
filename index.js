@@ -420,6 +420,97 @@ function toFiniteOptionalNumber(value) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function toBoolean(value, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  return fallback;
+}
+
+function normalizeRsiAxisMode(value, fallback = "adaptive") {
+  if (value === "fixed_0_100") {
+    return "fixed_0_100";
+  }
+  if (value === "adaptive_include_levels") {
+    return "adaptive_include_levels";
+  }
+  if (value === "adaptive") {
+    return "adaptive";
+  }
+  return fallback;
+}
+
+function defaultRsiLevelColor(value) {
+  if (value >= 70) {
+    return toColorNumber("#EF4444", 0xffef4444);
+  }
+  if (value <= 30) {
+    return toColorNumber("#14B8A6", 0xff14b8a6);
+  }
+  return toColorNumber("#6B7280", 0xff6b7280);
+}
+
+function normalizeRsiLevel(level) {
+  const value = toFiniteOptionalNumber(level?.value);
+  if (typeof value !== "number") {
+    return null;
+  }
+  const color =
+    typeof level?.color === "number" || typeof level?.color === "string"
+      ? toColorNumber(level.color, defaultRsiLevelColor(value))
+      : defaultRsiLevelColor(value);
+  const defaultLabel = Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return {
+    value,
+    label:
+      typeof level?.label === "string" && level.label.trim().length > 0
+        ? level.label.trim()
+        : defaultLabel,
+    color,
+    dashed: toBoolean(level?.dashed, true),
+    showRightTag: toBoolean(level?.showRightTag, true),
+    showGuideLine: toBoolean(level?.showGuideLine, true),
+  };
+}
+
+function normalizeRsiLevels(levels, withDefaults = false) {
+  const normalized = (Array.isArray(levels) ? levels : [])
+    .map((item) => normalizeRsiLevel(item))
+    .filter(Boolean);
+  if (normalized.length > 0) {
+    return normalized;
+  }
+  if (!withDefaults) {
+    return [];
+  }
+  return [
+    normalizeRsiLevel({ value: 70, label: "70", color: "#EF4444", dashed: true, showRightTag: true, showGuideLine: true }),
+    normalizeRsiLevel({ value: 50, label: "50", color: "#6B7280", dashed: true, showRightTag: false, showGuideLine: true }),
+    normalizeRsiLevel({ value: 30, label: "30", color: "#14B8A6", dashed: true, showRightTag: true, showGuideLine: true }),
+  ].filter(Boolean);
+}
+
+function normalizeRsiCurrentTag(currentTag, defaultPeriod = 14, enabledByDefault = false) {
+  const explicitPeriod = toPeriod(currentTag?.period, defaultPeriod);
+  const labelText =
+    typeof currentTag?.label === "string" && currentTag.label.trim().length > 0
+      ? currentTag.label.trim()
+      : `RSI (${explicitPeriod})`;
+  const color =
+    typeof currentTag?.color === "number" || typeof currentTag?.color === "string"
+      ? toColorNumber(currentTag.color, toColorNumber("#9C27B0", 0xff9c27b0))
+      : toColorNumber("#9C27B0", 0xff9c27b0);
+  return {
+    enabled: toBoolean(currentTag?.enabled, enabledByDefault),
+    period: explicitPeriod,
+    label: labelText,
+    color,
+  };
+}
+
 function uniqPositiveIntegers(list, fallback) {
   const values = Array.from(
     new Set(
@@ -1148,6 +1239,11 @@ function composeOptionList({
   srStyle,
   supportLevel,
   resistanceLevel,
+  rsiStyle,
+  rsiAxisMode,
+  rsiLevels,
+  rsiCurrentTag,
+  rsiOnly,
   draw,
   prediction,
   interaction,
@@ -1172,6 +1268,11 @@ function composeOptionList({
   const resolvedMaStyle = maStyle === "line_labels" ? "line_labels" : "default";
   const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
   const resolvedSrStyle = srStyle === "line_labels" ? "line_labels" : "default";
+  const resolvedRsiStyle = rsiStyle === "line_labels" ? "line_labels" : "default";
+  const resolvedRsiAxisMode = normalizeRsiAxisMode(rsiAxisMode, "adaptive");
+  const resolvedRsiLevels = Array.isArray(rsiLevels) ? rsiLevels : [];
+  const resolvedRsiCurrentTag = isObject(rsiCurrentTag) ? rsiCurrentTag : undefined;
+  const resolvedRsiOnly = rsiOnly === true;
   const support = toFiniteOptionalNumber(supportLevel);
   const resistance = toFiniteOptionalNumber(resistanceLevel);
   const hasValidSrLevels =
@@ -1235,6 +1336,11 @@ function composeOptionList({
     showVolume: resolvedShowVolume,
     maStyle: resolvedMaStyle,
     bollStyle: resolvedBollStyle,
+    rsiStyle: resolvedRsiStyle,
+    rsiAxisMode: resolvedRsiAxisMode,
+    ...(resolvedRsiLevels.length > 0 ? { rsiLevels: resolvedRsiLevels } : {}),
+    ...(resolvedRsiCurrentTag ? { rsiCurrentTag: resolvedRsiCurrentTag } : {}),
+    rsiOnly: resolvedRsiOnly,
     srStyle: resolvedSrStyle,
     ...(resolvedSrStyle === "line_labels" && hasValidSrLevels
       ? {
@@ -1277,6 +1383,7 @@ function toLegacyPropsConfig({
   initialData,
   theme,
   mainIndicators,
+  subIndicators,
   subCharts,
   volume,
   interaction,
@@ -1284,13 +1391,39 @@ function toLegacyPropsConfig({
   const enabledSub = (Array.isArray(subCharts) ? subCharts : []).filter(
     (item) => item && item.enabled !== false
   );
-  const second = enabledSub.length > 0 ? mapSubTypeToSecond(enabledSub[0].type) : -1;
+  const rsiSubIndicatorEnabled = subIndicators?.rsi?.enabled === true;
+  const second = rsiSubIndicatorEnabled
+    ? 5
+    : enabledSub.length > 0
+    ? mapSubTypeToSecond(enabledSub[0].type)
+    : -1;
 
   const maEnabled = mainIndicators?.ma?.enabled !== false;
   const emaEnabled = mainIndicators?.ema?.enabled === true;
   const superEnabled = mainIndicators?.super?.enabled === true;
   const bollEnabled = mainIndicators?.boll?.enabled === true;
   const srEnabled = mainIndicators?.sr?.enabled === true;
+  const rsiPeriods = rsiSubIndicatorEnabled
+    ? uniqPositiveIntegers(subIndicators?.rsi?.periods, [14])
+    : DEFAULT_INDICATOR_PERIODS.rsi;
+  const rsiStyle =
+    rsiSubIndicatorEnabled && subIndicators?.rsi?.style === "line_labels"
+      ? "line_labels"
+      : "default";
+  const rsiAxisMode = rsiSubIndicatorEnabled
+    ? normalizeRsiAxisMode(subIndicators?.rsi?.axisMode, "fixed_0_100")
+    : "adaptive";
+  const rsiLevels = rsiSubIndicatorEnabled
+    ? normalizeRsiLevels(subIndicators?.rsi?.levels, rsiStyle === "line_labels")
+    : [];
+  const rsiCurrentTag = rsiSubIndicatorEnabled
+    ? normalizeRsiCurrentTag(
+        subIndicators?.rsi?.currentTag,
+        rsiPeriods[0] ?? 14,
+        rsiStyle === "line_labels"
+      )
+    : undefined;
+  const rsiOnly = rsiSubIndicatorEnabled && subIndicators?.rsi?.rsiOnly === true;
   const srSupportLevel = srEnabled
     ? toFiniteOptionalNumber(mainIndicators?.sr?.supportLevel)
     : undefined;
@@ -1331,6 +1464,11 @@ function toLegacyPropsConfig({
     showVolume: volume?.enabled !== false,
     maStyle: mainIndicators?.ma?.style === "line_labels" ? "line_labels" : "default",
     bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
+    rsiStyle,
+    rsiAxisMode,
+    rsiLevels,
+    rsiCurrentTag,
+    rsiOnly,
     srStyle:
       srEnabled && mainIndicators?.sr?.style === "line_labels"
         ? "line_labels"
@@ -1361,6 +1499,10 @@ function toLegacyPropsConfig({
             DEFAULT_INDICATOR_PERIODS.superMultiplier
         ),
       },
+      rsi: {
+        enabled: rsiSubIndicatorEnabled,
+        periods: rsiPeriods,
+      },
       targetList: {
         maList: buildTargetItemsFromPeriods(
           Array.isArray(mainIndicators?.ma?.periods)
@@ -1376,6 +1518,7 @@ function toLegacyPropsConfig({
         ),
         bollN: String(mainIndicators?.boll?.n ?? DEFAULT_INDICATOR_PERIODS.bollN),
         bollP: String(mainIndicators?.boll?.p ?? DEFAULT_INDICATOR_PERIODS.bollP),
+        rsiList: buildTargetItemsFromPeriods(rsiPeriods, true),
       },
       autoCompute: true,
       computeMode: "prefer_input",
@@ -1448,6 +1591,7 @@ const RNKLineView = forwardRef((props, ref) => {
     indicator,
     theme,
     mainIndicators,
+    subIndicators,
     subCharts,
     volume,
     interaction,
@@ -1535,6 +1679,7 @@ const RNKLineView = forwardRef((props, ref) => {
       initialData: [],
       theme,
       mainIndicators: derivedMainIndicators,
+      subIndicators,
       subCharts,
       volume,
       interaction,
@@ -1572,6 +1717,11 @@ const RNKLineView = forwardRef((props, ref) => {
       srStyle: legacy.srStyle,
       supportLevel: legacy.supportLevel,
       resistanceLevel: legacy.resistanceLevel,
+      rsiStyle: legacy.rsiStyle,
+      rsiAxisMode: legacy.rsiAxisMode,
+      rsiLevels: legacy.rsiLevels,
+      rsiCurrentTag: legacy.rsiCurrentTag,
+      rsiOnly: legacy.rsiOnly,
       draw,
       prediction,
       interaction: legacy.interaction,
@@ -1591,6 +1741,7 @@ const RNKLineView = forwardRef((props, ref) => {
     indicator,
     theme,
     mainIndicators,
+    subIndicators,
     subCharts,
     volume,
     interaction,

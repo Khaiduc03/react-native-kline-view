@@ -120,6 +120,16 @@ class HTKLineConfigManager: NSObject {
 
     var resistanceLevel: CGFloat?
 
+    var rsiStyle = "default"
+
+    var rsiAxisMode = "adaptive"
+
+    var rsiLevels = [[String: Any]]()
+
+    var rsiCurrentTag: [String: Any]? = nil
+
+    var rsiOnly = false
+
     var mainType: HTKLineMainType {
         get {
             return HTKLineMainType(rawValue: self.primary) ?? HTKLineMainType.none
@@ -619,6 +629,32 @@ class HTKLineConfigManager: NSObject {
         if let support = supportLevel, let resistance = resistanceLevel, support >= resistance {
             supportLevel = nil
             resistanceLevel = nil
+        }
+        if let value = optionList["rsiStyle"] as? String, value == "line_labels" {
+            rsiStyle = "line_labels"
+        } else {
+            rsiStyle = "default"
+        }
+        if let value = optionList["rsiAxisMode"] as? String,
+           value == "fixed_0_100" || value == "adaptive_include_levels" || value == "adaptive" {
+            rsiAxisMode = value
+        } else {
+            rsiAxisMode = "adaptive"
+        }
+        if let levels = optionList["rsiLevels"] as? [[String: Any]] {
+            rsiLevels = levels
+        } else {
+            rsiLevels = []
+        }
+        if let currentTag = optionList["rsiCurrentTag"] as? [String: Any] {
+            rsiCurrentTag = currentTag
+        } else {
+            rsiCurrentTag = nil
+        }
+        if let value = optionList["rsiOnly"] as? Bool {
+            rsiOnly = value
+        } else {
+            rsiOnly = false
         }
 
         _itemWidth = configList["itemWidth"] as? CGFloat ?? 0

@@ -91,14 +91,14 @@ class HTKLineContainerView: UIView {
                     : ((CGFloat(safeVisibleStart) + 0.5) * oldItemWidth - oldOffset)
 
                 let previousSelectedIndex = self.klineView.selectedIndex
-                let selectedId: Int? = {
-                    if previousSelectedIndex < 0 || previousSelectedIndex >= previousModels.count {
-                        return nil
-                    }
-                    return previousModels[previousSelectedIndex].id
-                }()
+                let selectedCandleId: CGFloat?
+                if previousSelectedIndex >= 0 && previousSelectedIndex < previousModels.count {
+                    selectedCandleId = previousModels[previousSelectedIndex].id
+                } else {
+                    selectedCandleId = nil
+                }
 
-                self.configManager.modelArray.insert(cwwontentsOf: models, at: 0)
+                self.configManager.modelArray.insert(contentsOf: models, at: 0)
                 self.configManager.shouldScrollToEnd = false
                 self.reloadConfigManager(self.configManager)
 
@@ -122,7 +122,7 @@ class HTKLineContainerView: UIView {
                     self.klineView.reloadContentOffset(oldOffset + fallbackDelta)
                 }
 
-                if let selectedId = selectedId,
+                if let selectedId = selectedCandleId,
                    self.klineView.selectedIndex >= 0,
                    let newSelectedIndex = self.configManager.modelArray.firstIndex(where: { $0.id == selectedId }) {
                     self.klineView.selectedIndex = newSelectedIndex

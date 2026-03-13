@@ -16,6 +16,8 @@ import com.github.fujianlian.klinechart.container.HTDrawContext;
 import com.github.fujianlian.klinechart.container.HTPoint;
 import com.github.fujianlian.klinechart.draw.MainDraw;
 import com.github.fujianlian.klinechart.draw.PrimaryStatus;
+import com.github.fujianlian.klinechart.draw.RSIDraw;
+import com.github.fujianlian.klinechart.draw.SecondStatus;
 import com.github.fujianlian.klinechart.entity.IKLine;
 import com.github.fujianlian.klinechart.formatter.TimeFormatter;
 import com.github.fujianlian.klinechart.formatter.ValueFormatter;
@@ -286,6 +288,17 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         int allHeight = this.getHeight() - mBottomPadding;
         boolean showVolumePane = shouldShowVolumePane();
         boolean hasChildPanel = hasChildPane();
+        boolean rsiOnly = isRsiOnlyMode();
+
+        if (rsiOnly && hasChildPanel) {
+            int mainTop = mTopPadding - textHeight;
+            mMainRect = new Rect(0, mainTop, mWidth, mainTop);
+            mVolRect = new Rect(0, mainTop, mWidth, mainTop);
+            int childTop = mTopPadding;
+            int childBottom = Math.max(childTop, allHeight);
+            mChildRect = new Rect(0, childTop, mWidth, childBottom);
+            return;
+        }
 
         int mainHeight = (int) (allHeight * configManager.mainFlex);
         if (!showVolumePane && !hasChildPanel) {
@@ -326,7 +339,13 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         super.onDraw(canvas);
 //        canvas.drawColor(mBackgroundPaint.getColor());
 
-        if (mWidth == 0 || mMainRect.height() == 0) {
+        if (mWidth == 0) {
+            return;
+        }
+        if (!isRsiOnlyMode() && mMainRect.height() == 0) {
+            return;
+        }
+        if (isRsiOnlyMode() && (mChildRect == null || mChildRect.height() == 0)) {
             return;
         }
         calculateValue();
@@ -336,10 +355,17 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         if (mItemCount > 0) {
             drawK(canvas);
             drawText(canvas);
-            drawMaxAndMin(canvas);
+            if (!isRsiOnlyMode()) {
+                drawMaxAndMin(canvas);
+            }
             drawValue(canvas, isLongPress ? mSelectedIndex : mStopIndex);
-            drawClosePriceLine(canvas);
-            drawPrediction(canvas);
+            if (!isRsiOnlyMode()) {
+                drawClosePriceLine(canvas);
+            }
+            drawChildOverlays(canvas);
+            if (!isRsiOnlyMode()) {
+                drawPrediction(canvas);
+            }
             drawSelector(canvas);
         }
         canvas.restore();
@@ -415,6 +441,12 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         return mChildDraw != null;
     }
 
+    private boolean isRsiOnlyMode() {
+        return configManager.rsiOnly
+                && configManager.secondStatus == SecondStatus.RSI
+                && mChildDraw != null;
+    }
+
     public float getVolY(float value) {
         return (mVolMaxValue - value) * mVolScaleY + mVolRect.top;
     }
@@ -448,11 +480,12 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         if (mWidth == 0 || mMainRect == null || mVolRect == null || mItemCount <= 0) {
             return;
         }
+        boolean rsiOnly = isRsiOnlyMode();
 
         // Horizontal price grid
         priceGridLevels.clear();
-        float minPrice = mMainMinValue;
-        float maxPrice = mMainMaxValue;
+        float minPrice = rsiOnly ? mChildMinValue : mMainMinValue;
+        float maxPrice = rsiOnly ? mChildMaxValue : mMainMaxValue;
         float range = maxPrice - minPrice;
         if (range > 0 && PRICE_TICK_COUNT >= 2) {
             int levelsCount = Math.max(2, PRICE_TICK_COUNT);
@@ -460,13 +493,13 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             for (int i = 0; i < levelsCount; i++) {
                 float value = minPrice + step * i;
                 priceGridLevels.add(value);
-                float y = yFromValue(value);
+                float y = rsiOnly ? getChildY(value) : yFromValue(value);
                 canvas.drawLine(0, y, mWidth, y, mGridPaint);
             }
         }
 
         // Separators main/vol/child
-        if (shouldShowVolumePane()) {
+        if (!rsiOnly && shouldShowVolumePane()) {
             canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
         }
         if (mChildDraw != null && mChildRect != null) {
@@ -739,21 +772,24 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      * @param canvas
      */
     private void drawK(Canvas canvas) {
+        boolean rsiOnly = isRsiOnlyMode();
         //保存之前的平移，缩放
         canvas.save();
         canvas.translate(-mScrollX * mScaleX, 0);
         canvas.scale(mScaleX, 1);
-        mainDraw.drawMinuteMinute(mTopPadding, mStartIndex, getMainBottom(), mStopIndex, canvas, this);
-        for (int i = mStartIndex; i <= mStopIndex; i++) {
-            if (i < 0 || i >= configManager.modelArray.size()) {
-                continue;
-            }
-            Object currentPoint = getItem(i);
-            float currentPointX = getItemMiddleScrollX(i);
-            Object lastPoint = i == 0 ? currentPoint : getItem(i - 1);
-            float lastX = i == 0 ? currentPointX : getItemMiddleScrollX(i - 1);
-            if (mMainDraw instanceof MainDraw) {
-                ((MainDraw) mMainDraw).drawBackground((IKLine) lastPoint, (IKLine) currentPoint, lastX, currentPointX, canvas, this);
+        if (!rsiOnly) {
+            mainDraw.drawMinuteMinute(mTopPadding, mStartIndex, getMainBottom(), mStopIndex, canvas, this);
+            for (int i = mStartIndex; i <= mStopIndex; i++) {
+                if (i < 0 || i >= configManager.modelArray.size()) {
+                    continue;
+                }
+                Object currentPoint = getItem(i);
+                float currentPointX = getItemMiddleScrollX(i);
+                Object lastPoint = i == 0 ? currentPoint : getItem(i - 1);
+                float lastX = i == 0 ? currentPointX : getItemMiddleScrollX(i - 1);
+                if (mMainDraw instanceof MainDraw) {
+                    ((MainDraw) mMainDraw).drawBackground((IKLine) lastPoint, (IKLine) currentPoint, lastX, currentPointX, canvas, this);
+                }
             }
         }
         for (int i = mStartIndex; i <= mStopIndex; i++) {
@@ -764,7 +800,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             float currentPointX = getItemMiddleScrollX(i);
             Object lastPoint = i == 0 ? currentPoint : getItem(i - 1);
             float lastX = i == 0 ? currentPointX : getItemMiddleScrollX(i - 1);
-            if (mMainDraw != null) {
+            if (!rsiOnly && mMainDraw != null) {
                 mMainDraw.drawTranslated(lastPoint, currentPoint, lastX, currentPointX, canvas, this, i);
             }
             if (shouldShowVolumePane()) {
@@ -807,24 +843,25 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      * @param canvas
      */
     private void drawText(Canvas canvas) {
+        boolean rsiOnly = isRsiOnlyMode();
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
         float textHeight = fm.descent - fm.ascent;
         float baseLine = (textHeight - fm.bottom - fm.top) / 2;
         //--------------画上方k线图的值-------------
-        if (mMainDraw != null) {
+        if (((!rsiOnly && mMainDraw != null) || (rsiOnly && mChildDraw != null))) {
             if (!priceGridLevels.isEmpty()) {
                 for (Float v : priceGridLevels) {
                     if (v == null) continue;
                     String text = formatValue(v);
                     float textWidth = calculateWidth(text);
-                    float y = yFromValue(v);
+                    float y = rsiOnly ? getChildY(v) : yFromValue(v);
                     float labelY = y - textHeight / 2f;
                     canvas.drawText(text, mWidth - textWidth, fixTextY1(labelY), mTextPaint);
                 }
             }
         }
         //--------------画中间子图的值-------------
-        if (shouldShowVolumePane()) {
+        if (!rsiOnly && shouldShowVolumePane()) {
             IValueFormatter formatter = mVolDraw.getValueFormatter();
             if (formatter instanceof ValueFormatter) {
                 ValueFormatter valueFormatter = (ValueFormatter)formatter;
@@ -869,6 +906,13 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
     private void drawSelector(Canvas canvas) {
         if (!isLongPress) {
+            return;
+        }
+        if (mSelectedIndex < 0 || mSelectedIndex >= mItemCount) {
+            return;
+        }
+        if (isRsiOnlyMode()) {
+            drawRsiOnlySelector(canvas);
             return;
         }
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
@@ -1042,6 +1086,185 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         mainDraw.drawSelector(this, canvas);
     }
 
+    private void drawRsiOnlySelector(Canvas canvas) {
+        if (mChildRect == null || mChildRect.height() <= 0) {
+            return;
+        }
+
+        Paint.FontMetrics fm = mTextPaint.getFontMetrics();
+        float textHeight = fm.descent - fm.ascent;
+        float selectedValue = resolveSelectedRsiValue(mSelectedIndex);
+        if (Float.isNaN(selectedValue) || Float.isInfinite(selectedValue)) {
+            return;
+        }
+
+        mSelectPointPaint.setColor(configManager.panelBackgroundColor);
+
+        float w1 = ViewUtil.Dp2Px(getContext(), 5);
+        float w2 = ViewUtil.Dp2Px(getContext(), 3);
+        float r = textHeight / 2 + w2;
+        float triangleWidth = 10;
+        float y = getChildY(selectedValue);
+        y = Math.max(mChildRect.top, Math.min(mChildRect.bottom, y));
+
+        float x;
+        float startX;
+        float endX;
+        String text = formatValue(selectedValue);
+        float textWidth = mTextPaint.measureText(text);
+        float pointX = scrollXtoViewX(getItemMiddleScrollX(mSelectedIndex));
+        if (pointX < getChartWidth() / 2f) {
+            x = 1;
+            startX = textWidth + 2 * w1 + w2 + triangleWidth;
+            endX = mWidth;
+            Path path = new Path();
+            path.moveTo(x, y - r);
+            path.lineTo(x, y + r);
+            path.lineTo(textWidth + 2 * w1, y + r);
+            path.lineTo(startX, y);
+            path.lineTo(textWidth + 2 * w1, y - r);
+            path.close();
+            canvas.drawPath(path, mSelectPointPaint);
+            canvas.drawPath(path, mSelectorFramePaint);
+            canvas.drawText(text, x + w1, fixTextY1(y), mMaxMinPaint);
+        } else {
+            x = mWidth - textWidth - 1 - 2 * w1 - w2 - triangleWidth;
+            startX = 0;
+            endX = x;
+
+            Path path = new Path();
+            path.moveTo(x, y);
+            path.lineTo(x + w2 + triangleWidth, y + r);
+            path.lineTo(mWidth - 2, y + r);
+            path.lineTo(mWidth - 2, y - r);
+            path.lineTo(x + w2 + triangleWidth, y - r);
+            path.close();
+
+            canvas.drawPath(path, mSelectPointPaint);
+            canvas.drawPath(path, mSelectorFramePaint);
+            canvas.drawText(text, x + w1 + w2, fixTextY1(y), mMaxMinPaint);
+        }
+
+        canvas.drawLine(startX, y, endX, y, mSelectedXLinePaint);
+
+        mSelectedYLinePaint.setShader(null);
+        mSelectedYLinePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), 1f));
+        mSelectedYLinePaint.setColor(configManager.candleTextColor);
+        canvas.drawLine(pointX, mChildRect.top, pointX, mChildRect.bottom, mSelectedYLinePaint);
+
+        final boolean useNewCursorStyle = configManager.cursorStyleEnabled;
+        final float innerRadius = ViewUtil.Dp2Px(
+                getContext(),
+                Math.max(0.5f, useNewCursorStyle ? configManager.cursorInnerRadiusPx : 2f)
+        );
+        final float outerRadius = ViewUtil.Dp2Px(
+                getContext(),
+                Math.max(0.5f, useNewCursorStyle ? configManager.cursorOuterRadiusPx : 5f)
+        );
+        final float resolvedOuterRadius = Math.max(outerRadius, innerRadius);
+        final float blurRadius = ViewUtil.Dp2Px(
+                getContext(),
+                Math.max(0f, useNewCursorStyle ? configManager.cursorOuterBlurRadiusPx : 0f)
+        );
+        final int outerColor = useNewCursorStyle ? configManager.cursorOuterColor : configManager.selectedPointContainerColor;
+        final int innerColor = useNewCursorStyle ? configManager.cursorInnerColor : configManager.selectedPointContentColor;
+        final int outerFillColor = useNewCursorStyle ? withAlpha(outerColor, 72) : outerColor;
+        final float borderWidth = ViewUtil.Dp2Px(
+                getContext(),
+                Math.max(0f, useNewCursorStyle ? configManager.cursorBorderWidthPx : 0f)
+        );
+        final int borderColor = useNewCursorStyle ? configManager.cursorBorderColor : outerColor;
+        final float innerBorderWidth = ViewUtil.Dp2Px(
+                getContext(),
+                Math.max(0f, useNewCursorStyle ? configManager.cursorInnerBorderWidthPx : 0f)
+        );
+        final int innerBorderColor = useNewCursorStyle ? configManager.cursorInnerBorderColor : Color.WHITE;
+
+        mSelectCenterPaint.setColor(innerColor);
+        mSelectCenterBackgroundPaint.setColor(outerFillColor);
+        mSelectCenterBackgroundPaint.setShader(null);
+
+        if (pointX > startX && pointX < endX) {
+            if (blurRadius > 0) {
+                float haloRadius = resolvedOuterRadius + (blurRadius * 2.8f);
+                float innerHaloStop = Math.min(0.985f, resolvedOuterRadius / haloRadius);
+                float midHaloStop = Math.min(0.995f, (resolvedOuterRadius + blurRadius * 1.6f) / haloRadius);
+                RadialGradient haloShader = new RadialGradient(
+                        pointX,
+                        y,
+                        haloRadius,
+                        new int[]{
+                                withAlpha(outerColor, 180),
+                                withAlpha(outerColor, 120),
+                                withAlpha(outerColor, 45),
+                                withAlpha(outerColor, 0)
+                        },
+                        new float[]{
+                                0f,
+                                innerHaloStop,
+                                midHaloStop,
+                                1f
+                        },
+                        Shader.TileMode.CLAMP
+                );
+                mSelectCenterBackgroundPaint.setShader(haloShader);
+                canvas.drawCircle(pointX, y, haloRadius, mSelectCenterBackgroundPaint);
+                mSelectCenterBackgroundPaint.setShader(null);
+            }
+
+            canvas.drawCircle(pointX, y, resolvedOuterRadius, mSelectCenterBackgroundPaint);
+            canvas.drawCircle(pointX, y, innerRadius, mSelectCenterPaint);
+            if (innerBorderWidth > 0) {
+                mSelectCenterInnerBorderPaint.setStrokeWidth(innerBorderWidth);
+                mSelectCenterInnerBorderPaint.setColor(innerBorderColor);
+                canvas.drawCircle(pointX, y, innerRadius, mSelectCenterInnerBorderPaint);
+            }
+            if (borderWidth > 0) {
+                mSelectCenterBorderPaint.setStrokeWidth(borderWidth);
+                mSelectCenterBorderPaint.setColor(borderColor);
+                canvas.drawCircle(pointX, y, resolvedOuterRadius, mSelectCenterBorderPaint);
+            }
+        }
+
+        String date = getItem(mSelectedIndex).Date;
+        textWidth = mMaxMinPaint.measureText(date);
+        r = textHeight / 2;
+        x = pointX;
+        y = mChildRect.bottom;
+
+        if (x < textWidth + 2 * w1) {
+            x = 1 + textWidth / 2 + w1;
+        } else if (mWidth - x < textWidth + 2 * w1) {
+            x = mWidth - 1 - textWidth / 2 - w1;
+        }
+
+        canvas.drawRect(x - textWidth / 2 - w1, y, x + textWidth / 2 + w1, y + mBottomPadding, mSelectPointPaint);
+        canvas.drawRect(x - textWidth / 2 - w1, y, x + textWidth / 2 + w1, y + mBottomPadding, mSelectorFramePaint);
+        canvas.drawText(date, x - textWidth / 2, fixTextY1(y + (mBottomPadding / 2)), mMaxMinPaint);
+    }
+
+    private float resolveSelectedRsiValue(int index) {
+        if (index < 0 || index >= mItemCount) {
+            return Float.NaN;
+        }
+        KLineEntity point = getItem(index);
+        if (point.rsiList != null) {
+            for (HTKLineTargetItem item : point.rsiList) {
+                if (item == null) {
+                    continue;
+                }
+                if (!Float.isNaN(item.value) && !Float.isInfinite(item.value)) {
+                    return item.value;
+                }
+            }
+        }
+        float legacyRsi = point.getRsi();
+        if (!Float.isNaN(legacyRsi) && !Float.isInfinite(legacyRsi)) {
+            return legacyRsi;
+        }
+        return Float.NaN;
+    }
+
     private int withAlpha(int color, int alpha) {
         return Color.argb(
             Math.max(0, Math.min(255, alpha)),
@@ -1093,16 +1316,16 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      * @param position 显示某个点的值
      */
     private void drawValue(Canvas canvas, int position) {
+        boolean rsiOnly = isRsiOnlyMode();
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
         float textHeight = fm.descent - fm.ascent;
-        float baseLine = (textHeight - fm.bottom - fm.top) / 2;
         float x = 10;
         if (position >= 0 && position < mItemCount) {
-            if (mMainDraw != null) {
+            if (!rsiOnly && mMainDraw != null) {
                 float y = textHeight + 15;
                 mMainDraw.drawText(canvas, this, position, x, y);
             }
-            if (shouldShowVolumePane()) {
+            if (!rsiOnly && shouldShowVolumePane()) {
                 float y = mVolRect.top - mChildPadding + textHeight;
                 mVolDraw.drawText(canvas, this, position, x, y);
             }
@@ -1111,6 +1334,13 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                 mChildDraw.drawText(canvas, this, position, x, y);
             }
         }
+    }
+
+    private void drawChildOverlays(Canvas canvas) {
+        if (!(mChildDraw instanceof RSIDraw)) {
+            return;
+        }
+        ((RSIDraw) mChildDraw).drawLevelOverlays(canvas, this);
     }
 
     public int dp2px(float dp) {
@@ -1229,6 +1459,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      * 计算当前的显示区域
      */
     private void calculateValue() {
+        boolean rsiOnly = isRsiOnlyMode();
         if (!isLongPress()) {
             mSelectedIndex = -1;
         }
@@ -1249,7 +1480,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                 continue;
             }
             IKLine point = (IKLine) getItem(i);
-            if (mMainDraw != null) {
+            if (!rsiOnly && mMainDraw != null) {
                 mMainMaxValue = Math.max(mMainMaxValue, mMainDraw.getMaxValue(point));
                 mMainMinValue = Math.min(mMainMinValue, mMainDraw.getMinValue(point));
                 if (mMainHighMaxValue != Math.max(mMainHighMaxValue, point.getHighPrice())) {
@@ -1261,7 +1492,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                     mMainMinIndex = i;
                 }
             }
-            if (shouldShowVolumePane()) {
+            if (!rsiOnly && shouldShowVolumePane()) {
                 mVolMaxValue = Math.max(mVolMaxValue, mVolDraw.getMaxValue(point));
                 mVolMinValue = Math.min(mVolMinValue, mVolDraw.getMinValue(point));
                 // 成交量最小应该是 0 或者比最小成交量大一点点
@@ -1288,12 +1519,12 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 //            }
 //        }
 
-        if (mMainMaxValue != mMainMinValue) {
+        if (!rsiOnly && mMainMaxValue != mMainMinValue) {
 //            float padding = (mMainMaxValue - mMainMinValue) * 0.05f;
 //            padding = 0;
 //            mMainMaxValue += padding;
 //            mMainMinValue -= padding;
-        } else {
+        } else if (!rsiOnly) {
             //当最大值和最小值都相等的时候 分别增大最大值和 减小最小值
 //            mMainMaxValue += Math.abs(mMainMaxValue * 0.05f);
 //            mMainMinValue -= Math.abs(mMainMinValue * 0.05f);
@@ -1302,7 +1533,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 //            }
         }
 
-        if (shouldShowVolumePane() && Math.abs(mVolMaxValue) < 0.01) {
+        if (!rsiOnly && shouldShowVolumePane() && Math.abs(mVolMaxValue) < 0.01) {
             mVolMaxValue = 15.00f;
         }
 
@@ -1326,7 +1557,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         }
 
         // Expand Y-axis range to include prediction elements (Entry, SL, TPs)
-        if (configManager.predictionEntry != null) {
+        if (!rsiOnly && configManager.predictionEntry != null) {
             float entry = configManager.predictionEntry.floatValue();
             mMainMaxValue = Math.max(mMainMaxValue, entry);
             mMainMinValue = Math.min(mMainMinValue, entry);
@@ -1355,8 +1586,14 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             }
         }
 
-        mMainScaleY = mMainRect.height() * 1f / (mMainMaxValue - mMainMinValue);
-        if (shouldShowVolumePane() && mVolRect.height() > 0 && (mVolMaxValue - mVolMinValue) != 0f) {
+        if (rsiOnly) {
+            mMainMaxValue = 100f;
+            mMainMinValue = 0f;
+            mMainScaleY = 0f;
+        } else {
+            mMainScaleY = mMainRect.height() * 1f / (mMainMaxValue - mMainMinValue);
+        }
+        if (!rsiOnly && shouldShowVolumePane() && mVolRect.height() > 0 && (mVolMaxValue - mVolMinValue) != 0f) {
             mVolScaleY = mVolRect.height() * 1f / (mVolMaxValue - mVolMinValue);
         } else {
             mVolScaleY = 0f;

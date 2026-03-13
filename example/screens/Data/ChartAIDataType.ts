@@ -27,6 +27,7 @@ export interface MarketData {
   ema50?: number[];
   ema200?: number[];
   rsi14?: number[];
+  rsi_14?: number[];
   macd_line?: number[];
   macd_signal?: number[];
   macd_histogram?: number[];

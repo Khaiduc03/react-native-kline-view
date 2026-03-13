@@ -83,6 +83,16 @@ public class HTKLineConfigManager {
 
     public Float resistanceLevel = null;
 
+    public String rsiStyle = "default";
+
+    public String rsiAxisMode = "adaptive";
+
+    public List<Map<String, Object>> rsiLevels = new ArrayList<>();
+
+    public Map<String, Object> rsiCurrentTag = null;
+
+    public boolean rsiOnly = false;
+
 	public SecondStatus secondStatus = SecondStatus.MACD;
 
 	public Boolean isMinute = false;
@@ -256,6 +266,14 @@ public class HTKLineConfigManager {
             return ((Number) value).floatValue();
         }
         return null;
+    }
+
+    private static String readString(Map map, String key, String defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof String) {
+            return (String) value;
+        }
+        return defaultValue;
     }
 
     private static int readColor(Map map, String key, int defaultValue) {
@@ -546,6 +564,33 @@ public class HTKLineConfigManager {
             this.supportLevel = null;
             this.resistanceLevel = null;
         }
+        Object rsiStyleValue = optionList.get("rsiStyle");
+        if (rsiStyleValue instanceof String && "line_labels".equals(rsiStyleValue)) {
+            this.rsiStyle = "line_labels";
+        } else {
+            this.rsiStyle = "default";
+        }
+        String axisMode = readString(optionList, "rsiAxisMode", "adaptive");
+        if ("fixed_0_100".equals(axisMode) || "adaptive_include_levels".equals(axisMode) || "adaptive".equals(axisMode)) {
+            this.rsiAxisMode = axisMode;
+        } else {
+            this.rsiAxisMode = "adaptive";
+        }
+        Object rsiLevelsValue = optionList.get("rsiLevels");
+        if (rsiLevelsValue instanceof List) {
+            //noinspection unchecked
+            this.rsiLevels = (List<Map<String, Object>>) rsiLevelsValue;
+        } else {
+            this.rsiLevels = new ArrayList<>();
+        }
+        Object rsiCurrentTagValue = optionList.get("rsiCurrentTag");
+        if (rsiCurrentTagValue instanceof Map) {
+            //noinspection unchecked
+            this.rsiCurrentTag = (Map<String, Object>) rsiCurrentTagValue;
+        } else {
+            this.rsiCurrentTag = null;
+        }
+        this.rsiOnly = readBoolean(optionList, "rsiOnly", false);
         this.secondStatus = secondStatus;
         this.isMinute = time == -1;
 

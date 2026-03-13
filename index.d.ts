@@ -240,6 +240,10 @@ export type IndicatorConfig = {
     period?: number;
     multiplier?: number;
   };
+  rsi?: {
+    enabled?: boolean;
+    periods?: number[];
+  };
   targetList?: IndicatorTargetList;
 };
 
@@ -279,6 +283,37 @@ export type SubChartConfig = {
   enabled: boolean;
   heightRatio?: number;
   params?: JsonObject;
+};
+
+export type RsiLevelConfig = {
+  value: number;
+  label?: string;
+  color?: ColorValue;
+  dashed?: boolean;
+  showRightTag?: boolean;
+  showGuideLine?: boolean;
+};
+
+export type RsiCurrentTagConfig = {
+  enabled?: boolean;
+  period?: number;
+  label?: string;
+  color?: ColorValue;
+};
+
+export type RsiSubIndicatorConfig = {
+  enabled: boolean;
+  /** Native RSI-only mode: skips main chart draw/calc pipeline and renders RSI pane as primary. */
+  rsiOnly?: boolean;
+  periods?: number[];
+  style?: "default" | "line_labels";
+  axisMode?: "fixed_0_100" | "adaptive_include_levels" | "adaptive";
+  levels?: RsiLevelConfig[];
+  currentTag?: RsiCurrentTagConfig;
+};
+
+export type SubIndicatorsConfig = {
+  rsi?: RsiSubIndicatorConfig;
 };
 
 export type VolumeConfig = {
@@ -357,6 +392,7 @@ type RNKLineViewBaseProps = ViewProps & {
   theme?: ChartThemeConfig;
   layout?: LayoutConfig;
   mainIndicators?: MainIndicatorsConfig;
+  subIndicators?: SubIndicatorsConfig;
   subCharts?: SubChartConfig[];
   volume?: VolumeConfig;
   draw?: DrawConfig;
