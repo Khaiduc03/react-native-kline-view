@@ -1,7 +1,7 @@
 # React Native KLine View
 
 <div align="center">
-  <img src="./example/logo.png" alt="React Native KLine View" width="120" height="120" style="border-radius: 60px;" />
+  <img src="https://raw.githubusercontent.com/Khaiduc03/react-native-kline-view/main/example/logo.png" alt="React Native KLine View" width="120" height="120" style="border-radius: 60px;" />
 </div>
 
 **Professional K-Line (Candlestick) Chart Library for React Native**
@@ -62,10 +62,10 @@ Perfect for cryptocurrency exchanges, stock trading apps, financial dashboards, 
 ## 🚀 Performance Demo
 
 <div align="center">
-  <img src="./example/1.png" alt="Performance Demo" width="300" />
-  <img src="./example/2.png" alt="Performance Demo" width="300" style="margin-left: 50px;" />
-  <img src="./example/3.png" alt="Performance Demo" width="800" />
-  <img src="./example/4.gif" alt="Performance Demo" width="800" />
+  <img src="https://raw.githubusercontent.com/Khaiduc03/react-native-kline-view/main/example/1.png" alt="Performance Demo" width="300" />
+  <img src="https://raw.githubusercontent.com/Khaiduc03/react-native-kline-view/main/example/2.png" alt="Performance Demo" width="300" style="margin-left: 50px;" />
+  <img src="https://raw.githubusercontent.com/Khaiduc03/react-native-kline-view/main/example/3.png" alt="Performance Demo" width="800" />
+  <img src="https://raw.githubusercontent.com/Khaiduc03/react-native-kline-view/main/example/4.gif" alt="Performance Demo" width="800" />
   
   *Smooth scrolling, zooming, and drawing operations at 60fps*
 </div>
@@ -73,9 +73,11 @@ Perfect for cryptocurrency exchanges, stock trading apps, financial dashboards, 
 ## 📦 Installation
 
 ```bash
-
-# For development version
-yarn add react-native-kline-view@https://github.com/Khaiduc03/react-native-kline-view
+npm install react-native-kline-view
+# or
+yarn add react-native-kline-view
+# or
+pnpm add react-native-kline-view
 ```
 
 ### iOS Setup
@@ -88,11 +90,17 @@ cd ios && pod install
 
 No additional setup required for Android.
 
+### Release-Ready Install Notes
+
+- iOS consumers must run `pod install` after adding/updating the package.
+- Android consumers do not need extra setup for autolinking.
+- This package ships library files only. Demo app sources live in the GitHub repository.
+
 ## 🎯 Quick Start
 
 ### Basic Usage
 
-For a comprehensive implementation with all features, please check **[example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**.
+For a comprehensive implementation with all features, see **[`example/screens/KLineScreen.tsx`](https://github.com/Khaiduc03/react-native-kline-view/blob/main/example/screens/KLineScreen.tsx)**.
 
 You can now pass only `candles` (without manually building `optionList` JSON):
 
@@ -167,8 +175,9 @@ The example app demonstrates:
 
 ## 🧪 Example (TypeScript)
 
-- Main demo screen: **`example/screens/KLineScreen.tsx`**
-- Entry point (if you added/kept it): **`example/App.tsx`** should render `KLineScreen`
+- Home screens guide: **[`docs/HOME_SCREENS.md`](./docs/HOME_SCREENS.md)**
+- Main demo screen: **[`example/screens/KLineScreen.tsx`](https://github.com/Khaiduc03/react-native-kline-view/blob/main/example/screens/KLineScreen.tsx)**
+- Entry point (if you added/kept it): **[`example/App.tsx`](https://github.com/Khaiduc03/react-native-kline-view/blob/main/example/App.tsx)** should render `KLineScreen`
 
 If you fork/customize this library, keep the example updated first — it doubles as the best integration test.
 
@@ -309,7 +318,7 @@ Each data point should contain the following fields:
 - `maVolumeList`: Volume moving average data
 - Various technical indicator data (MACD, KDJ, RSI, etc.)
 
-**For complete data structure examples, see [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**
+**For complete data structure examples, see [`example/screens/KLineScreen.tsx`](https://github.com/Khaiduc03/react-native-kline-view/blob/main/example/screens/KLineScreen.tsx)**
 
 ### Visual Configuration (configList)
 
@@ -397,7 +406,7 @@ Contains parameter settings for various technical indicators:
 - `rsiList`: RSI configuration array
 - `wrList`: WR configuration array
 
-**For complete configuration examples, see [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx)**
+**For complete configuration examples, see [`example/screens/KLineScreen.tsx`](https://github.com/Khaiduc03/react-native-kline-view/blob/main/example/screens/KLineScreen.tsx)**
 
 ## 🔮 Price Prediction Visualization
 
@@ -510,7 +519,7 @@ While we honor the inspiration from the original project, this implementation re
 
 - 📧 **Email**: hellohublot@gmail.com
 - 💬 **Issues**: [GitHub Issues](https://github.com/Khaiduc03/react-native-kline-view/issues)
-- 🎯 **Examples**: Check out [example/screens/KLineScreen.tsx](./example/screens/KLineScreen.tsx) for comprehensive usage
+- 🎯 **Examples**: Check out [`docs/HOME_SCREENS.md`](./docs/HOME_SCREENS.md) and [`example/screens/KLineScreen.tsx`](https://github.com/Khaiduc03/react-native-kline-view/blob/main/example/screens/KLineScreen.tsx)
 
 ---
 

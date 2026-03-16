@@ -1,19 +1,49 @@
 {
   "name": "react-native-kline-view",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.1",
+  "description": "High-performance K-line (candlestick) chart library for React Native with native iOS/Android rendering.",
   "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "android/src/main/**/*",
+    "android/build.gradle",
+    "ios/Classes/**/*",
+    "RNKLineView.podspec",
+    "index.js",
+    "index.d.ts",
+    "types/**/*",
+    "utils/**/*",
+    "README.md",
+    "README.cn.md",
+    "docs/HOME_SCREENS.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pack:dry-run": "npm pack --dry-run",
+    "pack:verify": "node scripts/verify-pack.js"
   },
   "keywords": [
-    "react-native"
+    "react-native",
+    "kline",
+    "candlestick",
+    "trading",
+    "chart",
+    "ios",
+    "android"
   ],
-  "author": "",
-  "license": "",
+  "author": "Khaiduc03",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Khaiduc03/react-native-kline-view.git"
+  },
+  "homepage": "https://github.com/Khaiduc03/react-native-kline-view#readme",
+  "bugs": {
+    "url": "https://github.com/Khaiduc03/react-native-kline-view/issues"
+  },
   "peerDependencies": {
     "react-native": ">=0.66.0"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
-  "types": "index.d.ts"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
