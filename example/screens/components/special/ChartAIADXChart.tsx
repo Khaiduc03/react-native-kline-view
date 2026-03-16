@@ -11,28 +11,35 @@ import {
   resolveChartWidths,
 } from './chartAIShared';
 
-export type ChartAIRSIChartProps = {
+export type ChartAIADXChartProps = {
   data: ChartAIData;
   title?: string;
 };
 
-export function ChartAIRSIChart({ data, title }: ChartAIRSIChartProps) {
+export function ChartAIADXChart({ data, title }: ChartAIADXChartProps) {
   const { width: screenWidth } = useWindowDimensions();
   const candles = useMemo(() => {
     const marketData = data?.market_data;
-    const rsi14Series = pickSeries(marketData, ['rsi14', 'rsi_14']);
+    const adxSeries = pickSeries(marketData, ['adx14', 'adx_14']);
+    const atrSeries = pickSeries(marketData, ['atr14', 'atr_14']);
 
     return mapSnapshotToCandles(data, {
       extraSelectedItems: ({ index, candleCount }) => {
-        const rsi14 = pickSeriesValueAligned(rsi14Series, index, candleCount);
-        return typeof rsi14 === 'number'
-          ? [{ title: 'RSI14: ', detail: rsi14.toFixed(2) }]
-          : [];
+        const adx14 = pickSeriesValueAligned(adxSeries, index, candleCount);
+        const atr14 = pickSeriesValueAligned(atrSeries, index, candleCount);
+        const selected = [] as { title: string; detail: string }[];
+        if (typeof adx14 === 'number') {
+          selected.push({ title: 'ADX14: ', detail: adx14.toFixed(2) });
+        }
+        if (typeof atr14 === 'number') {
+          selected.push({ title: 'ATR14: ', detail: atr14.toFixed(2) });
+        }
+        return selected;
       },
       mapExtraFields: ({ index, candleCount }) => {
-        const rsi14 = pickSeriesValueAligned(rsi14Series, index, candleCount);
+        const adx14 = pickSeriesValueAligned(adxSeries, index, candleCount);
         return {
-          rsiList: buildSinglePeriodIndicator(rsi14, 14),
+          rsiList: buildSinglePeriodIndicator(adx14, 14),
         };
       },
     });
@@ -45,18 +52,18 @@ export function ChartAIRSIChart({ data, title }: ChartAIRSIChartProps) {
       resolveChartWidths({
         screenWidth,
         itemCount,
-        rightPriceArea: 86,
+        rightPriceArea: 92,
         minUsableWidth: 160,
-        minItemWidth: 0.9,
+        minItemWidth: 1,
         maxItemWidth: 8,
         candleRatio: 0.58,
-        minCandleWidth: 0.7,
+        minCandleWidth: 0.8,
       }),
     [itemCount, screenWidth],
   );
 
   return (
-    <ChartAICard title={title ?? `RSI (14) - ${symbol}`}>
+    <ChartAICard title={title ?? `Trend Strength (ADX14) - ${symbol}`}>
       <RNKLineView
         style={styles.chart}
         initialData={candles}
@@ -75,25 +82,25 @@ export function ChartAIRSIChart({ data, title }: ChartAIRSIChartProps) {
             axisMode: 'fixed_0_100',
             levels: [
               {
-                value: 70,
-                label: '70',
-                color: '#EF4444',
-                dashed: true,
-                showRightTag: true,
-                showGuideLine: true,
-              },
-              {
-                value: 50,
-                label: '50',
-                color: '#6B7280',
+                value: 20,
+                label: '20',
+                color: '#64748B',
                 dashed: true,
                 showRightTag: false,
                 showGuideLine: true,
               },
               {
-                value: 30,
-                label: '30',
-                color: '#14B8A6',
+                value: 25,
+                label: '25',
+                color: '#EA580C',
+                dashed: true,
+                showRightTag: true,
+                showGuideLine: true,
+              },
+              {
+                value: 40,
+                label: '40',
+                color: '#B91C1C',
                 dashed: true,
                 showRightTag: true,
                 showGuideLine: true,
@@ -102,8 +109,8 @@ export function ChartAIRSIChart({ data, title }: ChartAIRSIChartProps) {
             currentTag: {
               enabled: true,
               period: 14,
-              label: 'RSI (14)',
-              color: '#9333EA',
+              label: 'ADX (14)',
+              color: '#0EA5E9',
             },
           },
         }}
@@ -117,7 +124,7 @@ export function ChartAIRSIChart({ data, title }: ChartAIRSIChartProps) {
             downColor: '#EF4444',
           },
           subIndicator: {
-            colors: ['#9333EA', '#22C55E', '#F59E0B'],
+            colors: ['#0EA5E9', '#22C55E', '#F59E0B'],
           },
           grid: { lineColor: '#E2E8F0' },
           axis: { textColor: '#334155' },
@@ -129,7 +136,7 @@ export function ChartAIRSIChart({ data, title }: ChartAIRSIChartProps) {
         layout={{
           paddingTop: 16,
           paddingBottom: 24,
-          paddingRight: 86,
+          paddingRight: 92,
           rightOffsetCandles: 0,
           itemWidth: widths.itemWidth,
           candleWidth: widths.candleWidth,
@@ -146,4 +153,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChartAIRSIChart;
+export default ChartAIADXChart;

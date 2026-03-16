@@ -253,6 +253,27 @@ You can also mix server/client-computed values:
 - pass partial `maList` / `rsiList` / `wrList` / `maVolumeList` on candles when available
 - library keeps provided numeric values and computes only missing items/values
 
+### MACD line-label customization
+
+When using `subIndicators.macd.style = "line_labels"`, you can customize right-tag labels:
+
+```tsx
+subIndicators={{
+  macd: {
+    enabled: true,
+    macdOnly: true,
+    style: "line_labels",
+    lineLabels: {
+      macd: "MACD",
+      signal: "Signal",
+      histogram: "", // empty -> value only, no prefix
+    },
+  },
+}}
+```
+
+Defaults are backward-compatible: `MACD / Signal / Histogram`.
+
 ### Do I need to call `setData` again after `appendCandle`?
 
 **No.** If you've already called `appendCandle(...)`, the native dataset is updated.

@@ -6,25 +6,25 @@ import {
   cloneChartAISnapshot,
 } from './Data/chartAISnapshotUtils';
 import ChartAISnapshotDemoLayout from './components/special/ChartAISnapshotDemoLayout';
-import ChartAITrendChart from './components/special/ChartAITrendChart';
+import ChartAIMACDChart from './components/special/ChartAIMACDChart';
 
-export default function ChartAITrendDemoScreen() {
+export default function ChartAIMACDDemoScreen() {
   const [snapshot, setSnapshot] = useState<ChartAIData>(() =>
     cloneChartAISnapshot(chart_data),
   );
 
   const candleCount = snapshot?.market_data?.candles?.length ?? 0;
   const handleRefreshSnapshot = () => {
-    setSnapshot(prev => bumpLatestSnapshotCandle(prev, 0.18));
+    setSnapshot(prev => bumpLatestSnapshotCandle(prev, 0.15));
   };
 
   return (
     <ChartAISnapshotDemoLayout
-      title="ChartAI Trend Snapshot Demo"
+      title="ChartAI MACD Snapshot Demo"
       candleCount={candleCount}
       onRefreshSnapshot={handleRefreshSnapshot}
     >
-      <ChartAITrendChart data={snapshot} />
+      <ChartAIMACDChart data={snapshot} />
     </ChartAISnapshotDemoLayout>
   );
 }

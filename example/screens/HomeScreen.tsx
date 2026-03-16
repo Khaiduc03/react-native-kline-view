@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -8,52 +8,69 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 export default function HomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>React Native KLine Demo</Text>
-      <Text style={styles.subtitle}>
-        Chọn cách dùng phù hợp: đơn giản hoặc đầy đủ tính năng.
-      </Text>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('SimpleKLineDemo')}
+      <ScrollView
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.buttonText}>Simple: chỉ truyền candles</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.secondaryButton]}
-        onPress={() => navigation.navigate('BinanceLiveDemo')}
-      >
-        <Text style={styles.buttonText}>Binance: REST + realtime WS</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.chartAiButton]}
-        onPress={() => navigation.navigate('ChartAIDemo')}
-      >
-        <Text style={styles.buttonText}>ChartAI: server snapshot + BOLL</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.chartAiTrendButton]}
-        onPress={() => navigation.navigate('ChartAITrendDemo')}
-      >
-        <Text style={styles.buttonText}>ChartAI: trend EMA 50/200</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.chartAiSrButton]}
-        onPress={() => navigation.navigate('ChartAISupportResistanceDemo')}
-      >
-        <Text style={styles.buttonText}>ChartAI: support/resistance</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.chartAiRsiButton]}
-        onPress={() => navigation.navigate('ChartAIRSIDemo')}
-      >
-        <Text style={styles.buttonText}>ChartAI: RSI 14</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.tertiaryButton]}
-        onPress={() => navigation.navigate('KLineDemo')}
-      >
-        <Text style={styles.buttonText}>Advanced: full optionList</Text>
-      </TouchableOpacity>
+        <Text style={styles.title}>React Native KLine Demo</Text>
+        <Text style={styles.subtitle}>
+          Chọn cách dùng phù hợp: đơn giản hoặc đầy đủ tính năng.
+        </Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate('SimpleKLineDemo')}
+        >
+          <Text style={styles.buttonText}>Simple: chỉ truyền candles</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={() => navigation.navigate('BinanceLiveDemo')}
+        >
+          <Text style={styles.buttonText}>Binance: REST + realtime WS</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.chartAiButton]}
+          onPress={() => navigation.navigate('ChartAIDemo')}
+        >
+          <Text style={styles.buttonText}>ChartAI: server snapshot + BOLL</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.chartAiTrendButton]}
+          onPress={() => navigation.navigate('ChartAITrendDemo')}
+        >
+          <Text style={styles.buttonText}>ChartAI: trend EMA 50/200</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.chartAiMacdButton]}
+          onPress={() => navigation.navigate('ChartAIMACDDemo')}
+        >
+          <Text style={styles.buttonText}>ChartAI: MACD 12/26/9</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.chartAiAdxButton]}
+          onPress={() => navigation.navigate('ChartAIADXDemo')}
+        >
+          <Text style={styles.buttonText}>ChartAI: ADX 14 + ATR tag</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.chartAiSrButton]}
+          onPress={() => navigation.navigate('ChartAISupportResistanceDemo')}
+        >
+          <Text style={styles.buttonText}>ChartAI: support/resistance</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.chartAiRsiButton]}
+          onPress={() => navigation.navigate('ChartAIRSIDemo')}
+        >
+          <Text style={styles.buttonText}>ChartAI: RSI 14</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.tertiaryButton]}
+          onPress={() => navigation.navigate('KLineDemo')}
+        >
+          <Text style={styles.buttonText}>Advanced: full optionList</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -61,10 +78,14 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  contentContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    flexGrow: 1,
+    paddingVertical: 24,
     paddingHorizontal: 24,
-    backgroundColor: '#0f172a',
   },
   title: {
     fontSize: 22,
@@ -100,6 +121,12 @@ const styles = StyleSheet.create({
   },
   chartAiTrendButton: {
     backgroundColor: '#7c3aed',
+  },
+  chartAiMacdButton: {
+    backgroundColor: '#ea580c',
+  },
+  chartAiAdxButton: {
+    backgroundColor: '#0284c7',
   },
   chartAiSrButton: {
     backgroundColor: '#0f766e',

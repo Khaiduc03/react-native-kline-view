@@ -97,6 +97,8 @@ public class HTKLineConfigManager {
 
     public boolean macdOnly = false;
 
+    public Map<String, Object> macdLineLabels = null;
+
 	public SecondStatus secondStatus = SecondStatus.MACD;
 
 	public Boolean isMinute = false;
@@ -602,6 +604,13 @@ public class HTKLineConfigManager {
             this.macdStyle = "default";
         }
         this.macdOnly = readBoolean(optionList, "macdOnly", false);
+        Object macdLineLabelsValue = optionList.get("macdLineLabels");
+        if (macdLineLabelsValue instanceof Map) {
+            //noinspection unchecked
+            this.macdLineLabels = (Map<String, Object>) macdLineLabelsValue;
+        } else {
+            this.macdLineLabels = null;
+        }
         this.secondStatus = secondStatus;
         this.isMinute = time == -1;
 

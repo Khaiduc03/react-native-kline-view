@@ -320,12 +320,25 @@ export type MacdPeriodsConfig =
       signal?: number;
     };
 
+export type MacdLineLabelsConfig = {
+  /** Right-tag label for DIF line. */
+  macd?: string;
+  /** Right-tag label for DEA line. */
+  signal?: string;
+  /**
+   * Right-tag label for histogram.
+   * Set empty string to hide prefix and keep value only.
+   */
+  histogram?: string;
+};
+
 export type MacdSubIndicatorConfig = {
   enabled: boolean;
   /** Native MACD-only mode: skips main chart draw/calc pipeline and renders MACD pane as primary. */
   macdOnly?: boolean;
   periods?: MacdPeriodsConfig;
   style?: "default" | "line_labels";
+  lineLabels?: MacdLineLabelsConfig;
 };
 
 export type SubIndicatorsConfig = {

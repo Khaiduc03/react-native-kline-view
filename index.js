@@ -259,6 +259,12 @@ const DEFAULT_INDICATOR_PERIODS = {
   superMultiplier: 3,
 };
 
+const DEFAULT_MACD_LINE_LABELS = {
+  macd: "MACD",
+  signal: "Signal",
+  histogram: "Histogram",
+};
+
 const PRESET_OVERRIDES = {
   simple: {},
   trading: {
@@ -532,6 +538,32 @@ function normalizeMacdPeriods(periods, fallback = DEFAULT_INDICATOR_PERIODS) {
     };
   }
   return defaults;
+}
+
+function normalizeMacdLineLabels(lineLabels, fallback = DEFAULT_MACD_LINE_LABELS) {
+  const base = isObject(fallback) ? fallback : DEFAULT_MACD_LINE_LABELS;
+  if (!isObject(lineLabels)) {
+    return {
+      macd: base.macd,
+      signal: base.signal,
+      histogram: base.histogram,
+    };
+  }
+  const macd =
+    typeof lineLabels.macd === "string" ? lineLabels.macd.trim() : base.macd;
+  const signal =
+    typeof lineLabels.signal === "string"
+      ? lineLabels.signal.trim()
+      : base.signal;
+  const histogram =
+    typeof lineLabels.histogram === "string"
+      ? lineLabels.histogram.trim()
+      : base.histogram;
+  return {
+    macd,
+    signal,
+    histogram,
+  };
 }
 
 function uniqPositiveIntegers(list, fallback) {
@@ -1260,6 +1292,7 @@ function composeOptionList({
   maStyle,
   bollStyle,
   macdStyle,
+  macdLineLabels,
   srStyle,
   supportLevel,
   resistanceLevel,
@@ -1293,6 +1326,7 @@ function composeOptionList({
   const resolvedMaStyle = maStyle === "line_labels" ? "line_labels" : "default";
   const resolvedBollStyle = bollStyle === "band_labels" ? "band_labels" : "default";
   const resolvedMacdStyle = macdStyle === "line_labels" ? "line_labels" : "default";
+  const resolvedMacdLineLabels = normalizeMacdLineLabels(macdLineLabels);
   const resolvedSrStyle = srStyle === "line_labels" ? "line_labels" : "default";
   const resolvedRsiStyle = rsiStyle === "line_labels" ? "line_labels" : "default";
   const resolvedRsiAxisMode = normalizeRsiAxisMode(rsiAxisMode, "adaptive");
@@ -1364,6 +1398,7 @@ function composeOptionList({
     maStyle: resolvedMaStyle,
     bollStyle: resolvedBollStyle,
     macdStyle: resolvedMacdStyle,
+    macdLineLabels: resolvedMacdLineLabels,
     rsiStyle: resolvedRsiStyle,
     rsiAxisMode: resolvedRsiAxisMode,
     ...(resolvedRsiLevels.length > 0 ? { rsiLevels: resolvedRsiLevels } : {}),
@@ -1446,6 +1481,9 @@ function toLegacyPropsConfig({
     macdSubIndicatorEnabled && subIndicators?.macd?.style === "line_labels"
       ? "line_labels"
       : "default";
+  const macdLineLabels = macdSubIndicatorEnabled
+    ? normalizeMacdLineLabels(subIndicators?.macd?.lineLabels)
+    : normalizeMacdLineLabels(undefined);
   const macdOnly =
     macdSubIndicatorEnabled && subIndicators?.macd?.macdOnly === true;
   const rsiPeriods = rsiSubIndicatorEnabled
@@ -1510,6 +1548,7 @@ function toLegacyPropsConfig({
     maStyle: mainIndicators?.ma?.style === "line_labels" ? "line_labels" : "default",
     bollStyle: mainIndicators?.boll?.style === "band_labels" ? "band_labels" : "default",
     macdStyle,
+    macdLineLabels,
     rsiStyle,
     rsiAxisMode,
     rsiLevels,
@@ -1765,6 +1804,7 @@ const RNKLineView = forwardRef((props, ref) => {
       maStyle: legacy.maStyle,
       bollStyle: legacy.bollStyle,
       macdStyle: legacy.macdStyle,
+      macdLineLabels: legacy.macdLineLabels,
       srStyle: legacy.srStyle,
       supportLevel: legacy.supportLevel,
       resistanceLevel: legacy.resistanceLevel,

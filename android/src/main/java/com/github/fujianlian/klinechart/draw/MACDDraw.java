@@ -136,11 +136,14 @@ public class MACDDraw implements IChartDraw<IMACD> {
         }
         KLineEntity point = view.getItem(stopIndex);
         List<LabelSpec> labels = new ArrayList<>();
+        String macdLabel = resolveLineLabel(view.configManager.macdLineLabels, "macd", "MACD");
+        String signalLabel = resolveLineLabel(view.configManager.macdLineLabels, "signal", "Signal");
+        String histogramLabel = resolveLineLabel(view.configManager.macdLineLabels, "histogram", "Histogram");
 
-        addOverlay(labels, canvas, view, point.dif, "MACD", safeTargetColor(view, 0), true);
-        addOverlay(labels, canvas, view, point.dea, "Signal", safeTargetColor(view, 1), true);
+        addOverlay(labels, canvas, view, point.dif, macdLabel, safeTargetColor(view, 0), true);
+        addOverlay(labels, canvas, view, point.dea, signalLabel, safeTargetColor(view, 1), true);
         int histogramColor = point.macd >= 0 ? view.configManager.increaseColor : view.configManager.decreaseColor;
-        addOverlay(labels, canvas, view, point.macd, "Histogram", histogramColor, true);
+        addOverlay(labels, canvas, view, point.macd, histogramLabel, histogramColor, true);
 
         if (labels.isEmpty()) {
             return;
@@ -252,8 +255,31 @@ public class MACDDraw implements IChartDraw<IMACD> {
         LabelSpec label = new LabelSpec();
         label.y = y;
         label.color = color;
-        label.text = name + " " + view.formatValue(value);
+        label.text = formatOverlayText(name, view.formatValue(value));
         labels.add(label);
+    }
+
+    private String formatOverlayText(@NonNull String name, @NonNull String valueText) {
+        String normalized = name.trim();
+        if (normalized.isEmpty()) {
+            return valueText;
+        }
+        return normalized + " " + valueText;
+    }
+
+    private String resolveLineLabel(
+            @Nullable java.util.Map<String, Object> labels,
+            @NonNull String key,
+            @NonNull String fallback
+    ) {
+        if (labels == null) {
+            return fallback;
+        }
+        Object value = labels.get(key);
+        if (value instanceof String) {
+            return (String) value;
+        }
+        return fallback;
     }
 
     private void drawRightLabels(

@@ -8,6 +8,8 @@ import ChartAIDemoScreen from '../screens/ChartAIDemoScreen';
 import ChartAITrendDemoScreen from '../screens/ChartAITrendDemoScreen';
 import ChartAISupportResistanceDemoScreen from '../screens/ChartAISupportResistanceDemoScreen';
 import ChartAIRSIDemoScreen from '../screens/ChartAIRSIDemoScreen';
+import ChartAIMACDDemoScreen from '../screens/ChartAIMACDDemoScreen';
+import ChartAIADXDemoScreen from '../screens/ChartAIADXDemoScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -18,6 +20,8 @@ export type RootStackParamList = {
   ChartAITrendDemo: undefined;
   ChartAISupportResistanceDemo: undefined;
   ChartAIRSIDemo: undefined;
+  ChartAIMACDDemo: undefined;
+  ChartAIADXDemo: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -70,6 +74,16 @@ export default function RootNavigator() {
         name="ChartAIRSIDemo"
         component={ChartAIRSIDemoScreen}
         options={{ title: 'ChartAI RSI Demo' }}
+      />
+      <Stack.Screen
+        name="ChartAIMACDDemo"
+        component={ChartAIMACDDemoScreen}
+        options={{ title: 'ChartAI MACD Demo' }}
+      />
+      <Stack.Screen
+        name="ChartAIADXDemo"
+        component={ChartAIADXDemoScreen}
+        options={{ title: 'ChartAI ADX Demo' }}
       />
     </Stack.Navigator>
   );

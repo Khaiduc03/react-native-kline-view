@@ -119,6 +119,14 @@ class HTKLineView: UIScrollView {
         return configManager.rsiOnly && configManager.childType == .rsi
     }
 
+    var isMacdOnlyMode: Bool {
+        return configManager.macdOnly && configManager.childType == .macd
+    }
+
+    var isChildOnlyMode: Bool {
+        return isRsiOnlyMode || isMacdOnlyMode
+    }
+
     func unPredictionSelect() {
         self.selectedPredictionType = nil
         self.selectedPredictionIndex = nil
@@ -328,16 +336,16 @@ class HTKLineView: UIScrollView {
             drawText(context)
             drawValue(context)
 
-            if !isRsiOnlyMode {
+            if !isChildOnlyMode {
                 drawHighLow(context)
             }
             drawTime(context)
-            if !isRsiOnlyMode {
+            if !isChildOnlyMode {
                 drawPrediction(context)
                 drawClosePrice(context)
             }
             if let latestVisible = visibleModelArray.last {
-                if !isRsiOnlyMode {
+                if !isChildOnlyMode {
                     mainDraw.drawMaRightLabels(
                         latestVisible,
                         allWidth,
@@ -380,9 +388,21 @@ class HTKLineView: UIScrollView {
                         configManager
                     )
                 }
+                if let macdChildDraw = childDraw as? HTMacdDraw {
+                    macdChildDraw.drawLevelOverlays(
+                        latestVisible,
+                        allWidth,
+                        childMinMaxRange.upperBound,
+                        childMinMaxRange.lowerBound,
+                        childBaseY,
+                        childHeight,
+                        context,
+                        configManager
+                    )
+                }
             }
             drawSelectedLine(context)
-            if !isRsiOnlyMode {
+            if !isChildOnlyMode {
                 drawSelectedBoard(context)
             }
             drawSelectedTime(context)
@@ -416,7 +436,7 @@ class HTKLineView: UIScrollView {
         self.allWidth = self.bounds.size.width
         self.textHeight = mainDraw.textHeight(font: UIFont.systemFont(ofSize: 11)) / 2
 
-        if isRsiOnlyMode && hasChildPane {
+        if isChildOnlyMode && hasChildPane {
             self.volumeRange = 0...0
             self.mainMinMaxRange = 0..<100
             self.mainBaseY = configManager.paddingTop - textHeight
@@ -529,8 +549,8 @@ class HTKLineView: UIScrollView {
         guard configManager.gridEnabled else { return }
 
         let baseColor = configManager.gridColor
-        let minPrice = isRsiOnlyMode ? childMinMaxRange.lowerBound : mainMinMaxRange.lowerBound
-        let maxPrice = isRsiOnlyMode ? childMinMaxRange.upperBound : mainMinMaxRange.upperBound
+        let minPrice = isChildOnlyMode ? childMinMaxRange.lowerBound : mainMinMaxRange.lowerBound
+        let maxPrice = isChildOnlyMode ? childMinMaxRange.upperBound : mainMinMaxRange.upperBound
         let range = maxPrice - minPrice
         guard range > 0, PRICE_TICK_COUNT >= 2 else { return }
 
@@ -547,7 +567,7 @@ class HTKLineView: UIScrollView {
             let value = minPrice + CGFloat(i) * step
             priceGridLevels.append(value)
             let y: CGFloat
-            if isRsiOnlyMode {
+            if isChildOnlyMode {
                 let childScale = (childMinMaxRange.upperBound - childMinMaxRange.lowerBound) / max(childHeight, 0.0001)
                 if childScale == 0 {
                     y = alignToPixel(childBaseY + childHeight / 2)
@@ -585,11 +605,11 @@ class HTKLineView: UIScrollView {
     }
 
     func drawCandle(_ context: CGContext) {
-        if !isRsiOnlyMode && (configManager.isMinute) {
+        if !isChildOnlyMode && (configManager.isMinute) {
             mainDraw.drawGradient(visibleModelArray, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, allWidth, mainBaseY, mainHeight, context, configManager)
         }
 
-        if !isRsiOnlyMode {
+        if !isChildOnlyMode {
             for (i, model) in visibleModelArray.enumerated() {
                 let lastIndex = i == 0 ? i : i - 1
                 let lastModel = visibleModelArray[lastIndex]
@@ -600,18 +620,18 @@ class HTKLineView: UIScrollView {
         for (i, model) in visibleModelArray.enumerated() {
             let lastIndex = i == 0 ? i : i - 1
             let lastModel = visibleModelArray[lastIndex]
-            if !isRsiOnlyMode {
+            if !isChildOnlyMode {
                 mainDraw.drawCandle(model, i, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, context, configManager)
             }
-            if !isRsiOnlyMode && shouldShowVolume {
+            if !isChildOnlyMode && shouldShowVolume {
                 volumeDraw.drawCandle(model, i, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, context, configManager)
             }
             childDraw?.drawCandle(model, i, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, context, configManager)
 
-            if !isRsiOnlyMode {
+            if !isChildOnlyMode {
                 mainDraw.drawLine(model, lastModel, mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, mainBaseY, mainHeight, i, lastIndex, context, configManager)
             }
-            if !isRsiOnlyMode && shouldShowVolume {
+            if !isChildOnlyMode && shouldShowVolume {
                 volumeDraw.drawLine(model, lastModel, volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, volumeBaseY, volumeHeight, i, lastIndex, context, configManager)
             }
             childDraw?.drawLine(model, lastModel, childMinMaxRange.upperBound, childMinMaxRange.lowerBound, childBaseY, childHeight, i, lastIndex, context, configManager)
@@ -625,10 +645,10 @@ class HTKLineView: UIScrollView {
         }
         if let model = model {
             let baseX: CGFloat = 5
-            if !isRsiOnlyMode {
+            if !isChildOnlyMode {
                 mainDraw.drawText(model, baseX, 10, context, configManager)
             }
-            if !isRsiOnlyMode && shouldShowVolume {
+            if !isChildOnlyMode && shouldShowVolume {
                 volumeDraw.drawText(model, baseX, volumeBaseY - configManager.headerHeight, context, configManager)
             }
             childDraw?.drawText(model, baseX, childBaseY - configManager.headerHeight, context, configManager)
@@ -637,7 +657,7 @@ class HTKLineView: UIScrollView {
 
     func drawValue(_ context: CGContext) {
         let baseX = self.allWidth
-        if isRsiOnlyMode, !priceGridLevels.isEmpty, childHeight > 0 {
+        if isChildOnlyMode, !priceGridLevels.isEmpty, childHeight > 0 {
             let font = configManager.createFont(configManager.rightTextFontSize)
             let color = configManager.textColor
 
@@ -655,7 +675,7 @@ class HTKLineView: UIScrollView {
                                   context: context,
                                   configManager: configManager)
             }
-        } else if !isRsiOnlyMode, !priceGridLevels.isEmpty, mainHeight > 0 {
+        } else if !isChildOnlyMode, !priceGridLevels.isEmpty, mainHeight > 0 {
             let font = configManager.createFont(configManager.rightTextFontSize)
             let color = configManager.textColor
 
@@ -676,10 +696,10 @@ class HTKLineView: UIScrollView {
                                   context: context,
                                   configManager: configManager)
             }
-        } else if !isRsiOnlyMode {
+        } else if !isChildOnlyMode {
             mainDraw.drawValue(mainMinMaxRange.upperBound, mainMinMaxRange.lowerBound, baseX, mainBaseY, mainHeight, context, configManager)
         }
-        if !isRsiOnlyMode && shouldShowVolume {
+        if !isChildOnlyMode && shouldShowVolume {
             volumeDraw.drawValue(volumeMinMaxRange.upperBound, volumeMinMaxRange.lowerBound, baseX, volumeBaseY, volumeHeight, context, configManager)
         }
         childDraw?.drawValue(childMinMaxRange.upperBound, childMinMaxRange.lowerBound, baseX, childBaseY, childHeight, context, configManager)
@@ -1313,22 +1333,22 @@ class HTKLineView: UIScrollView {
         // X bám tâm nến (snap)
         let x = (CGFloat(selectedIndex) + 0.5) * configManager.itemWidth - contentOffset.x
 
-        // Y/value theo mode (main chart hoặc RSI-only child pane)
+        // Y/value theo mode (main chart hoặc child-only pane)
         let minY: CGFloat
         let maxY: CGFloat
         let verticalStartY: CGFloat
         let verticalEndY: CGFloat
         var y: CGFloat
         let value: CGFloat
-        if isRsiOnlyMode {
+        if isChildOnlyMode {
             guard childHeight > 0 else { return }
             minY = childBaseY
             maxY = childBaseY + childHeight
             verticalStartY = childBaseY
             verticalEndY = childBaseY + childHeight
-            if let selectedRsiValue = resolveSelectedRsiValue() {
-                value = selectedRsiValue
-                y = childYFromValue(selectedRsiValue)
+            if let selectedChildValue = resolveSelectedChildValue() {
+                value = selectedChildValue
+                y = childYFromValue(selectedChildValue)
             } else {
                 y = max(minY, min(loc.y, maxY))
                 value = childValueFromY(y)
@@ -1603,6 +1623,33 @@ class HTKLineView: UIScrollView {
             }
         }
         return model.rsiList.first(where: { $0.value.isFinite && !$0.value.isNaN })?.value
+    }
+
+    private func resolveSelectedMacdValue() -> CGFloat? {
+        guard let local = localSelectedIndex(), local >= 0, local < visibleModelArray.count else {
+            return nil
+        }
+        let model = visibleModelArray[local]
+        if model.macdDif.isFinite, !model.macdDif.isNaN {
+            return model.macdDif
+        }
+        if model.macdDea.isFinite, !model.macdDea.isNaN {
+            return model.macdDea
+        }
+        if model.macdValue.isFinite, !model.macdValue.isNaN {
+            return model.macdValue
+        }
+        return nil
+    }
+
+    private func resolveSelectedChildValue() -> CGFloat? {
+        if isRsiOnlyMode {
+            return resolveSelectedRsiValue()
+        }
+        if isMacdOnlyMode {
+            return resolveSelectedMacdValue()
+        }
+        return nil
     }
 
     private func resolvedRsiCurrentPeriod() -> Int? {
