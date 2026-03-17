@@ -394,7 +394,7 @@ export type FormatConfig = Partial<{
   time: number;
 }>;
 
-type RNKLineViewBaseProps = ViewProps & {
+export interface RNKLineViewDataProps {
   /** Base candles for init/reset. Indicator values can be omitted; wrapper computes from config. */
   initialData?: Candle[];
   /** @deprecated Use `initialData` */
@@ -406,7 +406,9 @@ type RNKLineViewBaseProps = ViewProps & {
   /** @deprecated Legacy mode flag */
   dataMode?: "prop" | "imperative";
   preset?: "simple" | "trading" | "binance";
+}
 
+export interface RNKLineViewEventProps {
   onDrawItemDidTouch?: (event: DrawItemTouchEvent) => void;
   onDrawItemComplete?: (event: DrawItemCompleteEvent) => void;
   onDrawPointComplete?: (event: DrawPointCompleteEvent) => void;
@@ -418,20 +420,42 @@ type RNKLineViewBaseProps = ViewProps & {
     source: "js" | "bridge" | "ios" | "android" | "data";
     fatal: boolean;
   }) => void;
+}
 
+export interface RNKLineViewConfigProps {
+  /** Chart theme: candle colors, grid, axis, panel, sub-indicator colors, etc. */
   theme?: ChartThemeConfig;
+  /** Chart layout: paddings, widths, font sizes and pane flex distribution. */
   layout?: LayoutConfig;
+  /** Main-pane overlays (MA/EMA/SUPER/BOLL/SR). */
   mainIndicators?: MainIndicatorsConfig;
+  /** Sub-pane indicators such as RSI/MACD in native sub-indicator mode. */
   subIndicators?: SubIndicatorsConfig;
+  /** Additional sub-chart definitions (macd/kdj/rsi/wr). */
   subCharts?: SubChartConfig[];
+  /** Volume pane visibility and MA periods. */
   volume?: VolumeConfig;
   draw?: DrawConfig;
   prediction?: PredictionConfig;
   interaction?: InteractionConfig;
   format?: FormatConfig;
-};
+}
 
-export type RNKLineViewProps = RNKLineViewBaseProps;
+export interface RNKLineViewProps
+  extends ViewProps,
+    RNKLineViewDataProps,
+    RNKLineViewEventProps,
+    RNKLineViewConfigProps {}
+
+export type RNKLineViewInitialDataProp = RNKLineViewProps["initialData"];
+export type RNKLineViewMainIndicatorsProp = RNKLineViewProps["mainIndicators"];
+export type RNKLineViewSubIndicatorsProp = RNKLineViewProps["subIndicators"];
+export type RNKLineViewSubChartsProp = RNKLineViewProps["subCharts"];
+export type RNKLineViewVolumeProp = RNKLineViewProps["volume"];
+export type RNKLineViewInteractionProp = RNKLineViewProps["interaction"];
+export type RNKLineViewFormatProp = RNKLineViewProps["format"];
+export type RNKLineViewThemeProp = RNKLineViewProps["theme"];
+export type RNKLineViewLayoutProp = RNKLineViewProps["layout"];
 
 export interface RNKLineViewRef {
   /**

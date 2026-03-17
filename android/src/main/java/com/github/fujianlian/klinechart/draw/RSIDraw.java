@@ -18,7 +18,6 @@ import com.github.fujianlian.klinechart.BuildConfig;
 import com.github.fujianlian.klinechart.HTKLineConfigManager;
 import com.github.fujianlian.klinechart.HTKLineTargetItem;
 import com.github.fujianlian.klinechart.KLineEntity;
-import com.github.fujianlian.klinechart.SecondStatus;
 import com.github.fujianlian.klinechart.base.IChartDraw;
 import com.github.fujianlian.klinechart.base.IValueFormatter;
 import com.github.fujianlian.klinechart.entity.IRSI;

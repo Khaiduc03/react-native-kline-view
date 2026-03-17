@@ -984,14 +984,26 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         mSelectedXLinePaint.setColor(configManager.candleTextColor);
 
         // 柱状图竖线
+        int[] panelGradientColors = configManager.panelGradientColorList;
+        if (panelGradientColors == null || panelGradientColors.length == 0) {
+            int fallbackColor = configManager.candleTextColor;
+            panelGradientColors = new int[]{fallbackColor, fallbackColor};
+        } else if (panelGradientColors.length == 1) {
+            int singleColor = panelGradientColors[0];
+            panelGradientColors = new int[]{singleColor, singleColor};
+        }
+        float[] panelGradientLocations = configManager.panelGradientLocationList;
+        if (panelGradientLocations != null && panelGradientLocations.length != panelGradientColors.length) {
+            panelGradientLocations = null;
+        }
         LinearGradient linearGradient = new LinearGradient(
-            0,
-            0,
-            0,
-            mChildRect.bottom - mMainRect.top,
-            configManager.panelGradientColorList,
-            configManager.panelGradientLocationList,
-            Shader.TileMode.CLAMP
+                0,
+                0,
+                0,
+                mChildRect.bottom - mMainRect.top,
+                panelGradientColors,
+                panelGradientLocations,
+                Shader.TileMode.CLAMP
         );
         mSelectedYLinePaint.setShader(linearGradient);
 

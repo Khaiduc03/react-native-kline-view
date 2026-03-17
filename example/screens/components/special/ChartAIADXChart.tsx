@@ -1,6 +1,15 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import RNKLineView from 'react-native-kline-view';
+import type {
+  ChartThemeConfig,
+  FormatConfig,
+  InteractionConfig,
+  LayoutConfig,
+  MainIndicatorsConfig,
+  SubIndicatorsConfig,
+  VolumeConfig,
+} from 'react-native-kline-view';
 import type { ChartAIData } from '../../Data/ChartAIDataType';
 import ChartAICard from './ChartAICard';
 import {
@@ -47,6 +56,71 @@ export function ChartAIADXChart({ data, title }: ChartAIADXChartProps) {
 
   const symbol = data?.symbol || 'Asset';
   const itemCount = candles.length;
+  const mainIndicators: MainIndicatorsConfig = {
+    ma: { enabled: false, periods: [5, 10, 20], style: 'default' },
+    ema: { enabled: false, periods: [10, 30, 60] },
+    super: { enabled: false, period: 10, multiplier: 3 },
+    boll: { enabled: false, n: 20, p: 2, style: 'default' },
+  };
+  const subIndicators: SubIndicatorsConfig = {
+    rsi: {
+      enabled: true,
+      rsiOnly: true,
+      periods: [14],
+      style: 'line_labels',
+      axisMode: 'fixed_0_100',
+      levels: [
+        {
+          value: 20,
+          label: '20',
+          color: '#64748B',
+          dashed: true,
+          showRightTag: false,
+          showGuideLine: true,
+        },
+        {
+          value: 25,
+          label: '25',
+          color: '#EA580C',
+          dashed: true,
+          showRightTag: true,
+          showGuideLine: true,
+        },
+        {
+          value: 40,
+          label: '40',
+          color: '#B91C1C',
+          dashed: true,
+          showRightTag: true,
+          showGuideLine: true,
+        },
+      ],
+      currentTag: {
+        enabled: true,
+        period: 14,
+        label: 'ADX (14)',
+        color: '#0EA5E9',
+      },
+    },
+  };
+  const volume: VolumeConfig = { enabled: false, maPeriods: [5, 10] };
+  const interaction: InteractionConfig = { autoFollow: false, loadMoreThreshold: 48 };
+  const format: FormatConfig = { price: 2, volume: 2, time: 1 };
+  const theme: ChartThemeConfig = {
+    candle: {
+      upColor: '#16A34A',
+      downColor: '#EF4444',
+    },
+    subIndicator: {
+      colors: ['#0EA5E9', '#22C55E', '#F59E0B'],
+    },
+    grid: { lineColor: '#E2E8F0' },
+    axis: { textColor: '#334155' },
+    panel: {
+      backgroundColor: '#FFFFFF',
+      borderColor: '#94A3B8',
+    },
+  };
   const widths = useMemo(
     () =>
       resolveChartWidths({
@@ -61,87 +135,29 @@ export function ChartAIADXChart({ data, title }: ChartAIADXChartProps) {
       }),
     [itemCount, screenWidth],
   );
+  const layout: LayoutConfig = {
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingRight: 92,
+    rightOffsetCandles: 0,
+    itemWidth: widths.itemWidth,
+    candleWidth: widths.candleWidth,
+    mainFlex: 0.1,
+  };
 
   return (
     <ChartAICard title={title ?? `Trend Strength (ADX14) - ${symbol}`}>
       <RNKLineView
         style={styles.chart}
         initialData={candles}
-        mainIndicators={{
-          ma: { enabled: false, periods: [5, 10, 20], style: 'default' },
-          ema: { enabled: false, periods: [10, 30, 60] },
-          super: { enabled: false, period: 10, multiplier: 3 },
-          boll: { enabled: false, n: 20, p: 2, style: 'default' },
-        }}
-        subIndicators={{
-          rsi: {
-            enabled: true,
-            rsiOnly: true,
-            periods: [14],
-            style: 'line_labels',
-            axisMode: 'fixed_0_100',
-            levels: [
-              {
-                value: 20,
-                label: '20',
-                color: '#64748B',
-                dashed: true,
-                showRightTag: false,
-                showGuideLine: true,
-              },
-              {
-                value: 25,
-                label: '25',
-                color: '#EA580C',
-                dashed: true,
-                showRightTag: true,
-                showGuideLine: true,
-              },
-              {
-                value: 40,
-                label: '40',
-                color: '#B91C1C',
-                dashed: true,
-                showRightTag: true,
-                showGuideLine: true,
-              },
-            ],
-            currentTag: {
-              enabled: true,
-              period: 14,
-              label: 'ADX (14)',
-              color: '#0EA5E9',
-            },
-          },
-        }}
+        mainIndicators={mainIndicators}
+        subIndicators={subIndicators}
         subCharts={[]}
-        volume={{ enabled: false, maPeriods: [5, 10] }}
-        interaction={{ autoFollow: false, loadMoreThreshold: 48 }}
-        format={{ price: 2, volume: 2, time: 1 }}
-        theme={{
-          candle: {
-            upColor: '#16A34A',
-            downColor: '#EF4444',
-          },
-          subIndicator: {
-            colors: ['#0EA5E9', '#22C55E', '#F59E0B'],
-          },
-          grid: { lineColor: '#E2E8F0' },
-          axis: { textColor: '#334155' },
-          panel: {
-            backgroundColor: '#FFFFFF',
-            borderColor: '#94A3B8',
-          },
-        }}
-        layout={{
-          paddingTop: 16,
-          paddingBottom: 24,
-          paddingRight: 92,
-          rightOffsetCandles: 0,
-          itemWidth: widths.itemWidth,
-          candleWidth: widths.candleWidth,
-          mainFlex: 0.1,
-        }}
+        volume={volume}
+        interaction={interaction}
+        format={format}
+        theme={theme}
+        layout={layout}
       />
     </ChartAICard>
   );

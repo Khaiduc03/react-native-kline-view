@@ -186,7 +186,8 @@ export function ChartAISupportResistanceChart({
   );
 
   const hasLevels =
-    typeof levels?.support === 'number' && typeof levels?.resistance === 'number';
+    typeof levels?.support === 'number' &&
+    typeof levels?.resistance === 'number';
 
   return (
     <ChartAICard title={title ?? `Support & Resistance - ${symbol}`}>

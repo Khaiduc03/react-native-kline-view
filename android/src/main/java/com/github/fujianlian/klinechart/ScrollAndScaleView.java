@@ -176,9 +176,13 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         boolean shouldContinue = true;
+        boolean isMultiTouchEvent = event.getPointerCount() > 1;
         // 按压手指超过1个
-        if (event.getPointerCount() > 1) {
+        if (isMultiTouchEvent) {
             isLongPress = false;
+            if (getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
         }
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
@@ -195,13 +199,22 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
                 if (isLongPress) {
                     onLongPress(event);
                 }
-                if(Math.abs(event.getX() - mDownX) >= Math.abs(event.getY()-mDownY) || isLongPress) {
+                if (isMultiTouchEvent) {
                     shouldContinue = true;
-                    getParent().requestDisallowInterceptTouchEvent(true);
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                } else if(Math.abs(event.getX() - mDownX) >= Math.abs(event.getY()-mDownY) || isLongPress) {
+                    shouldContinue = true;
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
                 } else {
                     //发现不是自己处理，还给父类
                     shouldContinue = false;
-                    getParent().requestDisallowInterceptTouchEvent(false);
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(false);
+                    }
                 }
                 break;
             case MotionEvent.ACTION_POINTER_UP:
@@ -222,7 +235,7 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
             default:
                 break;
         }
-        mMultipleTouch = event.getPointerCount() > 1;
+        mMultipleTouch = isMultiTouchEvent;
         this.mDetector.onTouchEvent(event);
         this.mScaleDetector.onTouchEvent(event);
         return shouldContinue;

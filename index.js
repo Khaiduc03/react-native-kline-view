@@ -230,7 +230,8 @@ const DEFAULT_CONFIG_LIST = {
 const DEFAULT_DRAW_LIST = {
   shotBackgroundColor: toColorNumber("rgba(0,0,0,0)", 0x00000000),
   drawType: 0,
-  shouldReloadDrawItemIndex: 0,
+  // Match native HTDrawState.none (-3) so pan/zoom remains enabled by default.
+  shouldReloadDrawItemIndex: -3,
   drawShouldContinue: false,
   drawColor: toColorNumber("#2563EB", 0xff2563eb),
   drawLineHeight: 1,

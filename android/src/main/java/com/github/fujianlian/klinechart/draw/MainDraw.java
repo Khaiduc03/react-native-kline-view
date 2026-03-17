@@ -186,13 +186,25 @@ public class MainDraw implements IChartDraw<ICandle> {
             return;
         }
         float r = mCandleWidth / 2;
+        int[] minuteGradientColors = view.configManager.minuteGradientColorList;
+        if (minuteGradientColors == null || minuteGradientColors.length == 0) {
+            int fallbackColor = view.configManager.minuteLineColor;
+            minuteGradientColors = new int[]{fallbackColor, fallbackColor};
+        } else if (minuteGradientColors.length == 1) {
+            int singleColor = minuteGradientColors[0];
+            minuteGradientColors = new int[]{singleColor, singleColor};
+        }
+        float[] minuteGradientLocations = view.configManager.minuteGradientLocationList;
+        if (minuteGradientLocations != null && minuteGradientLocations.length != minuteGradientColors.length) {
+            minuteGradientLocations = null;
+        }
         LinearGradient linearGradient = new LinearGradient(
                 0,
                 0,
                 0,
                 bottom - top,
-                view.configManager.minuteGradientColorList,
-                view.configManager.minuteGradientLocationList,
+                minuteGradientColors,
+                minuteGradientLocations,
                 Shader.TileMode.CLAMP
         );
 //        minuteGradientPaint.setColor(Color.BLUE);

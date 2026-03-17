@@ -4,7 +4,6 @@ package com.github.fujianlian.klinechart.container;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
-import android.widget.ScrollView;
 import com.facebook.react.bridge.*;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
@@ -49,15 +48,36 @@ public class HTKLineContainerView extends RelativeLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        ViewGroup willShotView = (ViewGroup)getParent();
         if (shotView == null) {
-            shotView = new HTShotView(getContext(), willShotView);
+            ViewGroup shotTarget = resolveShotTarget();
+            shotView = new HTShotView(getContext(), shotTarget);
             shotView.setEnabled(false);
             shotView.dimension = 300;
+        }
+        if (shotView.getParent() != this) {
+            if (shotView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) shotView.getParent()).removeView(shotView);
+            }
             RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(shotView.dimension, shotView.dimension);
             layoutParams.setMargins(50, 50, 0, 0);
-            ((ViewGroup)willShotView.getParent().getParent()).addView(shotView, layoutParams);
+            addView(shotView, layoutParams);
+            shotView.bringToFront();
         }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        if (shotView != null && shotView.getParent() == this) {
+            removeView(shotView);
+        }
+        super.onDetachedFromWindow();
+    }
+
+    private ViewGroup resolveShotTarget() {
+        if (getParent() instanceof ViewGroup) {
+            return (ViewGroup) getParent();
+        }
+        return this;
     }
 
     public void reloadConfigManager() {
@@ -276,7 +296,18 @@ public class HTKLineContainerView extends RelativeLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (event != null && event.getPointerCount() > 1) {
+            // Keep pinch-zoom handled by chart view.
+            if (getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+            return false;
+        }
         int reloadIndex = configManager.shouldReloadDrawItemIndex;
+        if (reloadIndex > HTDrawState.showContext && !isValidDrawItemIndex(reloadIndex)) {
+            configManager.shouldReloadDrawItemIndex = HTDrawState.showPencil;
+            reloadIndex = HTDrawState.showPencil;
+        }
         switch (reloadIndex) {
             case HTDrawState.none: {
                 return false;
@@ -289,6 +320,17 @@ public class HTKLineContainerView extends RelativeLayout {
                         return false;
                     }
                 }
+                return true;
+            }
+            case HTDrawState.showContext: {
+                if (configManager.drawType == HTDrawType.none) {
+                    HTPoint location = new HTPoint(event.getX(), event.getY());
+                    location = convertLocation(location);
+                    if ((HTDrawItem.canResponseLocation(klineView.drawContext.drawItemList, location, klineView)) == null) {
+                        return false;
+                    }
+                }
+                return true;
             }
         }
         return true;
@@ -324,6 +366,9 @@ public class HTKLineContainerView extends RelativeLayout {
     }
 
     private void handlerShot(MotionEvent event) {
+        if (shotView == null) {
+            return;
+        }
         if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
             shotView.setPoint(null);
             lastLocation = null;
@@ -361,6 +406,10 @@ public class HTKLineContainerView extends RelativeLayout {
             }
         }
         return -1;
+    }
+
+    private boolean isValidDrawItemIndex(int index) {
+        return index >= 0 && index < klineView.drawContext.drawItemList.size();
     }
 
     public void emitError(String code, String message, boolean fatal) {
