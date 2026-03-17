@@ -1,6 +1,6 @@
 {
   "name": "react-native-kline-view",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "High-performance K-line (candlestick) chart library for React Native with native iOS/Android rendering.",
   "main": "index.js",
   "types": "index.d.ts",
