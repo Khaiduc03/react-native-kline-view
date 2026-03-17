@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import androidx.core.view.GestureDetectorCompat;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 
@@ -33,6 +34,7 @@ import java.util.List;
  * Created by tian on 2016/5/3.
  */
 public abstract class BaseKLineChartView extends ScrollAndScaleView implements Drawable.Callback {
+    private static final String TOUCH_TAG = "RNKLineView.Scale";
 
     public HTKLineConfigManager configManager;
 
@@ -1450,6 +1452,23 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         }
         if (mItemCount != 0) {
             mDataLen = mItemCount * mPointWidth;
+            // Adapt min zoom so large datasets (e.g. Binance) can zoom-out further on Android.
+            float availableWidth = Math.max(1f, mWidth - configManager.paddingRight);
+            float offsetWidth = configManager.rightOffsetCandles * mPointWidth;
+            float fullDataWidth = Math.max(1f, mDataLen + offsetWidth);
+            float adaptiveMinScale = Math.max(0.05f, Math.min(0.3f, availableWidth / fullDataWidth));
+            setScaleXMin(adaptiveMinScale);
+            setScaleXMax(3f);
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                        TOUCH_TAG,
+                        "notifyChanged itemCount=" + mItemCount
+                                + " width=" + availableWidth
+                                + " dataWidth=" + fullDataWidth
+                                + " minScale=" + adaptiveMinScale
+                                + " currentScale=" + getScaleX()
+                );
+            }
             checkAndFixScrollX();
         }
         if (mSelectedIndex >= mItemCount) {
@@ -1507,6 +1526,16 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
     @Override
     protected void onScaleChanged(float scale, float oldScale) {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TOUCH_TAG,
+                    "onScaleChanged old=" + oldScale
+                            + " new=" + scale
+                            + " min=" + getScaleXMin()
+                            + " max=" + getScaleXMax()
+                            + " scrollX=" + mScrollX
+            );
+        }
         checkAndFixScrollX();
         super.onScaleChanged(scale, oldScale);
     }

@@ -9,6 +9,7 @@ import androidx.annotation.ColorRes;
 import androidx.annotation.DimenRes;
 import androidx.core.content.ContextCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ProgressBar;
@@ -23,6 +24,7 @@ import static android.graphics.Typeface.NORMAL;
  * Created by tian on 2016/5/20.
  */
 public class KLineChartView extends BaseKLineChartView {
+    private static final String TAG = "RNKLineView.KLineTouch";
 
     ProgressBar mProgressBar;
     private boolean isRefreshing = false;
@@ -179,7 +181,19 @@ public class KLineChartView extends BaseKLineChartView {
     @Override
     protected void onScrollChanged(int l, int t, int oldl, int oldt) {
         super.onScrollChanged(l, t, oldl, oldt);
+        if (configManager.modelArray == null || configManager.modelArray.isEmpty()) {
+            return;
+        }
         int threshold = Math.max(0, Math.round(configManager.loadMoreThreshold));
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "onScrollChanged x=" + mScrollX
+                            + " threshold=" + threshold
+                            + " refreshing=" + isRefreshing
+                            + " scaleEnabled=" + isScaleEnable()
+            );
+        }
         if (mScrollX <= threshold) {
             if (!didTriggerNearLeftLoadMore) {
                 didTriggerNearLeftLoadMore = true;
@@ -193,16 +207,19 @@ public class KLineChartView extends BaseKLineChartView {
     public void showLoading() {
         if (!isLoadMoreEnd && !isRefreshing) {
             isRefreshing = true;
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "showLoading -> disable scroll/scale");
+            }
+            mLastScaleEnable = isScaleEnable();
+            mLastScrollEnable = isScrollEnable();
+            super.setScrollEnable(false);
+            super.setScaleEnable(false);
             if (mProgressBar != null) {
                 mProgressBar.setVisibility(View.VISIBLE);
             }
             if (mRefreshListener != null) {
                 mRefreshListener.onLoadMoreBegin(this);
             }
-            mLastScaleEnable = isScaleEnable();
-            mLastScrollEnable = isScrollEnable();
-            super.setScrollEnable(false);
-            super.setScaleEnable(false);
         }
     }
 
@@ -210,22 +227,31 @@ public class KLineChartView extends BaseKLineChartView {
         if (!isRefreshing) {
             isLongPress = false;
             isRefreshing = true;
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "justShowLoading -> disable scroll/scale");
+            }
+            mLastScaleEnable = isScaleEnable();
+            mLastScrollEnable = isScrollEnable();
+            super.setScrollEnable(false);
+            super.setScaleEnable(false);
             if (mProgressBar != null) {
                 mProgressBar.setVisibility(View.VISIBLE);
             }
             if (mRefreshListener != null) {
                 mRefreshListener.onLoadMoreBegin(this);
             }
-            mLastScaleEnable = isScaleEnable();
-            mLastScrollEnable = isScrollEnable();
-            super.setScrollEnable(false);
-            super.setScaleEnable(false);
         }
     }
 
     private void hideLoading() {
         if (mProgressBar != null) {
             mProgressBar.setVisibility(View.GONE);
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "hideLoading restore scroll=" + mLastScrollEnable + " scale=" + mLastScaleEnable
+            );
         }
         super.setScrollEnable(mLastScrollEnable);
         super.setScaleEnable(mLastScaleEnable);
@@ -244,6 +270,9 @@ public class KLineChartView extends BaseKLineChartView {
      */
     public void refreshComplete() {
         isRefreshing = false;
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "refreshComplete");
+        }
         hideLoading();
     }
 
@@ -253,6 +282,9 @@ public class KLineChartView extends BaseKLineChartView {
     public void refreshEnd() {
         isLoadMoreEnd = true;
         isRefreshing = false;
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "refreshEnd");
+        }
         hideLoading();
     }
 
@@ -490,23 +522,52 @@ public class KLineChartView extends BaseKLineChartView {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        switch (ev.getAction()) {
+        switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 startX = (int) ev.getX();
                 startY = (int) ev.getY();
-                break;
+                if (getParent() != null) {
+                    // Keep chart as the primary gesture target.
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "intercept DOWN x=" + startX + " y=" + startY);
+                }
+                return true;
             case MotionEvent.ACTION_MOVE:
                 int dX = (int) (ev.getX() - startX);
-                int dY = (int) (ev.getY() - startX);
-                if (Math.abs(dX) > Math.abs(dY)) {
-                    //左右滑动
-                    return true;
-                } else {
-                    //上下滑动
-                    return false;
+                int dY = (int) (ev.getY() - startY);
+                boolean intercept = true;
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(intercept);
                 }
+                if (BuildConfig.DEBUG) {
+                    Log.d(
+                            TAG,
+                            "intercept MOVE dX=" + dX + " dY=" + dY
+                                    + " pointers=" + ev.getPointerCount()
+                                    + " intercept=" + intercept
+                    );
+                }
+                return intercept;
+            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_POINTER_UP:
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "intercept POINTER action=" + ev.getActionMasked());
+                }
+                return true;
             case MotionEvent.ACTION_UP:
-                break;
+            case MotionEvent.ACTION_CANCEL:
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "intercept END action=" + ev.getActionMasked());
+                }
+                return false;
             default:
         }
         return super.onInterceptTouchEvent(ev);

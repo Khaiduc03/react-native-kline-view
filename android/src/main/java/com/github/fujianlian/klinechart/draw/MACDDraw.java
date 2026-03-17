@@ -64,9 +64,10 @@ public class MACDDraw implements IChartDraw<IMACD> {
     public void reloadColor(BaseKLineChartView view) {
         mRedPaint.setColor(view.configManager.increaseColor);
         mGreenPaint.setColor(view.configManager.decreaseColor);
-        mMACDPaint.setColor(view.configManager.targetColorList[5]);
-        mDIFPaint.setColor(view.configManager.targetColorList[0]);
-        mDEAPaint.setColor(view.configManager.targetColorList[1]);
+        // Some screens provide only 3 sub-indicator colors, so all lookups must be bounds-safe.
+        mMACDPaint.setColor(safeTargetColor(view, 5));
+        mDIFPaint.setColor(safeTargetColor(view, 0));
+        mDEAPaint.setColor(safeTargetColor(view, 1));
     }
 
     @Override

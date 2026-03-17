@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -425,7 +424,7 @@ export default function BinanceLiveScreen() {
   }, [clearDrawNonce]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.title}>Binance Live</Text>
       <Text style={styles.subTitle}>
         REST history + realtime WebSocket kline stream
@@ -473,6 +472,7 @@ export default function BinanceLiveScreen() {
           style={styles.chart}
           initialData={EMPTY_CANDLES}
           preset="binance"
+          layout={{ itemWidth: 9, candleWidth: 6 }}
           mainIndicators={mainIndicatorsConfig}
           subCharts={subChartsConfig}
           volume={{ enabled: true, maPeriods: [5, 10] }}
@@ -520,7 +520,7 @@ export default function BinanceLiveScreen() {
         onSelectDrawType={setDrawType}
         onClearDraw={triggerClearDraw}
       />
-    </ScrollView>
+    </View>
   );
 }
 

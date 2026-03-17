@@ -4,9 +4,11 @@ package com.github.fujianlian.klinechart.container;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
+import android.util.Log;
 import com.facebook.react.bridge.*;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.github.fujianlian.klinechart.BuildConfig;
 import com.github.fujianlian.klinechart.HTKLineConfigManager;
 import com.github.fujianlian.klinechart.KLineChartView;
 import com.github.fujianlian.klinechart.BaseKLineChartView;
@@ -16,6 +18,7 @@ import com.github.fujianlian.klinechart.formatter.DateFormatter;
 
 
 public class HTKLineContainerView extends RelativeLayout {
+    private static final String TAG = "RNKLineView.Container";
 
     private ThemedReactContext reactContext;
 
@@ -81,6 +84,16 @@ public class HTKLineContainerView extends RelativeLayout {
     }
 
     public void reloadConfigManager() {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "reloadConfigManager count=" + configManager.modelArray.size()
+                            + " drawState=" + configManager.shouldReloadDrawItemIndex
+                            + " drawType=" + configManager.drawType
+                            + " itemWidth=" + configManager.itemWidth
+                            + " candleWidth=" + configManager.candleWidth
+            );
+        }
         klineView.changeMainDrawType(klineView.configManager.primaryStatus);
         klineView.changeSecondDrawType(klineView.configManager.secondStatus);
         klineView.setMainDrawLine(klineView.configManager.isMinute);
@@ -132,6 +145,14 @@ public class HTKLineContainerView extends RelativeLayout {
         klineView.notifyChanged();
         if (isEnd || klineView.configManager.shouldScrollToEnd) {
             klineView.setScrollX(klineView.getMaxScrollX());
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "after reload scrollX=" + klineView.getScrollOffset()
+                            + " maxScrollX=" + klineView.getMaxScrollX()
+                            + " scale=" + klineView.getScaleX()
+            );
         }
 
 
@@ -296,6 +317,15 @@ public class HTKLineContainerView extends RelativeLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (BuildConfig.DEBUG && event != null) {
+            Log.d(
+                    TAG,
+                    "onIntercept action=" + event.getActionMasked()
+                            + " pointers=" + event.getPointerCount()
+                            + " drawState=" + configManager.shouldReloadDrawItemIndex
+                            + " drawType=" + configManager.drawType
+            );
+        }
         if (event != null && event.getPointerCount() > 1) {
             // Keep pinch-zoom handled by chart view.
             if (getParent() != null) {
@@ -340,6 +370,13 @@ public class HTKLineContainerView extends RelativeLayout {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (BuildConfig.DEBUG && event != null) {
+            Log.d(
+                    TAG,
+                    "onTouch action=" + event.getActionMasked()
+                            + " pointers=" + event.getPointerCount()
+            );
+        }
         handlerDraw(event);
         handlerShot(event);
         return true;

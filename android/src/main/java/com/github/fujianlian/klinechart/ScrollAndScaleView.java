@@ -2,6 +2,7 @@ package com.github.fujianlian.klinechart;
 
 import android.content.Context;
 import androidx.core.view.GestureDetectorCompat;
+import android.util.Log;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -16,6 +17,8 @@ import android.widget.RelativeLayout;
 public abstract class ScrollAndScaleView extends RelativeLayout implements
         GestureDetector.OnGestureListener,
         ScaleGestureDetector.OnScaleGestureListener {
+    private static final String TAG = "RNKLineView.Gesture";
+
     protected int mScrollX = 0;
     protected GestureDetectorCompat mDetector;
     protected ScaleGestureDetector mScaleDetector;
@@ -28,9 +31,9 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
 
     protected float mScaleX = 1;
 
-    protected float mScaleXMax = 2f;
+    protected float mScaleXMax = 3f;
 
-    protected float mScaleXMin = 0.5f;
+    protected float mScaleXMin = 0.3f;
 
     private boolean mMultipleTouch = false;
 
@@ -70,7 +73,10 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
 
     @Override
     public boolean onDown(MotionEvent e) {
-        return false;
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "onDown x=" + e.getX() + " y=" + e.getY());
+        }
+        return true;
     }
 
     @Override
@@ -87,6 +93,12 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
         if (!isLongPress && !isMultipleTouch()) {
             scrollBy(-Math.round(distanceX), 0);
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                        TAG,
+                        "onScroll dx=" + distanceX + " dy=" + distanceY + " scrollX=" + mScrollX
+                );
+            }
             return true;
         }
         return false;
@@ -140,42 +152,72 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
     @Override
     public boolean onScale(ScaleGestureDetector detector) {
         if (!isScaleEnable()) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "onScale blocked: scale disabled");
+            }
             return false;
         }
         if (isLongPress) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "onScale blocked: longPress active");
+            }
             return false;
         }
         float oldScale = mScaleX;
-        mScaleX *= detector.getScaleFactor();
-        if (mScaleX < mScaleXMin) {
-            mScaleX = mScaleXMin;
-        } else if (mScaleX > mScaleXMax) {
-            mScaleX = mScaleXMax;
-        } else {
+        float nextScale = oldScale * detector.getScaleFactor();
+        if (nextScale < mScaleXMin) {
+            nextScale = mScaleXMin;
+        } else if (nextScale > mScaleXMax) {
+            nextScale = mScaleXMax;
+        }
+        mScaleX = nextScale;
+        if (Math.abs(mScaleX - oldScale) > 0.0001f) {
             onScaleChanged(mScaleX, oldScale);
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "onScale factor=" + detector.getScaleFactor()
+                            + " scaleX=" + mScaleX
+                            + " min=" + mScaleXMin
+                            + " max=" + mScaleXMax
+            );
         }
         return true;
     }
 
     protected void onScaleChanged(float scale, float oldScale) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "onScaleChanged old=" + oldScale + " new=" + scale);
+        }
         invalidate();
     }
 
     @Override
     public boolean onScaleBegin(ScaleGestureDetector detector) {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "onScaleBegin enabled=" + isScaleEnable()
+                            + " longPress=" + isLongPress
+                            + " currentScale=" + mScaleX
+                            + " pointers?" // pointer count is unavailable on detector, keep event trace in onTouch.
+            );
+        }
         return true;
     }
 
     @Override
     public void onScaleEnd(ScaleGestureDetector detector) {
-
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "onScaleEnd finalScale=" + mScaleX);
+        }
     }
 
     float x;
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        boolean shouldContinue = true;
         boolean isMultiTouchEvent = event.getPointerCount() > 1;
         // 按压手指超过1个
         if (isMultiTouchEvent) {
@@ -193,28 +235,24 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
                 x = event.getX();
                 mDownX = event.getX();
                 mDownY = event.getY();
+                if (getParent() != null) {
+                    // Chart gestures have priority over parent scroll containers.
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
                 break;
             case MotionEvent.ACTION_MOVE:
                 //长按之后移动
                 if (isLongPress) {
                     onLongPress(event);
                 }
-                if (isMultiTouchEvent) {
-                    shouldContinue = true;
-                    if (getParent() != null) {
-                        getParent().requestDisallowInterceptTouchEvent(true);
-                    }
-                } else if(Math.abs(event.getX() - mDownX) >= Math.abs(event.getY()-mDownY) || isLongPress) {
-                    shouldContinue = true;
-                    if (getParent() != null) {
-                        getParent().requestDisallowInterceptTouchEvent(true);
-                    }
-                } else {
-                    //发现不是自己处理，还给父类
-                    shouldContinue = false;
-                    if (getParent() != null) {
-                        getParent().requestDisallowInterceptTouchEvent(false);
-                    }
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                mMultipleTouch = true;
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
                 }
                 break;
             case MotionEvent.ACTION_POINTER_UP:
@@ -225,11 +263,19 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
 
                 }
                 touch = false;
+                mMultipleTouch = false;
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
                 invalidate();
                 break;
             case MotionEvent.ACTION_CANCEL:
                 isLongPress = false;
                 touch = false;
+                mMultipleTouch = false;
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
                 invalidate();
                 break;
             default:
@@ -238,7 +284,38 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
         mMultipleTouch = isMultiTouchEvent;
         this.mDetector.onTouchEvent(event);
         this.mScaleDetector.onTouchEvent(event);
-        return shouldContinue;
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "onTouch action=" + actionToString(event.getActionMasked())
+                            + " pointers=" + event.getPointerCount()
+                            + " multi=" + mMultipleTouch
+                            + " touch=" + touch
+                            + " scaleEnabled=" + isScaleEnable()
+                            + " scrollEnabled=" + isScrollEnable()
+                            + " scaleX=" + mScaleX
+            );
+        }
+        return true;
+    }
+
+    private String actionToString(int action) {
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                return "DOWN";
+            case MotionEvent.ACTION_UP:
+                return "UP";
+            case MotionEvent.ACTION_MOVE:
+                return "MOVE";
+            case MotionEvent.ACTION_CANCEL:
+                return "CANCEL";
+            case MotionEvent.ACTION_POINTER_DOWN:
+                return "POINTER_DOWN";
+            case MotionEvent.ACTION_POINTER_UP:
+                return "POINTER_UP";
+            default:
+                return String.valueOf(action);
+        }
     }
 
 
@@ -346,6 +423,9 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
      * 设置是否可以缩放
      */
     public void setScaleEnable(boolean scaleEnable) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "setScaleEnable " + mScaleEnable + " -> " + scaleEnable);
+        }
         mScaleEnable = scaleEnable;
     }
 
