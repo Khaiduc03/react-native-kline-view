@@ -101,6 +101,31 @@ public class HTKLineContainerView extends RelativeLayout {
         appliedInitialScale = requested;
     }
 
+    private float normalizeTextSizePx(float configuredSize, float fallbackSp) {
+        float raw = configuredSize;
+        if (Float.isNaN(raw) || Float.isInfinite(raw) || raw <= 0f) {
+            raw = fallbackSp;
+        }
+        // JS config typically passes typography as dp/sp-like values (e.g. 9-12).
+        // Convert those to px for Android; keep large values as-is to avoid double scaling.
+        float asPx = raw <= 24f ? klineView.sp2px(raw) : raw;
+        float minPx = klineView.sp2px(fallbackSp);
+        return Math.max(asPx, minPx);
+    }
+
+    private void normalizeAndroidTypographyIfNeeded() {
+        configManager.headerTextFontSize = normalizeTextSizePx(configManager.headerTextFontSize, 10f);
+        configManager.rightTextFontSize = normalizeTextSizePx(configManager.rightTextFontSize, 10f);
+        configManager.candleTextFontSize = normalizeTextSizePx(configManager.candleTextFontSize, 11f);
+        configManager.panelTextFontSize = normalizeTextSizePx(configManager.panelTextFontSize, 10f);
+    }
+
+    private void applyStrokeQualityDefaults() {
+        float lineWidthPx = Math.max(1f, klineView.dp2px(0.6f));
+        klineView.setLineWidth(lineWidthPx);
+        klineView.setCandleLineWidth(lineWidthPx);
+    }
+
     public void reloadConfigManager() {
         if (BuildConfig.DEBUG) {
             Log.d(
@@ -117,6 +142,8 @@ public class HTKLineContainerView extends RelativeLayout {
         klineView.setMainDrawLine(klineView.configManager.isMinute);
         klineView.setPointWidth(klineView.configManager.itemWidth);
         klineView.setCandleWidth(klineView.configManager.candleWidth);
+        normalizeAndroidTypographyIfNeeded();
+        applyStrokeQualityDefaults();
 
         if (klineView.configManager.fontFamily.length() > 0) {
             klineView.setTextFontFamily(klineView.configManager.fontFamily);

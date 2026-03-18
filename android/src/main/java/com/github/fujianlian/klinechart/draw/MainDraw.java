@@ -896,7 +896,7 @@ public class MainDraw implements IChartDraw<ICandle> {
         float bodyTop = Math.min(open, close);
         float bodyBottom = Math.max(open, close);
         // Keep tiny/doji candles visible by enforcing a minimum body height.
-        final float minBodyPx = 1.5f;
+        final float minBodyPx = 1.2f;
         if (bodyBottom - bodyTop < minBodyPx) {
             float mid = (bodyTop + bodyBottom) / 2f;
             bodyTop = mid - (minBodyPx / 2f);
