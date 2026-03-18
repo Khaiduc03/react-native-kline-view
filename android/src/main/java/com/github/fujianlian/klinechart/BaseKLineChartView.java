@@ -889,6 +889,11 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
         float textHeight = fm.descent - fm.ascent;
         float baseLine = (textHeight - fm.bottom - fm.top) / 2;
+        float closePriceY = Float.NaN;
+        if (!childOnly && mItemCount > 0) {
+            IKLine closePoint = (IKLine) getItem(mItemCount - 1);
+            closePriceY = yFromValue(closePoint.getClosePrice());
+        }
         //--------------画上方k线图的值-------------
         if (((!childOnly && mMainDraw != null) || (childOnly && mChildDraw != null))) {
             if (!priceGridLevels.isEmpty()) {
@@ -897,6 +902,12 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                     String text = formatValue(v);
                     float textWidth = calculateWidth(text);
                     float y = childOnly ? getChildY(v) : yFromValue(v);
+                    if (!childOnly && !Float.isNaN(closePriceY)) {
+                        float minGap = Math.max(textHeight * 1.15f, ViewUtil.Dp2Px(getContext(), 12f));
+                        if (Math.abs(y - closePriceY) < minGap) {
+                            continue;
+                        }
+                    }
                     float labelY = y - textHeight / 2f;
                     canvas.drawText(text, mWidth - textWidth, fixTextY1(labelY), mTextPaint);
                 }
@@ -940,7 +951,10 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                 String text = entity.Date;
                 float centerScrollX = getItemMiddleScrollX(i);
                 float x = scrollXtoViewX(centerScrollX);
-                canvas.drawText(text, x - mTextPaint.measureText(text) / 2f, y, mTextPaint);
+                float textWidth = mTextPaint.measureText(text);
+                float drawX = x - textWidth / 2f;
+                drawX = Math.max(0, Math.min(drawX, mWidth - textWidth));
+                canvas.drawText(text, drawX, y, mTextPaint);
             }
         }
 

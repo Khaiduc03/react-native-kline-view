@@ -1012,7 +1012,7 @@ function mergeTargetListPreferInput(inputList, computedList) {
   });
 }
 
-function applyMainLineColors(configList, targetList, indicatorColors) {
+function applyMainLineColors(configList, targetList, indicatorColors, options = {}) {
   const next = { ...configList };
   const currentColors = Array.isArray(next.targetColorList)
     ? [...next.targetColorList]
@@ -1021,6 +1021,9 @@ function applyMainLineColors(configList, targetList, indicatorColors) {
   const emaColors = Array.isArray(indicatorColors?.ema) ? indicatorColors.ema : [];
   const superColors = Array.isArray(indicatorColors?.super)
     ? indicatorColors.super
+    : [];
+  const bollColors = Array.isArray(indicatorColors?.boll)
+    ? indicatorColors.boll
     : [];
   let maColorIndex = 0;
   let emaColorIndex = 0;
@@ -1042,6 +1045,15 @@ function applyMainLineColors(configList, targetList, indicatorColors) {
     }
     currentColors[index] = toResolvedColor(colorValue, currentColors[index] ?? 0);
   });
+  if (options.showMainBOLL === true && bollColors.length > 0) {
+    for (let i = 0; i < 3; i += 1) {
+      const colorValue = bollColors[i];
+      if (colorValue === undefined) {
+        continue;
+      }
+      currentColors[i] = toResolvedColor(colorValue, currentColors[i] ?? 0);
+    }
+  }
   next.targetColorList = currentColors;
   return next;
 }
@@ -1375,7 +1387,8 @@ function composeOptionList({
   const configList = applyMainLineColors(
     normalizeConfigColors(baseConfigList),
     targetList,
-    deepMerge(presetIndicatorColors, themeIndicatorColors)
+    deepMerge(presetIndicatorColors, themeIndicatorColors),
+    { showMainBOLL }
   );
   if (!resolvedShowVolume) {
     configList.volumeFlex = 0;
@@ -1532,6 +1545,7 @@ function toLegacyPropsConfig({
       ma: theme?.mainIndicator?.maColors,
       ema: theme?.mainIndicator?.emaColors,
       super: theme?.mainIndicator?.superColors,
+      boll: theme?.mainIndicator?.bollColors,
     },
     cursorStyleEnabled:
       typeof theme?.crosshair?.enabled === "boolean"

@@ -75,21 +75,21 @@ export function ChartAIServerChart({ data, title }: ChartAIServerChartProps) {
           }}
           subCharts={[]}
           volume={{ enabled: false, maPeriods: [5, 10] }}
-          interaction={buildChartAIInteraction()}
+          interaction={buildChartAIInteraction(48, 0.64)}
           format={{ price: 2, volume: 2, time: 1 }}
           theme={{
             candle: {
-              upColor: '#16A34A',
-              downColor: '#DC2626',
+              upColor: '#19B37A',
+              downColor: '#EA4D68',
             },
             mainIndicator: {
-              bollColors: ['#16A34A', '#16A34A', '#DC2626'],
+              bollColors: ['#DFC987', '#67C8BC', '#B794DE'],
             },
-            grid: { lineColor: '#E2E8F0' },
-            axis: { textColor: '#334155' },
+            grid: { lineColor: '#E6EBF1' },
+            axis: { textColor: '#475467' },
             panel: {
               backgroundColor: '#FFFFFF',
-              borderColor: '#94A3B8',
+              borderColor: '#CBD5E1',
             },
           }}
           layout={{

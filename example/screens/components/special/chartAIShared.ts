@@ -213,10 +213,11 @@ export const CHART_AI_INITIAL_SCALE = 0.72;
 
 export const buildChartAIInteraction = (
   loadMoreThreshold = 48,
+  initialScale = CHART_AI_INITIAL_SCALE,
 ): InteractionConfig => ({
   autoFollow: false,
   loadMoreThreshold,
   configList: {
-    initialScale: CHART_AI_INITIAL_SCALE,
+    initialScale,
   },
 });
