@@ -103,9 +103,9 @@ public class HTKLineConfigManager {
 
 	public Boolean isMinute = false;
 
-    public int increaseColor = Color.RED;
+    public int increaseColor = Color.parseColor("#16A34A");
 
-    public int decreaseColor = Color.GREEN;
+    public int decreaseColor = Color.parseColor("#EF4444");
 
     public int minuteLineColor = Color.BLUE;
 
@@ -123,7 +123,7 @@ public class HTKLineConfigManager {
 
     public float candleWidth = 7;
 
-    public int minuteVolumeCandleColor = Color.RED;
+    public int minuteVolumeCandleColor = Color.parseColor("#2563EB");
 
     public float minuteVolumeCandleWidth = 1.5f;
 
@@ -199,7 +199,14 @@ public class HTKLineConfigManager {
 
 
 
-    public int[] targetColorList = { Color.RED, Color.RED, Color.RED, Color.RED, Color.RED, Color.RED };
+    public int[] targetColorList = {
+            Color.parseColor("#EAB308"),
+            Color.parseColor("#22C55E"),
+            Color.parseColor("#A855F7"),
+            Color.parseColor("#38BDF8"),
+            Color.parseColor("#F97316"),
+            Color.parseColor("#6366F1")
+    };
 
     // Prediction / Live Analyst
     public int rightOffsetCandles = 0;
@@ -235,19 +242,37 @@ public class HTKLineConfigManager {
     }
 
     public static int[] parseColorList(Object object) {
-        List colorArray = (List)object;
-        int[] colorList = new int[colorArray.size()];
-        for (int i = 0; i < colorArray.size(); i ++) {
-            colorList[i] = ((Number) colorArray.get(i)).intValue();
+        if (!(object instanceof List)) {
+            return new int[0];
+        }
+        List colorArray = (List) object;
+        List<Integer> parsed = new ArrayList<>();
+        for (Object item : colorArray) {
+            if (item instanceof Number) {
+                parsed.add(((Number) item).intValue());
+            }
+        }
+        int[] colorList = new int[parsed.size()];
+        for (int i = 0; i < parsed.size(); i++) {
+            colorList[i] = parsed.get(i);
         }
         return colorList;
     }
 
     public static float[] parseLocationList(Object object) {
-        List locationArray = (List)object;
-        float[] locationList = new float[locationArray.size()];
-        for (int i = 0; i < locationArray.size(); i ++) {
-            locationList[i] = ((Number) locationArray.get(i)).floatValue();
+        if (!(object instanceof List)) {
+            return new float[0];
+        }
+        List locationArray = (List) object;
+        List<Float> parsed = new ArrayList<>();
+        for (Object item : locationArray) {
+            if (item instanceof Number) {
+                parsed.add(((Number) item).floatValue());
+            }
+        }
+        float[] locationList = new float[parsed.size()];
+        for (int i = 0; i < parsed.size(); i++) {
+            locationList[i] = parsed.get(i);
         }
         return locationList;
     }
@@ -264,6 +289,14 @@ public class HTKLineConfigManager {
         Object value = map.get(key);
         if (value instanceof Number) {
             return ((Number) value).floatValue();
+        }
+        return defaultValue;
+    }
+
+    private static int readInt(Map map, String key, int defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
         }
         return defaultValue;
     }
@@ -299,6 +332,14 @@ public class HTKLineConfigManager {
         }
         if (value instanceof Number) {
             return ((Number) value).intValue() != 0;
+        }
+        return defaultValue;
+    }
+
+    private static List readList(Map map, String key, List defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof List) {
+            return (List) value;
         }
         return defaultValue;
     }
@@ -397,9 +438,8 @@ public class HTKLineConfigManager {
 
     public void reloadOptionList(Map optionList) {
 
-    	Boolean preserveModelArray = (Boolean) optionList.get("preserveModelArray");
-    	boolean shouldPreserveModelArray = preserveModelArray != null && preserveModelArray;
-    	List modelArray = (List)optionList.get("modelArray");
+    	boolean shouldPreserveModelArray = readBoolean(optionList, "preserveModelArray", false);
+        List modelArray = readList(optionList, "modelArray", null);
     	if (!shouldPreserveModelArray && modelArray != null) {
             if (modelArray.isEmpty() && !this.modelArray.isEmpty()) {
                 if (BuildConfig.DEBUG) {
@@ -410,97 +450,61 @@ public class HTKLineConfigManager {
             }
     	}
 
-    	Map targetList = (Map)optionList.get("targetList");
-    	if (targetList != null) {
-    		this.maList = HTKLineTargetItem.packModelArray((List) targetList.get("maList"));
-	        this.maVolumeList = HTKLineTargetItem.packModelArray((List) targetList.get("maVolumeList"));
-	        this.rsiList = HTKLineTargetItem.packModelArray((List) targetList.get("rsiList"));
-	        this.wrList = HTKLineTargetItem.packModelArray((List) targetList.get("wrList"));
-	        this.bollN = (String) targetList.get("bollN");
-	        this.bollP = (String) targetList.get("bollP");
-	        this.macdL = (String) targetList.get("macdL");
-	        this.macdM = (String) targetList.get("macdM");
-	        this.macdS = (String) targetList.get("macdS");
-	        this.kdjN = (String) targetList.get("kdjN");
-	        this.kdjM1 = (String) targetList.get("kdjM1");
-	        this.kdjM2 = (String) targetList.get("kdjM2");
+        Object targetListObj = optionList.get("targetList");
+    	if (targetListObj instanceof Map) {
+            Map targetList = (Map) targetListObj;
+    		this.maList = HTKLineTargetItem.packModelArray(readList(targetList, "maList", new ArrayList()));
+	        this.maVolumeList = HTKLineTargetItem.packModelArray(readList(targetList, "maVolumeList", new ArrayList()));
+	        this.rsiList = HTKLineTargetItem.packModelArray(readList(targetList, "rsiList", new ArrayList()));
+	        this.wrList = HTKLineTargetItem.packModelArray(readList(targetList, "wrList", new ArrayList()));
+            this.bollN = readString(targetList, "bollN", this.bollN);
+            this.bollP = readString(targetList, "bollP", this.bollP);
+            this.macdL = readString(targetList, "macdL", this.macdL);
+            this.macdM = readString(targetList, "macdM", this.macdM);
+            this.macdS = readString(targetList, "macdS", this.macdS);
+            this.kdjN = readString(targetList, "kdjN", this.kdjN);
+            this.kdjM1 = readString(targetList, "kdjM1", this.kdjM1);
+            this.kdjM2 = readString(targetList, "kdjM2", this.kdjM2);
     	}
 
-    	Map drawList = (Map)optionList.get("drawList");
-    	if (drawList != null) {
-    	    Number shotBackgroundColorValue = (Number)drawList.get("shotBackgroundColor");
-    	    if (shotBackgroundColorValue != null) {
-    	        this.shotBackgroundColor = shotBackgroundColorValue.intValue();
+        Object drawListObj = optionList.get("drawList");
+    	if (drawListObj instanceof Map) {
+            Map drawList = (Map) drawListObj;
+            this.shotBackgroundColor = readColor(drawList, "shotBackgroundColor", this.shotBackgroundColor);
+            Object drawTypeValue = drawList.get("drawType");
+            if (drawTypeValue instanceof Number) {
+                this.drawType = HTDrawType.drawTypeFromRawValue(((Number) drawTypeValue).intValue());
             }
-    	    Number drawTypeValue = (Number)drawList.get("drawType");
-    	    if (drawTypeValue != null) {
-    	        this.drawType = HTDrawType.drawTypeFromRawValue(drawTypeValue.intValue());
-            }
-    	    Boolean drawShouldContinue = (Boolean) drawList.get("drawShouldContinue");
-    	    if (drawShouldContinue != null) {
-    	        this.drawShouldContinue = drawShouldContinue;
-            }
-            Boolean shouldFixDraw = (Boolean) drawList.get("shouldFixDraw");
-            if (shouldFixDraw != null) {
-                this.shouldFixDraw = shouldFixDraw;
-            }
-            Boolean shouldClearDraw = (Boolean) drawList.get("shouldClearDraw");
-            if (shouldClearDraw != null) {
-                this.shouldClearDraw = shouldClearDraw;
-            }
-            Number drawColorValue = (Number)drawList.get("drawColor");
-            if (drawColorValue != null) {
-                this.drawColor = drawColorValue.intValue();
-            }
-            Number drawLineHeightValue = (Number)drawList.get("drawLineHeight");
-            if (drawLineHeightValue != null) {
-                this.drawLineHeight = drawLineHeightValue.floatValue();
-            }
-            Number drawDashWidthValue = (Number)drawList.get("drawDashWidth");
-            if (drawDashWidthValue != null) {
-                this.drawDashWidth = drawDashWidthValue.floatValue();
-            }
-            Number drawDashSpaceValue = (Number)drawList.get("drawDashSpace");
-            if (drawDashSpaceValue != null) {
-                this.drawDashSpace = drawDashSpaceValue.floatValue();
-            }
-            Number shouldReloadDrawItemIndexValue = (Number)drawList.get("shouldReloadDrawItemIndex");
-            if (shouldReloadDrawItemIndexValue != null) {
-                this.shouldReloadDrawItemIndex = shouldReloadDrawItemIndexValue.intValue();
-            }
-            Boolean drawIsLock = (Boolean) drawList.get("drawIsLock");
-            if (drawIsLock != null) {
-                this.drawIsLock = drawIsLock;
-            }
-            Boolean drawShouldTrash = (Boolean) drawList.get("drawShouldTrash");
-            if (drawShouldTrash != null) {
-                this.drawShouldTrash = drawShouldTrash;
-            }
+            this.drawShouldContinue = readBoolean(drawList, "drawShouldContinue", this.drawShouldContinue);
+            this.shouldFixDraw = readBoolean(drawList, "shouldFixDraw", this.shouldFixDraw);
+            this.shouldClearDraw = readBoolean(drawList, "shouldClearDraw", this.shouldClearDraw);
+            this.drawColor = readColor(drawList, "drawColor", this.drawColor);
+            this.drawLineHeight = readFloat(drawList, "drawLineHeight", this.drawLineHeight);
+            this.drawDashWidth = readFloat(drawList, "drawDashWidth", this.drawDashWidth);
+            this.drawDashSpace = readFloat(drawList, "drawDashSpace", this.drawDashSpace);
+            this.shouldReloadDrawItemIndex = readInt(drawList, "shouldReloadDrawItemIndex", this.shouldReloadDrawItemIndex);
+            this.drawIsLock = readBoolean(drawList, "drawIsLock", this.drawIsLock);
+            this.drawShouldTrash = readBoolean(drawList, "drawShouldTrash", this.drawShouldTrash);
         }
 
-        Boolean shouldScrollToEnd = (Boolean)optionList.get("shouldScrollToEnd");
-        if (shouldScrollToEnd != null) {
-            this.shouldScrollToEnd = shouldScrollToEnd;
-        }
-        Number loadMoreThreshold = (Number) optionList.get("loadMoreThreshold");
-        if (loadMoreThreshold != null) {
-            this.loadMoreThreshold = Math.max(0f, loadMoreThreshold.floatValue());
-        }
+        this.shouldScrollToEnd = readBoolean(optionList, "shouldScrollToEnd", this.shouldScrollToEnd);
+        this.loadMoreThreshold = Math.max(0f, readFloat(optionList, "loadMoreThreshold", this.loadMoreThreshold));
 
         if (shouldReloadDrawItemIndex >= HTDrawState.showPencil) {
             this.shouldScrollToEnd = false;
         }
 
 
-    	Map configList = (Map)optionList.get("configList");
-    	if (configList == null) {
+        Object configListObj = optionList.get("configList");
+        if (!(configListObj instanceof Map)) {
     		return;
     	}
-    	Integer primary = ((Number)this.getOrDefault(optionList, "primary", -1.0)).intValue();
-        Integer second = ((Number)this.getOrDefault(optionList, "second", -1.0)).intValue();
-        Integer time = ((Number)this.getOrDefault(optionList, "time", -1.0)).intValue();
-        Integer priceRightLength = ((Number)this.getOrDefault(optionList, "price", -1.0)).intValue();
-        Integer volumeRightLength = ((Number)this.getOrDefault(optionList, "volume", -1.0)).intValue();
+        Map configList = (Map) configListObj;
+    	Integer primary = readInt(optionList, "primary", -1);
+        Integer second = readInt(optionList, "second", -1);
+        Integer time = readInt(optionList, "time", -1);
+        Integer priceRightLength = readInt(optionList, "price", -1);
+        Integer volumeRightLength = readInt(optionList, "volume", -1);
 
         PrimaryStatus primaryStatus = PrimaryStatus.NONE;
         SecondStatus secondStatus = SecondStatus.NONE;
@@ -622,48 +626,56 @@ public class HTKLineConfigManager {
 
 
 
-    	Map colorList = (Map)configList.get("colorList");
-        this.increaseColor = ((Number) colorList.get("increaseColor")).intValue();
-        this.decreaseColor = ((Number) colorList.get("decreaseColor")).intValue();
+        Object colorListObj = configList.get("colorList");
+        if (colorListObj instanceof Map) {
+            Map colorList = (Map) colorListObj;
+            this.increaseColor = readColor(colorList, "increaseColor", this.increaseColor);
+            this.decreaseColor = readColor(colorList, "decreaseColor", this.decreaseColor);
+        }
 
-        this.mainFlex = ((Number)configList.get("mainFlex")).floatValue();
-        this.volumeFlex = ((Number)configList.get("volumeFlex")).floatValue();
+        this.mainFlex = readFloat(configList, "mainFlex", this.mainFlex);
+        this.volumeFlex = readFloat(configList, "volumeFlex", this.volumeFlex);
 
-        
-        this.minuteLineColor = ((Number) configList.get("minuteLineColor")).intValue();
-        this.paddingRight = ((Number)configList.get("paddingRight")).floatValue();
-        this.paddingTop = ((Number)configList.get("paddingTop")).floatValue();
-        this.paddingBottom = ((Number)configList.get("paddingBottom")).floatValue();
-        this.itemWidth = ((Number)configList.get("itemWidth")).floatValue();
-        this.candleWidth = ((Number)configList.get("candleWidth")).floatValue();
+        this.minuteLineColor = readColor(configList, "minuteLineColor", this.minuteLineColor);
+        this.paddingRight = readFloat(configList, "paddingRight", this.paddingRight);
+        this.paddingTop = readFloat(configList, "paddingTop", this.paddingTop);
+        this.paddingBottom = readFloat(configList, "paddingBottom", this.paddingBottom);
+        this.itemWidth = readFloat(configList, "itemWidth", this.itemWidth);
+        this.candleWidth = readFloat(configList, "candleWidth", this.candleWidth);
         this.initialScale = readFloat(configList, "initialScale", 1f);
         if (Float.isNaN(this.initialScale) || Float.isInfinite(this.initialScale) || this.initialScale <= 0f) {
             this.initialScale = 1f;
         }
 
-        this.fontFamily = (configList.get("fontFamily")).toString();
-        this.textColor = ((Number) configList.get("textColor")).intValue();
+        this.fontFamily = readString(configList, "fontFamily", this.fontFamily);
+        this.textColor = readColor(configList, "textColor", this.textColor);
         if (configList.containsKey("gridColor")) {
-            this.gridColor = ((Number) configList.get("gridColor")).intValue();
+            this.gridColor = readColor(configList, "gridColor", this.gridColor);
         }
-        this.headerTextFontSize = ((Number)configList.get("headerTextFontSize")).floatValue();
-        this.rightTextFontSize = ((Number)configList.get("rightTextFontSize")).floatValue();
-        this.candleTextFontSize = ((Number)configList.get("candleTextFontSize")).floatValue();
-        this.candleTextColor = ((Number) configList.get("candleTextColor")).intValue();
-        this.closePriceCenterSeparatorColor = ((Number) configList.get("closePriceCenterSeparatorColor")).intValue();
-        this.closePriceCenterBorderColor = ((Number) configList.get("closePriceCenterBorderColor")).intValue();
-        this.closePriceCenterBackgroundColor = ((Number) configList.get("closePriceCenterBackgroundColor")).intValue();
-        this.closePriceCenterTriangleColor = ((Number) configList.get("closePriceCenterTriangleColor")).intValue();
-        this.closePriceRightSeparatorColor = ((Number) configList.get("closePriceRightSeparatorColor")).intValue();
-        this.closePriceRightBackgroundColor = ((Number) configList.get("closePriceRightBackgroundColor")).intValue();
-        this.closePriceRightLightLottieSource = (String) configList.get("closePriceRightLightLottieSource");
-        this.closePriceRightLightLottieFloder = (String) configList.get("closePriceRightLightLottieFloder");
-        this.closePriceRightLightLottieScale = ((Number)configList.get("closePriceRightLightLottieScale")).floatValue();
+        this.headerTextFontSize = readFloat(configList, "headerTextFontSize", this.headerTextFontSize);
+        this.rightTextFontSize = readFloat(configList, "rightTextFontSize", this.rightTextFontSize);
+        this.candleTextFontSize = readFloat(configList, "candleTextFontSize", this.candleTextFontSize);
+        this.candleTextColor = readColor(configList, "candleTextColor", this.candleTextColor);
+        this.closePriceCenterSeparatorColor = readColor(configList, "closePriceCenterSeparatorColor", this.closePriceCenterSeparatorColor);
+        this.closePriceCenterBorderColor = readColor(configList, "closePriceCenterBorderColor", this.closePriceCenterBorderColor);
+        this.closePriceCenterBackgroundColor = readColor(configList, "closePriceCenterBackgroundColor", this.closePriceCenterBackgroundColor);
+        this.closePriceCenterTriangleColor = readColor(configList, "closePriceCenterTriangleColor", this.closePriceCenterTriangleColor);
+        this.closePriceRightSeparatorColor = readColor(configList, "closePriceRightSeparatorColor", this.closePriceRightSeparatorColor);
+        this.closePriceRightBackgroundColor = readColor(configList, "closePriceRightBackgroundColor", this.closePriceRightBackgroundColor);
+        this.closePriceRightLightLottieSource = readString(configList, "closePriceRightLightLottieSource", this.closePriceRightLightLottieSource);
+        this.closePriceRightLightLottieFloder = readString(configList, "closePriceRightLightLottieFloder", this.closePriceRightLightLottieFloder);
+        this.closePriceRightLightLottieScale = readFloat(configList, "closePriceRightLightLottieScale", this.closePriceRightLightLottieScale);
 
-        this.panelGradientColorList = parseColorList(configList.get("panelGradientColorList"));
-        this.panelGradientLocationList = parseLocationList(configList.get("panelGradientLocationList"));
-        this.panelBackgroundColor = ((Number) configList.get("panelBackgroundColor")).intValue();
-        this.panelBorderColor = ((Number) configList.get("panelBorderColor")).intValue();
+        int[] panelGradientColorList = parseColorList(configList.get("panelGradientColorList"));
+        if (panelGradientColorList.length > 0) {
+            this.panelGradientColorList = panelGradientColorList;
+        }
+        float[] panelGradientLocationList = parseLocationList(configList.get("panelGradientLocationList"));
+        if (panelGradientLocationList.length > 0) {
+            this.panelGradientLocationList = panelGradientLocationList;
+        }
+        this.panelBackgroundColor = readColor(configList, "panelBackgroundColor", this.panelBackgroundColor);
+        this.panelBorderColor = readColor(configList, "panelBorderColor", this.panelBorderColor);
         this.selectedPointContainerColor = readColor(configList, "selectedPointContainerColor", Color.BLACK);
         this.selectedPointContentColor = readColor(configList, "selectedPointContentColor", Color.BLACK);
         this.cursorStyleEnabled = readBoolean(configList, "cursorStyleEnabled", true);
@@ -676,25 +688,31 @@ public class HTKLineConfigManager {
         this.cursorOuterColor = readColor(configList, "cursorOuterColor", this.selectedPointContainerColor);
         this.cursorBorderColor = readColor(configList, "cursorBorderColor", this.cursorOuterColor);
         this.cursorInnerBorderColor = readColor(configList, "cursorInnerBorderColor", Color.WHITE);
-        this.panelMinWidth = ((Number)configList.get("panelMinWidth")).floatValue();
-        this.panelTextFontSize = ((Number)configList.get("panelTextFontSize")).floatValue();
+        this.panelMinWidth = readFloat(configList, "panelMinWidth", this.panelMinWidth);
+        this.panelTextFontSize = readFloat(configList, "panelTextFontSize", this.panelTextFontSize);
 
 
 
-        this.minuteVolumeCandleColor = ((Number) configList.get("minuteVolumeCandleColor")).intValue();
-        this.minuteVolumeCandleWidth = ((Number)configList.get("minuteVolumeCandleWidth")).floatValue();
-        this.macdCandleWidth = ((Number)configList.get("macdCandleWidth")).floatValue();
+        this.minuteVolumeCandleColor = readColor(configList, "minuteVolumeCandleColor", this.minuteVolumeCandleColor);
+        this.minuteVolumeCandleWidth = readFloat(configList, "minuteVolumeCandleWidth", this.minuteVolumeCandleWidth);
+        this.macdCandleWidth = readFloat(configList, "macdCandleWidth", this.macdCandleWidth);
 
 
-        this.targetColorList = parseColorList(configList.get("targetColorList"));
-        this.minuteGradientColorList = parseColorList(configList.get("minuteGradientColorList"));
-        this.minuteGradientLocationList = parseLocationList(configList.get("minuteGradientLocationList"));
+        int[] targetColorList = parseColorList(configList.get("targetColorList"));
+        if (targetColorList.length > 0) {
+            this.targetColorList = targetColorList;
+        }
+        int[] minuteGradientColorList = parseColorList(configList.get("minuteGradientColorList"));
+        if (minuteGradientColorList.length > 0) {
+            this.minuteGradientColorList = minuteGradientColorList;
+        }
+        float[] minuteGradientLocationList = parseLocationList(configList.get("minuteGradientLocationList"));
+        if (minuteGradientLocationList.length > 0) {
+            this.minuteGradientLocationList = minuteGradientLocationList;
+        }
 
         // Prediction / Live Analyst
-        Number rightOffsetCandlesVal = (Number) configList.get("rightOffsetCandles");
-        if (rightOffsetCandlesVal != null) {
-            this.rightOffsetCandles = rightOffsetCandlesVal.intValue();
-        }
+        this.rightOffsetCandles = readInt(configList, "rightOffsetCandles", this.rightOffsetCandles);
 
         if (optionList.get("predictionList") instanceof List) {
             this.predictionList = (List<Map<String, Object>>) optionList.get("predictionList");

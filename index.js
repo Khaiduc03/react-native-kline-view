@@ -406,6 +406,143 @@ function normalizeConfigColors(configList) {
   return next;
 }
 
+function compactObject(value) {
+  if (!isObject(value)) return {};
+  const next = {};
+  Object.keys(value).forEach((key) => {
+    const field = value[key];
+    if (field !== undefined && field !== null) {
+      next[key] = field;
+    }
+  });
+  return next;
+}
+
+function ensureFiniteNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sanitizeColorArray(value, fallback) {
+  const source = Array.isArray(value)
+    ? value
+    : Array.isArray(fallback)
+    ? fallback
+    : [];
+  const fallbackArray = Array.isArray(fallback) ? fallback : [];
+  const next = source
+    .map((item, index) => toResolvedColor(item, fallbackArray[index] ?? 0))
+    .filter((item) => Number.isFinite(item));
+  if (next.length > 0) return next;
+  return fallbackArray.length > 0 ? [...fallbackArray] : [];
+}
+
+function sanitizeLocationArray(value, expectedLength, fallback) {
+  const fallbackArray = Array.isArray(fallback) ? fallback : [];
+  const source = Array.isArray(value) ? value : fallbackArray;
+  const size = Math.max(0, expectedLength || source.length || fallbackArray.length);
+  if (size <= 0) return [];
+  const values = source
+    .slice(0, size)
+    .map((item, index) => ensureFiniteNumber(item, index / Math.max(size - 1, 1)));
+  if (values.length === size) return values;
+  return Array.from({ length: size }, (_, index) =>
+    size === 1 ? 1 : index / (size - 1)
+  );
+}
+
+function sanitizeTargetList(targetList) {
+  const source = compactObject(targetList);
+  return {
+    ...DEFAULT_TARGET_LIST,
+    ...source,
+    maList: Array.isArray(source.maList) ? source.maList : DEFAULT_TARGET_LIST.maList,
+    maVolumeList: Array.isArray(source.maVolumeList)
+      ? source.maVolumeList
+      : DEFAULT_TARGET_LIST.maVolumeList,
+    rsiList: Array.isArray(source.rsiList)
+      ? source.rsiList
+      : DEFAULT_TARGET_LIST.rsiList,
+    wrList: Array.isArray(source.wrList) ? source.wrList : DEFAULT_TARGET_LIST.wrList,
+  };
+}
+
+function sanitizeDrawList(drawList) {
+  return compactObject(deepMerge(DEFAULT_DRAW_LIST, compactObject(drawList)));
+}
+
+function sanitizeConfigList(configList) {
+  const merged = normalizeConfigColors(
+    deepMerge(DEFAULT_CONFIG_LIST, compactObject(configList))
+  );
+  const next = compactObject(merged);
+  next.colorList = {
+    increaseColor: toResolvedColor(
+      merged?.colorList?.increaseColor,
+      DEFAULT_CONFIG_LIST.colorList.increaseColor
+    ),
+    decreaseColor: toResolvedColor(
+      merged?.colorList?.decreaseColor,
+      DEFAULT_CONFIG_LIST.colorList.decreaseColor
+    ),
+  };
+  next.targetColorList = sanitizeColorArray(
+    merged?.targetColorList,
+    DEFAULT_CONFIG_LIST.targetColorList
+  );
+  next.minuteGradientColorList = sanitizeColorArray(
+    merged?.minuteGradientColorList,
+    DEFAULT_CONFIG_LIST.minuteGradientColorList
+  );
+  next.panelGradientColorList = sanitizeColorArray(
+    merged?.panelGradientColorList,
+    DEFAULT_CONFIG_LIST.panelGradientColorList
+  );
+  next.minuteGradientLocationList = sanitizeLocationArray(
+    merged?.minuteGradientLocationList,
+    next.minuteGradientColorList.length,
+    DEFAULT_CONFIG_LIST.minuteGradientLocationList
+  );
+  next.panelGradientLocationList = sanitizeLocationArray(
+    merged?.panelGradientLocationList,
+    next.panelGradientColorList.length,
+    DEFAULT_CONFIG_LIST.panelGradientLocationList
+  );
+  return next;
+}
+
+function sanitizeOptionListForBridge(optionList) {
+  const source = compactObject(optionList);
+  const next = {
+    ...source,
+    configList: sanitizeConfigList(source.configList),
+    targetList: sanitizeTargetList(source.targetList),
+    drawList: sanitizeDrawList(source.drawList),
+  };
+  if (!Array.isArray(next.modelArray)) {
+    next.modelArray = [];
+  }
+  if (!Array.isArray(next.predictionList) && next.predictionList !== undefined) {
+    next.predictionList = [];
+  }
+  if (
+    !Array.isArray(next.predictionEntryZones) &&
+    next.predictionEntryZones !== undefined
+  ) {
+    next.predictionEntryZones = [];
+  }
+  ["predictionStartTime", "predictionEntry", "predictionStopLoss"].forEach((key) => {
+    if (next[key] === undefined || next[key] === null) return;
+    const normalized = ensureFiniteNumber(next[key], Number.NaN);
+    if (Number.isNaN(normalized)) {
+      delete next[key];
+      return;
+    }
+    next[key] = normalized;
+  });
+  return next;
+}
+
 function toPeriod(value, fallback) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -1374,20 +1511,25 @@ function composeOptionList({
     delete themeConfigSafe.indicatorColors;
   }
 
+  const presetConfigLayer =
+    preset === "binance"
+      ? deepMerge(themeConfigSafe ?? {}, presetConfig.configList ?? {})
+      : deepMerge(presetConfig.configList ?? {}, themeConfigSafe ?? {});
   const baseConfigList = deepMerge(
     DEFAULT_CONFIG_LIST,
     deepMerge(
-      deepMerge(
-        deepMerge(presetConfig.configList ?? {}, themeConfigSafe ?? {}),
-        layout ?? {}
-      ),
+      deepMerge(presetConfigLayer, layout ?? {}),
       interaction?.configList ?? {}
     )
   );
+  const resolvedIndicatorColors =
+    preset === "binance"
+      ? deepMerge(themeIndicatorColors, presetIndicatorColors)
+      : deepMerge(presetIndicatorColors, themeIndicatorColors);
   const configList = applyMainLineColors(
     normalizeConfigColors(baseConfigList),
     targetList,
-    deepMerge(presetIndicatorColors, themeIndicatorColors),
+    resolvedIndicatorColors,
     { showMainBOLL }
   );
   if (!resolvedShowVolume) {
@@ -1439,7 +1581,7 @@ function composeOptionList({
     predictionMinCandles: prediction?.predictionMinCandles,
   };
 
-  return deepMerge(baseOptionList, advanced ?? {});
+  return sanitizeOptionListForBridge(deepMerge(baseOptionList, advanced ?? {}));
 }
 
 function mapSubTypeToSecond(type) {

@@ -378,10 +378,17 @@ public void receiveCommand(@Nonnull final HTKLineContainerView root, int command
                         }
                     });
                 } catch (Exception e) {
+                    final String detail = e.getClass().getSimpleName() + ": " +
+                            (e.getMessage() != null ? e.getMessage() : "unknown");
+                    Log.e(TAG, "setConfig failed: " + detail, e);
                     containerView.post(new Runnable() {
                         @Override
                         public void run() {
-                            containerView.emitError("E_INVALID_CONFIG", "Failed to apply chart config", false);
+                            containerView.emitError(
+                                    "E_INVALID_CONFIG",
+                                    "Failed to apply chart config (" + detail + ")",
+                                    false
+                            );
                         }
                     });
                 }
