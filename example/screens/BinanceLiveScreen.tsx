@@ -478,7 +478,13 @@ export default function BinanceLiveScreen() {
           volume={{ enabled: true, maPeriods: [5, 10] }}
           theme={themeConfig}
           draw={drawConfig}
-          interaction={{ autoFollow: false, loadMoreThreshold: 48 }}
+          interaction={{
+            autoFollow: false,
+            loadMoreThreshold: 48,
+            configList: {
+              initialScale: 0.82,
+            },
+          }}
           onLoadMore={handleLoadMore}
           onDrawItemDidTouch={onDrawItemDidTouch}
         />

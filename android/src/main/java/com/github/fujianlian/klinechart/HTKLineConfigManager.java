@@ -129,6 +129,8 @@ public class HTKLineConfigManager {
 
     public float macdCandleWidth = 0.6f;
 
+    public float initialScale = 1f;
+
     public float mainFlex = 0.716f;
 
     public float volumeFlex = 0.122f;
@@ -634,6 +636,10 @@ public class HTKLineConfigManager {
         this.paddingBottom = ((Number)configList.get("paddingBottom")).floatValue();
         this.itemWidth = ((Number)configList.get("itemWidth")).floatValue();
         this.candleWidth = ((Number)configList.get("candleWidth")).floatValue();
+        this.initialScale = readFloat(configList, "initialScale", 1f);
+        if (Float.isNaN(this.initialScale) || Float.isInfinite(this.initialScale) || this.initialScale <= 0f) {
+            this.initialScale = 1f;
+        }
 
         this.fontFamily = (configList.get("fontFamily")).toString();
         this.textColor = ((Number) configList.get("textColor")).intValue();

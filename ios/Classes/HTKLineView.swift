@@ -23,6 +23,7 @@ class HTKLineView: UIScrollView {
     // Lưu vị trí chạm cuối cùng (theo view) để Y của crosshair tự do
     var selectedLocation: CGPoint?
     var scale: CGFloat = 1
+    private var appliedInitialScale: CGFloat?
 
     let mainDraw = HTMainDraw.init()
     let volumeDraw = HTVolumeDraw.init()
@@ -235,6 +236,22 @@ class HTKLineView: UIScrollView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private func clampScale(_ value: CGFloat) -> CGFloat {
+        if !value.isFinite || value <= 0 {
+            return 1
+        }
+        return max(0.3, min(value, 3))
+    }
+
+    private func applyInitialScaleIfNeeded(_ requested: CGFloat) {
+        let clamped = clampScale(requested)
+        if let applied = appliedInitialScale, abs(applied - clamped) <= 0.0001 {
+            return
+        }
+        scale = clamped
+        appliedInitialScale = clamped
+    }
+
     func reloadConfigManager(_ configManager: HTKLineConfigManager) {
 
         switch configManager.childType {
@@ -250,6 +267,7 @@ class HTKLineView: UIScrollView {
             childDraw = wrDraw
         }
 
+        applyInitialScaleIfNeeded(configManager.initialScale)
         let isEnd = contentOffset.x + 1 + bounds.size.width >= contentSize.width
         reloadContentSize()
 

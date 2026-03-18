@@ -28,6 +28,8 @@ public class HTKLineContainerView extends RelativeLayout {
 
     public HTShotView shotView;
 
+    private Float appliedInitialScale = null;
+
     public HTKLineContainerView(ThemedReactContext context) {
         super(context);
         this.reactContext = context;
@@ -81,6 +83,22 @@ public class HTKLineContainerView extends RelativeLayout {
             return (ViewGroup) getParent();
         }
         return this;
+    }
+
+    private float clampInitialScale(float scale) {
+        if (Float.isNaN(scale) || Float.isInfinite(scale) || scale <= 0f) {
+            return 1f;
+        }
+        return Math.max(klineView.getScaleXMin(), Math.min(scale, klineView.getScaleXMax()));
+    }
+
+    private void applyInitialScaleIfNeeded() {
+        float requested = clampInitialScale(configManager.initialScale);
+        if (appliedInitialScale != null && Math.abs(appliedInitialScale - requested) <= 0.0001f) {
+            return;
+        }
+        klineView.applyScaleX(requested);
+        appliedInitialScale = requested;
     }
 
     public void reloadConfigManager() {
@@ -143,6 +161,7 @@ public class HTKLineContainerView extends RelativeLayout {
         // Do not force scroll to end after append/update unless explicitly requested
         klineView.configManager.shouldScrollToEnd = false;
         klineView.notifyChanged();
+        applyInitialScaleIfNeeded();
         if (isEnd || klineView.configManager.shouldScrollToEnd) {
             klineView.setScrollX(klineView.getMaxScrollX());
         }

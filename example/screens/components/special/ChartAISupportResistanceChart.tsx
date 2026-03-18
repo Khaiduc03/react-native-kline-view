@@ -4,6 +4,7 @@ import RNKLineView, { type Candle } from 'react-native-kline-view';
 import type { ChartAIData } from '../../Data/ChartAIDataType';
 import ChartAICard from './ChartAICard';
 import {
+  buildChartAIInteraction,
   mapSnapshotToCandles,
   resolveChartWidths,
   toFiniteOptionalNumber,
@@ -208,7 +209,7 @@ export function ChartAISupportResistanceChart({
         }}
         subCharts={[]}
         volume={{ enabled: false, maPeriods: [5, 10] }}
-        interaction={{ autoFollow: false, loadMoreThreshold: 48 }}
+        interaction={buildChartAIInteraction()}
         format={{ price: 2, volume: 2, time: 1 }}
         theme={{
           candle: {

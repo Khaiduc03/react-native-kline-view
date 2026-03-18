@@ -13,6 +13,7 @@ import type {
 import type { ChartAIData } from '../../Data/ChartAIDataType';
 import ChartAICard from './ChartAICard';
 import {
+  buildChartAIInteraction,
   buildSinglePeriodIndicator,
   mapSnapshotToCandles,
   pickSeries,
@@ -104,7 +105,7 @@ export function ChartAIADXChart({ data, title }: ChartAIADXChartProps) {
     },
   };
   const volume: VolumeConfig = { enabled: false, maPeriods: [5, 10] };
-  const interaction: InteractionConfig = { autoFollow: false, loadMoreThreshold: 48 };
+  const interaction: InteractionConfig = buildChartAIInteraction();
   const format: FormatConfig = { price: 2, volume: 2, time: 1 };
   const theme: ChartThemeConfig = {
     candle: {

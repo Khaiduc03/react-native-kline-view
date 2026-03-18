@@ -4,6 +4,7 @@ import RNKLineView, { type IndicatorItem } from 'react-native-kline-view';
 import type { ChartAIData } from '../../Data/ChartAIDataType';
 import ChartAICard from './ChartAICard';
 import {
+  buildChartAIInteraction,
   mapSnapshotToCandles,
   pickSeries,
   pickSeriesValueAligned,
@@ -92,7 +93,7 @@ export function ChartAITrendChart({ data, title }: ChartAITrendChartProps) {
         }}
         subCharts={[]}
         volume={{ enabled: false, maPeriods: [5, 10] }}
-        interaction={{ autoFollow: false, loadMoreThreshold: 48 }}
+        interaction={buildChartAIInteraction()}
         format={{ price: 2, volume: 2, time: 1 }}
         theme={{
           candle: {

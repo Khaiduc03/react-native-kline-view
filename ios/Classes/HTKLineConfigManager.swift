@@ -166,6 +166,8 @@ class HTKLineConfigManager: NSObject {
 
     var _macdCandleWidth: CGFloat = 0
 
+    var initialScale: CGFloat = 1
+
     func reloadScrollViewScale(_ scale: CGFloat) {
         itemWidth = _itemWidth * scale
         candleWidth = _candleWidth * scale
@@ -682,6 +684,16 @@ class HTKLineConfigManager: NSObject {
         _candleWidth = configList["candleWidth"] as? CGFloat ?? 0
         _minuteVolumeCandleWidth = configList["minuteVolumeCandleWidth"] as? CGFloat ?? 0
         _macdCandleWidth = configList["macdCandleWidth"] as? CGFloat ?? 0
+        if let number = configList["initialScale"] as? NSNumber {
+            initialScale = CGFloat(number.doubleValue)
+        } else if let value = configList["initialScale"] as? CGFloat {
+            initialScale = value
+        } else {
+            initialScale = 1
+        }
+        if !initialScale.isFinite || initialScale <= 0 {
+            initialScale = 1
+        }
         reloadScrollViewScale(1)
         paddingTop = configList["paddingTop"] as? CGFloat ?? 0
         paddingRight = configList["paddingRight"] as? CGFloat ?? 0

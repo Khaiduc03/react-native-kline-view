@@ -1,4 +1,9 @@
-import type { Candle, IndicatorItem, SelectedItem } from 'react-native-kline-view';
+import type {
+  Candle,
+  IndicatorItem,
+  InteractionConfig,
+  SelectedItem,
+} from 'react-native-kline-view';
 import type { ChartAIData, MarketData } from '../../Data/ChartAIDataType';
 
 type NumericSeries = Array<number | string | null | undefined>;
@@ -203,3 +208,15 @@ export const resolveChartWidths = ({
   const candleWidth = Math.max(minCandleWidth, itemWidth * candleRatio);
   return { itemWidth, candleWidth };
 };
+
+export const CHART_AI_INITIAL_SCALE = 0.72;
+
+export const buildChartAIInteraction = (
+  loadMoreThreshold = 48,
+): InteractionConfig => ({
+  autoFollow: false,
+  loadMoreThreshold,
+  configList: {
+    initialScale: CHART_AI_INITIAL_SCALE,
+  },
+});

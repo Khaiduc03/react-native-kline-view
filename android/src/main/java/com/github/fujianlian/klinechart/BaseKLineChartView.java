@@ -207,6 +207,16 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
             }
         });
 
+        applyPaintQuality(mGridPaint, false);
+        applyPaintQuality(mTextPaint, true);
+        applyPaintQuality(mMaxMinPaint, true);
+        applyPaintQuality(mSelectedXLinePaint, false);
+        applyPaintQuality(mSelectedYLinePaint, false);
+        applyPaintQuality(mClosePriceLinePaint, false);
+        applyPaintQuality(mClosePriceRightTextPaint, true);
+        applyPaintQuality(mPredictionLinePaint, false);
+        mGridPaint.setStrokeWidth(hairlineWidth());
+
         mSelectorFramePaint.setStrokeWidth(ViewUtil.Dp2Px(getContext(), 0.6f));
         mSelectorFramePaint.setStyle(Paint.Style.STROKE);
         mSelectorFramePaint.setColor(Color.WHITE);
@@ -237,6 +247,22 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
         mSelectCenterInnerBorderPaint.setStyle(Paint.Style.STROKE);
         mSelectCenterInnerBorderPaint.setAntiAlias(true);
 
+    }
+
+    private void applyPaintQuality(Paint paint, boolean textPaint) {
+        if (paint == null) return;
+        paint.setDither(true);
+        if (textPaint) {
+            paint.setSubpixelText(true);
+        }
+    }
+
+    private float hairlineWidth() {
+        return 1f;
+    }
+
+    private float alignToPixel(float value) {
+        return (float) Math.floor(value) + 0.5f;
     }
 
     @Override
@@ -507,16 +533,19 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
                 float value = minPrice + step * i;
                 priceGridLevels.add(value);
                 float y = childOnly ? getChildY(value) : yFromValue(value);
+                y = alignToPixel(y);
                 canvas.drawLine(0, y, mWidth, y, mGridPaint);
             }
         }
 
         // Separators main/vol/child
         if (!childOnly && shouldShowVolumePane()) {
-            canvas.drawLine(0, mVolRect.bottom, mWidth, mVolRect.bottom, mGridPaint);
+            float separatorY = alignToPixel(mVolRect.bottom);
+            canvas.drawLine(0, separatorY, mWidth, separatorY, mGridPaint);
         }
         if (mChildDraw != null && mChildRect != null) {
-            canvas.drawLine(0, mChildRect.bottom, mWidth, mChildRect.bottom, mGridPaint);
+            float separatorY = alignToPixel(mChildRect.bottom);
+            canvas.drawLine(0, separatorY, mWidth, separatorY, mGridPaint);
         }
 
         // Vertical time grid
@@ -534,7 +563,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
 
         for (int i = firstIndex; i <= mStopIndex; i += step) {
             float centerScrollX = getItemMiddleScrollX(i);
-            float x = scrollXtoViewX(centerScrollX);
+            float x = alignToPixel(scrollXtoViewX(centerScrollX));
             canvas.drawLine(x, 0, x, mHeight, verticalPaint);  // Extend full height
         }
     }
@@ -2077,7 +2106,7 @@ public abstract class BaseKLineChartView extends ScrollAndScaleView implements D
      * 设置表格线宽度
      */
     public void setGridLineWidth(float width) {
-        mGridPaint.setStrokeWidth(width);
+        mGridPaint.setStrokeWidth(Math.max(hairlineWidth(), width));
     }
 
     /**

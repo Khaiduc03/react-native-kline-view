@@ -433,4 +433,18 @@ public abstract class ScrollAndScaleView extends RelativeLayout implements
     public float getScaleX() {
         return mScaleX;
     }
+
+    public void applyScaleX(float scaleX) {
+        float clamped = scaleX;
+        if (clamped < mScaleXMin) {
+            clamped = mScaleXMin;
+        } else if (clamped > mScaleXMax) {
+            clamped = mScaleXMax;
+        }
+        float oldScale = mScaleX;
+        mScaleX = clamped;
+        if (Math.abs(mScaleX - oldScale) > 0.0001f) {
+            onScaleChanged(mScaleX, oldScale);
+        }
+    }
 }
